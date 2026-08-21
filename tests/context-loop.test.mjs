@@ -40,7 +40,13 @@ describe("V0.1 core loop wiring", () => {
     assert.match(studio, /regionLive/);
     assert.match(studio, /selectedCharacterId/);
     assert.match(studio, /contextLocked/);
-    assert.match(studio, /setFrozenContext/);
+    assert.match(studio, /conversationFrames=\{conversationFrames\}/);
+    assert.match(studio, /onPreview=/);
+    assert.doesNotMatch(studio, /onPreview=\{onRestore\}/);
+    assert.match(studio, /setRevisionPreview/);
+    assert.match(studio, /CharacterBoard/);
+    assert.match(studio, /promoteKeys: true/);
+    assert.match(studio, /請先在畫布上拖出真實選區/);
     assert.match(tools, /thumbnailRef/);
     assert.match(tools, /Workspace session not found/);
   });

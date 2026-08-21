@@ -48,6 +48,7 @@ export function AdvancedInspector({
   onDelete,
   onUndo,
   onRedo,
+  onPreview,
   onRestore,
   onExport,
   onCreateCharacter,
@@ -96,6 +97,7 @@ export function AdvancedInspector({
   onDelete: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onPreview: (id: string, previewData?: string | null) => void;
   onRestore: (id: string) => void;
   onExport: () => void;
   onCreateCharacter: (name: string) => void;
@@ -195,7 +197,7 @@ export function AdvancedInspector({
         <Button size="sm" variant="secondary" disabled={busy} onClick={onRepair}>
           混合修復
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onRepairRegion}>
+        <Button size="sm" variant="ghost" disabled={busy || regionBox.w < 8 || regionBox.h < 8} onClick={onRepairRegion}>
           區域混合
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onDuplicate}>
@@ -263,7 +265,7 @@ export function AdvancedInspector({
           .map((t) => `${t.name}${t.score != null ? ` ${"●".repeat(Math.round((t.score ?? 0) * 4))}${"○".repeat(4 - Math.round((t.score ?? 0) * 4))}` : ""}`)
           .join(", ") || "none"}
       </p>
-      <VisualHistory rows={revisions} onPreview={onRestore} onRestore={onRestore} onUndo={onUndo} onRedo={onRedo} />
+      <VisualHistory rows={revisions} onPreview={onPreview} onRestore={onRestore} onUndo={onUndo} onRedo={onRedo} />
       <ul className="max-h-16 overflow-auto text-[10px] text-faint">
         {jobs.slice(0, 6).map((j) => (
           <li key={j.id}>

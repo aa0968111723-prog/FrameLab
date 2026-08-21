@@ -50,7 +50,7 @@ export type MotionPlanView = {
 export type InbetweenCandidateView = {
   candidateId: string;
   previousCandidateId?: string;
-  previousFrames?: { frameNumber: number; motion_progress: number; thumbnailData: string }[];
+  previousFrames?: { frameNumber: number; motion_progress: number; thumbnailData: string; imageData?: string }[];
   provider: string;
   count: number;
   quality: string;

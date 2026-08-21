@@ -61,6 +61,7 @@ export async function createKeyframePairCmd(ctx: CommandContext, args: Record<st
   const end = Number(args.endFrame ?? args.frameB);
   const a = await repo.getFrameByNumber(t.id, start);
   const b = await repo.getFrameByNumber(t.id, end);
+  const promote = args.promoteKeys === true;
   const pair = validateKeyframePair({
     timelineId: t.id,
     startFrame: start,
@@ -72,12 +73,17 @@ export async function createKeyframePairCmd(ctx: CommandContext, args: Record<st
     endHasAsset: Boolean(b?.image_data),
     startLockedInvalid: Boolean(a?.is_locked && a.frame_type !== "KEY"),
     endLockedInvalid: Boolean(b?.is_locked && b.frame_type !== "KEY"),
+    startIsKey: promote ? true : a?.frame_type === "KEY",
+    endIsKey: promote ? true : b?.frame_type === "KEY",
   });
-  if (a && a.frame_type !== "KEY" && a.frame_type !== "HOLD" && !a.is_locked) {
+  const promoted_to_key: number[] = [];
+  if (promote && a && a.frame_type !== "KEY" && !a.is_locked) {
     await repo.updateFrame(a.id, { frame_type: "KEY" });
+    promoted_to_key.push(start);
   }
-  if (b && b.frame_type !== "KEY" && b.frame_type !== "HOLD" && !b.is_locked) {
+  if (promote && b && b.frame_type !== "KEY" && !b.is_locked) {
     await repo.updateFrame(b.id, { frame_type: "KEY" });
+    promoted_to_key.push(end);
   }
   const id = await repo.insertKeyframePair({
     timelineId: t.id,
@@ -88,7 +94,7 @@ export async function createKeyframePairCmd(ctx: CommandContext, args: Record<st
     gap: pair.frame_gap,
     count: pair.desired_inbetween_count,
   });
-  return { id, ...pair, start_frame_id: a?.id, end_frame_id: b?.id };
+  return { id, ...pair, start_frame_id: a?.id, end_frame_id: b?.id, promoted_to_key };
 }
 
 export async function getKeyframePairCmd(ctx: CommandContext, args: Record<string, unknown>) {
@@ -161,7 +167,7 @@ export async function analyzeKeyframeTransition(ctx: CommandContext, args: Recor
     visual_similarity: (hist + mae) / 2,
     character_count: charCount,
     contact_count: detectContactBreaks(tracks.map((p) => ({ name: p.name, x: p.x, y: p.y, frame_number: p.frame_number }))).length,
-    camera_motion: motion[0]?.mean_motion ?? 0,
+    camera_motion: 0,
     occlusion: Boolean(chars.some((c) => c.occluded && (c.frame_number === start || c.frame_number === end))),
   };
   const analysis = scoreTransition(features);
@@ -848,6 +854,7 @@ export async function regenerateInbetweenRangeCmd(ctx: CommandContext, args: Rec
       frameNumber: f.frameNumber,
       motion_progress: f.motion_progress,
       thumbnailData: f.thumbnailData,
+      imageData: f.imageData,
     })),
     candidateId: newId,
     regenerated: generatedFrameNumbers(rs - 1, count),
@@ -860,6 +867,7 @@ export async function regenerateInbetweenRangeCmd(ctx: CommandContext, args: Rec
       motion_progress: f.motion_progress,
       contentHash: f.contentHash,
       thumbnailData: f.thumbnailData,
+      imageData: f.imageData,
     })),
     note: "New candidate created. Previous candidate kept. Re-evaluated.",
   };

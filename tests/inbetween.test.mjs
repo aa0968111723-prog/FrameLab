@@ -239,6 +239,14 @@ describe("provider routing", () => {
     assert.ok(!warnings.some((w) => w.constraint === "LOCK_KEYFRAME"));
     assert.match(warnings[0].message, /cannot be enforced/);
   });
+
+  it("does not copy pixel mean_motion as camera_motion", () => {
+    const src = readFileSync(new URL("../src/lib/commands/inbetween-tools.ts", import.meta.url), "utf8");
+    assert.match(src, /camera_motion: 0/);
+    assert.doesNotMatch(src, /camera_motion: motion\[0\]\?\.mean_motion/);
+    assert.match(src, /promoteKeys === true/);
+    assert.match(src, /imageData: f\.imageData/);
+  });
 });
 
 describe("interpolation provider", () => {

@@ -65,6 +65,8 @@ export function AnimationCanvas({
   compareMode = "flicker",
   holdCompare = false,
   candidatePreview,
+  compareSources,
+  revisionPreview,
   maskTrack,
   focusRegion,
   focusTick,
@@ -96,6 +98,12 @@ export function AnimationCanvas({
   compareMode?: CompareMode;
   holdCompare?: boolean;
   candidatePreview?: { frameNumber: number; data: string } | null;
+  compareSources?: {
+    original?: string | null;
+    candidate?: string | null;
+    previous?: string | null;
+  } | null;
+  revisionPreview?: { frameNumber: number; data: string } | null;
   maskTrack?: MaskProp[];
   focusRegion?: { x: number; y: number; w: number; h: number } | null;
   focusTick: number;
@@ -181,9 +189,11 @@ export function AnimationCanvas({
     const current = frames.find((f) => f.frameNumber === engine.currentFrame);
     if (!current) return;
     const src =
-      candidatePreview && candidatePreview.frameNumber === current.frameNumber
-        ? candidatePreview.data
-        : imageMap.get(current.id);
+      revisionPreview && revisionPreview.frameNumber === current.frameNumber
+        ? revisionPreview.data
+        : candidatePreview && candidatePreview.frameNumber === current.frameNumber
+          ? candidatePreview.data
+          : imageMap.get(current.id);
     if (!src) return;
 
     const vt = computeViewport({
@@ -243,19 +253,49 @@ export function AnimationCanvas({
 
     const onion = onionNeighbors(engine.currentFrame, engine.frameCount, engine.onionSkin);
     const showOnion = engine.onionSkin.enabled && (layers.has("onion") || overlay.primary === "onion");
-    const showCompare = overlay.primary === "compare" && compareFrame != null;
+    const showCompare = overlay.primary === "compare" && (compareFrame != null || Boolean(compareSources));
     const hold = holdCompare && compareFrame != null;
 
-    if (showCompare && compareMode === "side" && compareFrame != null) {
-      const halfW = current.width * scale * 0.48;
-      const halfH = current.height * scale * 0.48;
-      const y = dy + current.height * scale * 0.26;
-      drawFrame(compareFrame, 1, undefined, { x: dx, y, w: halfW, h: halfH });
+    if (showCompare && compareMode === "side") {
+      const halfW = current.width * scale * (compareSources?.previous ? 0.31 : 0.48);
+      const halfH = current.height * scale * (compareSources?.previous ? 0.31 : 0.48);
+      const y = dy + current.height * scale * 0.28;
+      const drawSrc = (data: string | null | undefined, x: number, label: string) => {
+        ctx.save();
+        ctx.fillStyle = "rgba(20,20,22,0.9)";
+        ctx.fillRect(x, y, halfW, halfH);
+        if (data) {
+          const im = load(`cmp-${label}-${engine.currentFrame}`, data);
+          if (im.complete) ctx.drawImage(im, x, y, halfW, halfH);
+          else im.onload = () => setPan((p) => ({ ...p }));
+        } else {
+          ctx.fillStyle = "#71717a";
+          ctx.font = "11px sans-serif";
+          ctx.fillText("空", x + 8, y + 16);
+        }
+        ctx.fillStyle = "#a1a1aa";
+        ctx.font = "11px sans-serif";
+        ctx.fillText(label, x, y - 6);
+        ctx.restore();
+      };
+      if (compareSources && (compareSources.original || compareSources.candidate || compareSources.previous)) {
+        let x = dx;
+        drawSrc(compareSources.original ?? imageMap.get(current.id), x, "原圖");
+        x += halfW + 8;
+        drawSrc(compareSources.candidate ?? null, x, "候選");
+        if (compareSources.previous) {
+          x += halfW + 8;
+          drawSrc(compareSources.previous, x, "上一版");
+        }
+        return;
+      }
+      const left = compareFrame ?? Math.max(0, engine.currentFrame - 1);
+      drawFrame(left, 1, undefined, { x: dx, y, w: halfW, h: halfH });
       drawFrame(engine.currentFrame, 1, undefined, { x: dx + halfW + 8, y, w: halfW, h: halfH });
       ctx.fillStyle = "#a1a1aa";
       ctx.font = "11px sans-serif";
-      ctx.fillText(`F${compareFrame} before`, dx, y - 6);
-      ctx.fillText(`F${engine.currentFrame} after`, dx + halfW + 8, y - 6);
+      ctx.fillText(`F${left} 前`, dx, y - 6);
+      ctx.fillText(`F${engine.currentFrame} 後`, dx + halfW + 8, y - 6);
       return;
     }
 
@@ -429,6 +469,8 @@ export function AnimationCanvas({
     compareMode,
     holdCompare,
     candidatePreview,
+    compareSources,
+    revisionPreview,
     tool,
     onViewport,
     layers,

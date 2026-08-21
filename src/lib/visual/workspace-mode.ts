@@ -155,7 +155,7 @@ export function chromeForMode(mode: WorkspaceMode, focus: boolean) {
   return {
     left: !review,
     right: !review,
-    ai: !review,
+    ai: !focus,
     onionPeek: mode === "ANIMATE" || mode === "ANALYZE" || mode === "REVIEW",
     regionActions: mode === "REPAIR" || mode === "ANALYZE",
     generateStory: mode === "GENERATE",

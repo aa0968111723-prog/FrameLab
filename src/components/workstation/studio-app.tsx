@@ -30,9 +30,12 @@ import {
   getTimelineImagesFn,
   listLLMProvidersFn,
   listRevisionsFn,
+  listConversationMessagesFn,
+  listConversationsFn,
   restoreRevisionFn,
   runToolFn,
   sendAskFn,
+  setConversationLockFn,
   setLockedFn,
   syncWorkspaceSessionFn,
   updateNotesFn,
@@ -84,6 +87,7 @@ import { ConstraintChips, MotionPlanVisual } from "./motion-plan-visual";
 import { AdvancedInspector } from "./inspector-advanced";
 import { ContextInspector } from "./context-inspector";
 import { RegionSelectorStatus } from "./region-selector";
+import { CharacterBoard } from "./character-board";
 
 const MODE_LABEL: Record<WorkspaceMode, string> = {
   ANIMATE: "動畫",
@@ -170,6 +174,12 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [regionBox, setRegionBox] = useState({ x: 40, y: 40, w: 64, h: 64 });
   const [regionLive, setRegionLive] = useState(false);
   const [regionKind, setRegionKind] = useState("custom");
+  const [revisionPreview, setRevisionPreview] = useState<{ frameNumber: number; data: string } | null>(null);
+  const [compareSources, setCompareSources] = useState<{
+    original?: string | null;
+    candidate?: string | null;
+    previous?: string | null;
+  } | null>(null);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [contextVersion, setContextVersion] = useState(1);
@@ -307,11 +317,6 @@ function StudioInner({ projectId }: { projectId: string }) {
   }, [bundle.data]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.innerWidth < 768) setWorkspaceMode("REVIEW");
-  }, []);
-
-  useEffect(() => {
     const parsePose = (n: number) => {
       const row = poses.find((p) => p.frame_number === n);
       if (!row) return [];
@@ -347,6 +352,11 @@ function StudioInner({ projectId }: { projectId: string }) {
     });
   }, [sessionId, projectId, bundle.data]);
 
+  const conversations = useQuery({
+    queryKey: ["conversations", projectId],
+    queryFn: () => listConversationsFn({ data: { projectId } }),
+  });
+
   const current = frames.find((f) => f.frameNumber === engine.currentFrame) ?? frames[0];
   const timelineId = bundle.data?.ok ? bundle.data.timeline?.id : undefined;
   const regionMode = canvasTool === "region";
@@ -356,18 +366,52 @@ function StudioInner({ projectId }: { projectId: string }) {
     setCanvasTool("region");
     setOverlayStack((s) => setPrimary(s, "mask"));
   };
-  const conversationCounts = conversationId ? { [engine.currentFrame]: 1 } : {};
-  function onOpenConversation(id: string) {
+  const conversationCounts = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (const c of conversations.data ?? []) {
+      if (typeof c.frame_start === "number") m[c.frame_start] = (m[c.frame_start] ?? 0) + 1;
+    }
+    return m;
+  }, [conversations.data]);
+  const conversationFrames = useMemo(
+    () => Object.keys(conversationCounts).map(Number),
+    [conversationCounts],
+  );
+  async function onOpenConversation(id: string) {
     setConversationId(id);
     setAiOpen(true);
+    try {
+      const r = await listConversationMessagesFn({ data: { conversationId: id } });
+      if (!r.ok) return;
+      setChat(
+        r.messages.map((m) => ({
+          id: m.id,
+          role: m.role === "assistant" || m.role === "tool" || m.role === "system" ? m.role : "user",
+          content: m.content,
+          contextVersion: m.context_version,
+        })),
+      );
+    } catch {
+      /* keep local chat */
+    }
   }
   function openThread() {
     setAiOpen(true);
+  }
+  function openConversationAtFrame(n: number) {
+    const hit = (conversations.data ?? []).find((c) => c.frame_start === n);
+    if (hit) void onOpenConversation(hit.id);
+    else {
+      setEngine((s) => seek(s, n));
+      setAiOpen(true);
+    }
   }
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["project", projectId] });
     void qc.invalidateQueries({ queryKey: ["images", projectId] });
+    void qc.invalidateQueries({ queryKey: ["conversations", projectId] });
+    void qc.invalidateQueries({ queryKey: ["rev", projectId] });
   };
 
   const tool = useMutation({
@@ -433,8 +477,16 @@ function StudioInner({ projectId }: { projectId: string }) {
           const firstN = d.frames?.[0]?.frameNumber;
           if (typeof firstN === "number") {
             setEngine((s) => seek(s, firstN));
-            setCompareFrame(firstN - 1);
+            setCompareFrame(firstN);
           }
+          const orig = frames.find((f) => f.frameNumber === firstN);
+          const cand = d.frames?.[0];
+          const prev = inb.candidate?.frames[0];
+          setCompareSources({
+            original: orig ? imageMap.get(orig.id) || orig.thumbnailData : null,
+            candidate: cand?.imageData || cand?.thumbnailData || null,
+            previous: prev?.imageData || prev?.thumbnailData || null,
+          });
         } catch {
           setInb((s) => ({ ...s, busy: false }));
         }
@@ -816,6 +868,7 @@ function StudioInner({ projectId }: { projectId: string }) {
       } catch {
         /* ignore */
       }
+      void qc.invalidateQueries({ queryKey: ["conversations", projectId] });
       if (r.inbetween) {
         applyInbetweenPlan(r.inbetween, text);
       } else if (r.curveAdjust) {
@@ -921,7 +974,11 @@ function StudioInner({ projectId }: { projectId: string }) {
   const runningJob = jobs.find((j) => j.state === "running" || j.state === "queued");
   const chrome = chromeForMode(workspaceMode, focusMode);
   const presence = buildPresence(assignments);
-  const dimFrames = charTrack && presence[0] ? new Set(frames.filter((f) => !presence[0].frames.has(f.frameNumber)).map((f) => f.frameNumber)) : undefined;
+  const selectedPresence = presence.find((p) => p.id === selectedCharacterId);
+  const dimFrames =
+    charTrack && selectedPresence
+      ? new Set(frames.filter((f) => !selectedPresence.frames.has(f.frameNumber)).map((f) => f.frameNumber))
+      : undefined;
 
   function propagateRegion() {
     const seed = { frame: engine.currentFrame, x: regionBox.x, y: regionBox.y, w: regionBox.w, h: regionBox.h };
@@ -1154,6 +1211,8 @@ function StudioInner({ projectId }: { projectId: string }) {
                 const data = slot?.imageData || slot?.thumbnailData;
                 return data ? { frameNumber: engine.currentFrame, data } : null;
               })()}
+              compareSources={compareSources}
+              revisionPreview={revisionPreview}
               maskTrack={maskTrack}
               focusRegion={focusRegion}
               focusTick={focusTick}
@@ -1335,9 +1394,17 @@ function StudioInner({ projectId }: { projectId: string }) {
                 if (contextLocked) {
                   setFrozenContext(null);
                   setContextLocked(false);
+                  if (conversationId) {
+                    void setConversationLockFn({ data: { conversationId, locked: false } });
+                  }
                 } else {
                   setFrozenContext({ ...liveContext });
                   setContextLocked(true);
+                  if (conversationId) {
+                    void setConversationLockFn({
+                      data: { conversationId, locked: true, snapshotJson: JSON.stringify(liveContext) },
+                    });
+                  }
                 }
               }}
               messages={chat}
@@ -1387,6 +1454,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                       endFrame: end,
                       count: inb.count,
                       curve: act.action === "APPLY_CURVE" ? "ease_in_out" : inb.curve,
+                      promoteKeys: true,
                       ...inb.constraints,
                     },
                   });
@@ -1473,7 +1541,8 @@ function StudioInner({ projectId }: { projectId: string }) {
             repairRange={repairViz}
             maskTrack={maskTrackMarks(maskTrack)}
             dimFrames={dimFrames}
-            conversationFrames={conversationId ? [engine.currentFrame] : []}
+            conversationFrames={conversationFrames}
+            onConversation={openConversationAtFrame}
             onSeek={(n, shift) => setEngine((s) => (shift ? selectRange(s, s.currentFrame, n) : seek(s, n)))}
             onScrub={(n) => setEngine((s) => seek(s, n))}
             onZoomTimeline={setTimelineZoom}
@@ -1539,7 +1608,26 @@ function StudioInner({ projectId }: { projectId: string }) {
                       </Button>
                     </div>
                   )}
-                  <ConsistencyStrips frames={frames} imageMap={imageMap} consMap={consMap} onSeek={(n) => setEngine((s) => seek(s, n))} />
+                  <ConsistencyStrips
+                    frames={frames}
+                    imageMap={imageMap}
+                    consMap={consMap}
+                    poses={poses}
+                    tracking={tracking}
+                    onSeek={(n) => setEngine((s) => seek(s, n))}
+                  />
+                  <CharacterBoard
+                    characters={characters}
+                    selectedId={selectedCharacterId}
+                    assignments={assignments}
+                    frames={frames}
+                    imageMap={imageMap}
+                    onSelect={(id) => {
+                      setSelectedCharacterId(id);
+                      setCharTrack(Boolean(id));
+                    }}
+                    onSeek={(n) => setEngine((s) => seek(s, n))}
+                  />
                   <div className="mt-3">
                     <p className="text-[10px] uppercase tracking-wide text-faint">AI 對話 {conversationCounts[engine.currentFrame] ? "💬" : ""}</p>
                     {conversationId ? (
@@ -1561,6 +1649,14 @@ function StudioInner({ projectId }: { projectId: string }) {
                     region={regionLive ? effectiveSnap.selected_region : null}
                     onClear={() => setRegionLive(false)}
                   />
+                  {revisionPreview && (
+                    <p className="text-[11px] text-warn">
+                      正在預覽修訂，尚未寫入時間軸。
+                      <button type="button" className="ml-2 text-accent" onClick={() => setRevisionPreview(null)}>
+                        關閉預覽
+                      </button>
+                    </p>
+                  )}
                   {regionMode && <p className="text-[10px] text-faint">選區工具 — 在畫布上拖曳。</p>}
                 </div>
               )}
@@ -1603,8 +1699,24 @@ function StudioInner({ projectId }: { projectId: string }) {
                     onCurve={(c) => setInb((s) => ({ ...s, curve: c }))}
                     onQuality={(q) => setInb((s) => ({ ...s, quality: q }))}
                     onConstraint={(k, v) => setInb((s) => ({ ...s, constraints: { ...s.constraints, [k]: v } }))}
-                    onSetStart={() => setInb((s) => ({ ...s, start: engine.currentFrame }))}
-                    onSetEnd={() => setInb((s) => ({ ...s, end: engine.currentFrame }))}
+                    onSetStart={() => {
+                      setInb((s) => ({ ...s, start: engine.currentFrame }));
+                      if (timelineId) {
+                        tool.mutate({
+                          tool: "set_frame_type",
+                          args: { timelineId, frameNumber: engine.currentFrame, frameType: "KEY" },
+                        });
+                      }
+                    }}
+                    onSetEnd={() => {
+                      setInb((s) => ({ ...s, end: engine.currentFrame }));
+                      if (timelineId) {
+                        tool.mutate({
+                          tool: "set_frame_type",
+                          args: { timelineId, frameNumber: engine.currentFrame, frameType: "KEY" },
+                        });
+                      }
+                    }}
                     onUseRange={() =>
                       engine.selectedRange && setInb((s) => ({ ...s, start: engine.selectedRange![0], end: engine.selectedRange![1] }))
                     }
@@ -1613,7 +1725,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                       setInb((s) => ({ ...s, busy: true }));
                       tool.mutate({
                         tool: "create_inbetween_plan",
-                        args: { timelineId, startFrame: inb.start, endFrame: inb.end, count: inb.count, curve: inb.curve, ...inb.constraints },
+                        args: { timelineId, startFrame: inb.start, endFrame: inb.end, count: inb.count, curve: inb.curve, promoteKeys: true, ...inb.constraints },
                       });
                     }}
                     onPlan={() => {
@@ -1621,7 +1733,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                       setInb((s) => ({ ...s, busy: true }));
                       tool.mutate({
                         tool: "create_inbetween_plan",
-                        args: { timelineId, startFrame: inb.start, endFrame: inb.end, count: inb.count, curve: inb.curve, ...inb.constraints },
+                        args: { timelineId, startFrame: inb.start, endFrame: inb.end, count: inb.count, curve: inb.curve, promoteKeys: true, ...inb.constraints },
                       });
                     }}
                     onConfirmGenerate={() => {
@@ -1674,19 +1786,40 @@ function StudioInner({ projectId }: { projectId: string }) {
                     }}
                     onMarkBreakdown={(n) => timelineId && tool.mutate({ tool: "mark_breakdown", args: { timelineId, frameNumber: n } })}
                     onViewCandidate={() => {
-                      const first = inb.candidate?.frames[0]?.frameNumber;
-                      if (typeof first === "number") setEngine((s) => seek(s, first));
+                      const first = inb.candidate?.frames[0];
+                      if (typeof first?.frameNumber === "number") setEngine((s) => seek(s, first.frameNumber));
+                      const orig = first ? frames.find((f) => f.frameNumber === first.frameNumber) : current;
+                      const prev = inb.candidate?.previousFrames?.find((f) => f.frameNumber === first?.frameNumber) ?? inb.candidate?.previousFrames?.[0];
+                      setCompareSources({
+                        original: orig ? imageMap.get(orig.id) || orig.thumbnailData : null,
+                        candidate: first?.imageData || first?.thumbnailData || null,
+                        previous: prev?.imageData || prev?.thumbnailData || null,
+                      });
                       setOverlayStack({ primary: "compare", extras: [] });
+                      setCompareMode("side");
                     }}
                     onSeekCandidate={(n) => {
                       setEngine((s) => seek(s, n));
+                      const orig = frames.find((f) => f.frameNumber === n);
+                      const cand = inb.candidate?.frames.find((f) => f.frameNumber === n);
+                      const prev = inb.candidate?.previousFrames?.find((f) => f.frameNumber === n);
+                      setCompareSources({
+                        original: orig ? imageMap.get(orig.id) || orig.thumbnailData : null,
+                        candidate: cand?.imageData || cand?.thumbnailData || null,
+                        previous: prev?.imageData || prev?.thumbnailData || null,
+                      });
                       setOverlayStack({ primary: "compare", extras: ["onion"] });
                     }}
                     onCompareCandidates={() => {
-                      const prev = inb.candidate?.previousFrames?.[0]?.frameNumber;
-                      const now = inb.candidate?.frames[0]?.frameNumber;
-                      if (typeof now === "number") setEngine((s) => seek(s, now));
-                      if (typeof prev === "number") setCompareFrame(prev);
+                      const prev = inb.candidate?.previousFrames?.[0];
+                      const now = inb.candidate?.frames[0];
+                      const orig = now ? frames.find((f) => f.frameNumber === now.frameNumber) : current;
+                      if (typeof now?.frameNumber === "number") setEngine((s) => seek(s, now.frameNumber));
+                      setCompareSources({
+                        original: orig ? imageMap.get(orig.id) || orig.thumbnailData : null,
+                        candidate: now?.imageData || now?.thumbnailData || null,
+                        previous: prev?.imageData || prev?.thumbnailData || null,
+                      });
                       setOverlayStack({ primary: "compare", extras: [] });
                       setCompareMode("side");
                     }}
@@ -1716,7 +1849,10 @@ function StudioInner({ projectId }: { projectId: string }) {
                   objects={objects}
                   tracking={tracking}
                   jobs={jobs}
-                  revisions={revisions.data ?? []}
+                  revisions={(revisions.data ?? []).map((r) => ({
+                    ...r,
+                    previewData: previewFromRevision(r),
+                  }))}
                   busy={tool.isPending}
                   regionBox={regionBox}
                   setRegionBox={setRegionBox}
@@ -1735,17 +1871,32 @@ function StudioInner({ projectId }: { projectId: string }) {
                   onTrack={() => timelineId && tool.mutate({ tool: "analyze_tracking", args: { timelineId } })}
                   onPose={() => timelineId && tool.mutate({ tool: "analyze_pose", args: { timelineId } })}
                   onRepair={() => tool.mutate({ tool: "repair_frame", args: { frameId: current.id, method: "blend" } })}
-                  onRepairRegion={() =>
+                  onRepairRegion={() => {
+                    if (!regionLive || regionBox.w < 8 || regionBox.h < 8) {
+                      toast.error("請先在畫布上拖出真實選區");
+                      return;
+                    }
                     tool.mutate({
                       tool: "regenerate_region",
                       args: { frameId: current.id, region: regionKind, method: "blend", x: regionBox.x, y: regionBox.y, w: regionBox.w, h: regionBox.h },
-                    })
-                  }
+                    });
+                  }}
                   onDuplicate={() => tool.mutate({ tool: "duplicate_frame", args: { frameId: current.id } })}
                   onDelete={() => tool.mutate({ tool: "delete_frame", args: { frameId: current.id } })}
                   onUndo={() => tool.mutate({ tool: "undo", args: { projectId, frameId: current.id } })}
                   onRedo={() => tool.mutate({ tool: "redo", args: { projectId, frameId: current.id } })}
-                  onRestore={(id) => restoreRevisionFn({ data: { revisionId: id } }).then(refresh)}
+                  onPreview={(id, data) => {
+                    if (data) {
+                      setRevisionPreview({ frameNumber: current.frameNumber, data });
+                      toast.message("修訂預覽 — 尚未寫入時間軸");
+                    } else {
+                      toast.message("這筆修訂沒有可預覽的影像");
+                    }
+                  }}
+                  onRestore={(id) => {
+                    setRevisionPreview(null);
+                    void restoreRevisionFn({ data: { revisionId: id } }).then(refresh);
+                  }}
                   onExport={() => void exportWebm(frames, imageMap, project.fps)}
                   onCreateCharacter={(name) => tool.mutate({ tool: "create_character", args: { projectId, name } })}
                   onAssign={(id) => {
@@ -1886,4 +2037,21 @@ async function exportPngSequence(
     await new Promise((r) => setTimeout(r, 80));
   }
   toast.message(`已匯出 ${n} 張 PNG`);
+}
+
+function previewFromRevision(row: { previous_json?: string; new_json?: string }): string | null {
+  const pick = (raw?: string) => {
+    if (!raw) return null;
+    try {
+      const o = JSON.parse(raw) as {
+        thumbnailData?: string;
+        imageData?: string;
+        frames?: { thumbnailData?: string; imageData?: string }[];
+      };
+      return o.thumbnailData || o.imageData || o.frames?.[0]?.thumbnailData || o.frames?.[0]?.imageData || null;
+    } catch {
+      return null;
+    }
+  };
+  return pick(row.new_json) || pick(row.previous_json);
 }

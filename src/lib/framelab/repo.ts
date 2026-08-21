@@ -1043,7 +1043,9 @@ export async function listConversations(userId: string, projectId: string) {
     provider: string;
     mode: string;
     created_at: string;
-  }>`select id, title, provider, mode, created_at from conversations where user_id = ${userId} and project_id = ${projectId} order by updated_at desc`;
+    frame_start: number | null;
+    frame_end: number | null;
+  }>`select id, title, provider, mode, created_at, frame_start, frame_end from conversations where user_id = ${userId} and project_id = ${projectId} order by updated_at desc`;
 }
 
 export async function updateConversation(

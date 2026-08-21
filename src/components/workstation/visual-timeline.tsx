@@ -44,6 +44,7 @@ export function VisualTimeline({
   onSeek,
   onScrub,
   onZoomTimeline,
+  onConversation,
 }: {
   frames: TimelineFrame[];
   engine: TimelineEngineState;
@@ -58,6 +59,7 @@ export function VisualTimeline({
   onSeek: (n: number, shift: boolean) => void;
   onScrub: (n: number) => void;
   onZoomTimeline: (z: number) => void;
+  onConversation?: (n: number) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -260,7 +262,14 @@ export function VisualTimeline({
                     </span>
                   )}
                   {talked && (
-                    <span className="absolute left-0.5 top-2.5 text-[8px] leading-none" title="Conversation">
+                    <span
+                      className="absolute left-0.5 top-2.5 text-[8px] leading-none"
+                      title="對話"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConversation?.(f.frameNumber);
+                      }}
+                    >
                       💬
                     </span>
                   )}

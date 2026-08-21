@@ -1,4 +1,5 @@
 import { sampleStripIndices } from "@/lib/visual/thumbnail-cache";
+import { locateProblemBox } from "@/lib/visual/problem-locate";
 import { cn } from "@/lib/utils";
 
 function jpegUrl(b64?: string) {
@@ -6,22 +7,28 @@ function jpegUrl(b64?: string) {
   return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
 }
 
-type Frame = { id: string; frameNumber: number; thumbnailData?: string };
+type Frame = { id: string; frameNumber: number; thumbnailData?: string; width?: number; height?: number };
+type Joint = { name: string; x: number; y: number; confidence: number };
+type Track = { name: string; x: number; y: number; frame_number: number };
 
 function Strip({
   title,
+  category,
   frames,
   imageMap,
   consMap,
+  poses,
+  tracking,
   onSeek,
-  objectTop,
 }: {
   title: string;
+  category: string;
   frames: Frame[];
   imageMap: Map<string, string>;
   consMap: Map<number, { severity: string }>;
+  poses: { frame_number: number; joints: Joint[] }[];
+  tracking: Track[];
   onSeek: (n: number) => void;
-  objectTop?: boolean;
 }) {
   const idx = sampleStripIndices(frames.length, 6);
   if (idx.length === 0) return null;
@@ -34,6 +41,24 @@ function Strip({
           if (!f) return null;
           const src = jpegUrl(imageMap.get(f.id) || f.thumbnailData || "");
           const bad = consMap.get(f.frameNumber)?.severity;
+          const joints = poses.find((p) => p.frame_number === f.frameNumber)?.joints ?? [];
+          const box = locateProblemBox({
+            category,
+            frameNumber: f.frameNumber,
+            frameWidth: f.width ?? 1,
+            frameHeight: f.height ?? 1,
+            joints,
+            tracking,
+          });
+          const style = box
+            ? {
+                width: `${100 / Math.max(0.08, box.w)}%`,
+                height: `${100 / Math.max(0.08, box.h)}%`,
+                marginLeft: `${(-box.x / Math.max(0.08, box.w)) * 100}%`,
+                marginTop: `${(-box.y / Math.max(0.08, box.h)) * 100}%`,
+                maxWidth: "none",
+              }
+            : undefined;
           return (
             <button key={f.id} type="button" onClick={() => onSeek(f.frameNumber)} className="w-12">
               <span
@@ -43,11 +68,7 @@ function Strip({
                 )}
               >
                 {src ? (
-                  <img
-                    src={src}
-                    alt=""
-                    className={cn("h-full w-full object-cover", objectTop !== false && "object-top")}
-                  />
+                  <img src={src} alt="" className="h-full w-full object-cover" style={style} />
                 ) : null}
               </span>
               <span className="font-mono text-[9px] text-faint">
@@ -66,18 +87,31 @@ export function ConsistencyStrips({
   frames,
   imageMap,
   consMap,
+  poses,
+  tracking,
   onSeek,
 }: {
   frames: Frame[];
   imageMap: Map<string, string>;
   consMap: Map<number, { severity: string }>;
+  poses?: { frame_number: number; joints_json?: string; joints?: Joint[] }[];
+  tracking?: Track[];
   onSeek: (n: number) => void;
 }) {
+  const parsed = (poses ?? []).map((p) => {
+    if (p.joints) return { frame_number: p.frame_number, joints: p.joints };
+    try {
+      return { frame_number: p.frame_number, joints: JSON.parse(p.joints_json || "[]") as Joint[] };
+    } catch {
+      return { frame_number: p.frame_number, joints: [] as Joint[] };
+    }
+  });
+  const tracks = tracking ?? [];
   return (
     <div>
-      <Strip title="臉" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} />
-      <Strip title="手" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} />
-      <Strip title="物件" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} objectTop={false} />
+      <Strip title="臉" category="FACE" frames={frames} imageMap={imageMap} consMap={consMap} poses={parsed} tracking={tracks} onSeek={onSeek} />
+      <Strip title="手" category="HAND" frames={frames} imageMap={imageMap} consMap={consMap} poses={parsed} tracking={tracks} onSeek={onSeek} />
+      <Strip title="物件" category="OBJECT" frames={frames} imageMap={imageMap} consMap={consMap} poses={parsed} tracking={tracks} onSeek={onSeek} />
     </div>
   );
 }
