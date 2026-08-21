@@ -1,6 +1,10 @@
 {
-  "name": "app-builder-workspace",
+  "name": "framelab",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aa0968111723-prog/FrameLab.git"
+  },
   "sideEffects": false,
   "type": "module",
   "overrides": {
