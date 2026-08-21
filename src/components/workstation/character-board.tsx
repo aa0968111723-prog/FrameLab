@@ -1,9 +1,6 @@
 /** Selected character's assigned frames — visual reference, not a JSON list. */
 
-function jpegUrl(b64?: string) {
-  if (!b64) return "";
-  return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
-}
+import { jpegUrl } from "@/lib/visual/jpeg-url";
 
 export function CharacterBoard({
   characters,

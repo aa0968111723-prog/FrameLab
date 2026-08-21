@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as StudioRouteImport } from './routes/studio'
+import { Route as ApiFrameAssetsRouteImport } from './routes/api/frame-assets'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
@@ -36,6 +37,11 @@ const LoginRoute = LoginRouteImport.update({
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
   path: '/studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFrameAssetsRoute = ApiFrameAssetsRouteImport.update({
+  id: '/api/frame-assets',
+  path: '/api/frame-assets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/studio': typeof StudioRouteWithChildren
+  '/api/frame-assets': typeof ApiFrameAssetsRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/models': typeof ApiModelsRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/api/frame-assets': typeof ApiFrameAssetsRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/models': typeof ApiModelsRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/studio': typeof StudioRouteWithChildren
+  '/api/frame-assets': typeof ApiFrameAssetsRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/models': typeof ApiModelsRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/studio'
+    | '/api/frame-assets'
     | '/api/health'
     | '/api/mcp'
     | '/api/models'
@@ -154,6 +164,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/api/frame-assets'
     | '/api/health'
     | '/api/mcp'
     | '/api/models'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/studio'
+    | '/api/frame-assets'
     | '/api/health'
     | '/api/mcp'
     | '/api/models'
@@ -185,6 +197,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   StudioRoute: typeof StudioRouteWithChildren
+  ApiFrameAssetsRoute: typeof ApiFrameAssetsRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpRoute: typeof ApiMcpRoute
   ApiModelsRoute: typeof ApiModelsRoute
@@ -215,6 +228,13 @@ declare module '@tanstack/react-router' {
       path: '/studio'
       fullPath: '/studio'
       preLoaderRoute: typeof StudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/frame-assets': {
+      id: '/api/frame-assets'
+      path: '/api/frame-assets'
+      fullPath: '/api/frame-assets'
+      preLoaderRoute: typeof ApiFrameAssetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -317,6 +337,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   StudioRoute: StudioRouteWithChildren,
+  ApiFrameAssetsRoute: ApiFrameAssetsRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpRoute: ApiMcpRoute,
   ApiModelsRoute: ApiModelsRoute,

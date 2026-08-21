@@ -3,8 +3,7 @@ import { deflateSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import type { RgbaFrame } from "./pixel-metrics.ts";
 
-export function decodeJpegBase64(b64: string): RgbaFrame {
-  const raw = Buffer.from(b64, "base64");
+export function decodeJpegBuffer(raw: Buffer): RgbaFrame {
   const decoded = jpegDecode(raw, { useTArray: true });
   return {
     data: decoded.data as Uint8Array,
@@ -13,12 +12,20 @@ export function decodeJpegBase64(b64: string): RgbaFrame {
   };
 }
 
-export function encodeJpegBase64(frame: RgbaFrame, quality = 78): string {
+export function decodeJpegBase64(b64: string): RgbaFrame {
+  return decodeJpegBuffer(Buffer.from(b64, "base64"));
+}
+
+export function encodeJpegBuffer(frame: RgbaFrame, quality = 78): Buffer {
   const encoded = jpegEncode(
     { data: frame.data, width: frame.width, height: frame.height },
     quality,
   );
-  return Buffer.from(encoded.data).toString("base64");
+  return Buffer.from(encoded.data);
+}
+
+export function encodeJpegBase64(frame: RgbaFrame, quality = 78): string {
+  return encodeJpegBuffer(frame, quality).toString("base64");
 }
 
 function crc32(bytes: Uint8Array): number {
@@ -70,15 +77,23 @@ export function hashBytes(b64: string): string {
   return createHash("sha256").update(b64).digest("hex").slice(0, 24);
 }
 
-export function makeThumbnail(frame: RgbaFrame, maxW = 96, maxH = 54): string {
-  const scale = Math.min(1, maxW / frame.width, maxH / frame.height);
+export function hashBuffer(buf: Buffer): string {
+  return createHash("sha256").update(buf).digest("hex").slice(0, 24);
+}
+
+export function scaleRgba(frame: RgbaFrame, maxW: number, maxH: number): RgbaFrame {
+  const scale = Math.min(1, maxW / Math.max(1, frame.width), maxH / Math.max(1, frame.height));
+  if (scale >= 0.999) {
+    return { data: frame.data, width: frame.width, height: frame.height };
+  }
   const width = Math.max(1, Math.round(frame.width * scale));
   const height = Math.max(1, Math.round(frame.height * scale));
   const data = new Uint8Array(width * height * 4);
+  const inv = 1 / scale;
   for (let y = 0; y < height; y += 1) {
-    const sy = Math.min(frame.height - 1, Math.round(y / scale));
+    const sy = Math.min(frame.height - 1, Math.round(y * inv));
     for (let x = 0; x < width; x += 1) {
-      const sx = Math.min(frame.width - 1, Math.round(x / scale));
+      const sx = Math.min(frame.width - 1, Math.round(x * inv));
       const si = (sy * frame.width + sx) * 4;
       const di = (y * width + x) * 4;
       data[di] = frame.data[si]!;
@@ -87,7 +102,11 @@ export function makeThumbnail(frame: RgbaFrame, maxW = 96, maxH = 54): string {
       data[di + 3] = 255;
     }
   }
-  return encodeJpegBase64({ data, width, height }, 62);
+  return { data, width, height };
+}
+
+export function makeThumbnail(frame: RgbaFrame, maxW = 96, maxH = 54): string {
+  return encodeJpegBase64(scaleRgba(frame, maxW, maxH), 62);
 }
 
 export function dataUrl(b64: string, mime = "image/jpeg"): string {

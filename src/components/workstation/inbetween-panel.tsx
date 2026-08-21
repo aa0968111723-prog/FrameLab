@@ -4,6 +4,7 @@ import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { curveCaption } from "@/lib/visual/motion-curve-visual";
+import { jpegUrl } from "@/lib/visual/jpeg-url";
 import { categoryLabel } from "@/lib/domain/visual-annotation";
 
 export type InbetweenConstraints = {
@@ -372,7 +373,7 @@ export function InbetweenPanel({
                   <span className="block h-10 w-10 overflow-hidden rounded-[var(--radius-xs)] border border-gen/40">
                     {f.thumbnailData ? (
                       <img
-                        src={f.thumbnailData.startsWith("data:") ? f.thumbnailData : `data:image/jpeg;base64,${f.thumbnailData}`}
+                        src={jpegUrl(f.thumbnailData)}
                         alt={`F${f.frameNumber}`}
                         className="h-full w-full object-cover"
                       />

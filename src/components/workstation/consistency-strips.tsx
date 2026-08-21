@@ -1,11 +1,7 @@
 import { sampleStripIndices } from "@/lib/visual/thumbnail-cache";
 import { locateProblemBox } from "@/lib/visual/problem-locate";
+import { jpegUrl } from "@/lib/visual/jpeg-url";
 import { cn } from "@/lib/utils";
-
-function jpegUrl(b64?: string) {
-  if (!b64) return "";
-  return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
-}
 
 type Frame = { id: string; frameNumber: number; thumbnailData?: string; width?: number; height?: number };
 type Joint = { name: string; x: number; y: number; confidence: number };

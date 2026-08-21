@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { jpegUrl } from "@/lib/visual/jpeg-url";
 
 export type HistoryRow = {
   id: string;
@@ -31,11 +32,6 @@ function actionZh(action: string) {
     default:
       return action.replaceAll("_", " ");
   }
-}
-
-function jpegUrl(b64?: string | null) {
-  if (!b64) return "";
-  return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
 }
 
 export function VisualHistory({

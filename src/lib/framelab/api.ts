@@ -89,7 +89,9 @@ export const getProjectBundle = createServerFn({ method: "GET" })
         timestampMs: f.timestamp_ms,
         durationMs: f.duration_ms,
         frameType: f.frame_type,
-        thumbnailData: f.thumbnail_data,
+        thumbnailData: f.thumbnail_asset
+          ? `/api/frame-assets?frameId=${encodeURIComponent(f.id)}&tier=thumbnail&v=${encodeURIComponent(f.content_hash || "")}`
+          : f.thumbnail_data,
         width: f.width,
         height: f.height,
         isLocked: f.is_locked,
@@ -146,10 +148,13 @@ export const getTimelineImagesFn = createServerFn({ method: "GET" })
     if (!timeline || timeline.project_id !== project.id) {
       return { ok: false as const, images: [] as { id: string; imageData: string }[] };
     }
-    const frames = await repo.listFramesFull(timeline.id);
+    const frames = await repo.listFramesMeta(timeline.id);
     return {
       ok: true as const,
-      images: frames.map((f) => ({ id: f.id, imageData: f.image_data })),
+      images: frames.map((f) => ({
+        id: f.id,
+        imageData: `/api/frame-assets?frameId=${encodeURIComponent(f.id)}&tier=preview&v=${encodeURIComponent(f.content_hash || "")}`,
+      })),
     };
   });
 

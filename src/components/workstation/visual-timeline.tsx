@@ -15,10 +15,7 @@ import {
 } from "@/lib/visual/timeline-virtual";
 import { cn } from "@/lib/utils";
 
-function jpegUrl(b64?: string) {
-  if (!b64) return "";
-  return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
-}
+import { jpegUrl } from "@/lib/visual/jpeg-url";
 
 export type TimelineFrame = {
   id: string;

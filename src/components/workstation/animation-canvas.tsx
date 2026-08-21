@@ -28,10 +28,7 @@ import type { TimelineEngineState } from "@/lib/domain/types";
 import { regionBoxFromDrag, isUsableRegionBox } from "@/lib/visual/region-box";
 import { cn } from "@/lib/utils";
 
-function jpegUrl(b64?: string) {
-  if (!b64) return "";
-  return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
-}
+import { jpegUrl } from "@/lib/visual/jpeg-url";
 
 export type CanvasTool = "pan" | "region" | "point" | "character";
 

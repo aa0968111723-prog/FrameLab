@@ -1,6 +1,11 @@
 /** FrameLab persistence. PGLite / Postgres via tagged SQL. */
 import { getSql } from "@/lib/db";
 import { nid } from "@/lib/domain/ids";
+import {
+  isInlineJpeg,
+  readFrameAssetBase64,
+  writeFrameAssets,
+} from "@/lib/storage/frame-assets";
 
 export type ProjectRow = {
   id: string;
@@ -41,6 +46,10 @@ export type FrameRow = {
   original_asset?: string | null;
   active_asset?: string | null;
   exposure_count?: number;
+  full_asset?: string | null;
+  preview_asset?: string | null;
+  thumbnail_asset?: string | null;
+  project_id?: string | null;
 };
 
 export type WorkspaceSessionRow = {
@@ -81,11 +90,6 @@ export type JobRow = {
   created_at: string;
 };
 
-const FRAME_COLS = `
-  id, timeline_id, frame_number, timestamp_ms, duration_ms, frame_type,
-  image_data, thumbnail_data, width, height, is_locked, notes, content_hash,
-  original_asset, active_asset, exposure_count
-`;
 
 export async function listProjects(userId: string) {
   const sql = await getSql();
@@ -145,46 +149,110 @@ export async function setTimelineFrameCount(id: string, count: number) {
   await sql`update timelines set frame_count = ${count} where id = ${id}`;
 }
 
+async function persistInlineJpeg(
+  timelineId: string,
+  frameNumber: number,
+  jpegBase64: string,
+) {
+  const t = await getTimeline(timelineId);
+  if (!t) return null;
+  return writeFrameAssets({
+    projectId: t.project_id,
+    frameNumber,
+    jpeg: Buffer.from(jpegBase64, "base64"),
+  });
+}
+
+async function hydrateFrame(row: FrameRow): Promise<FrameRow> {
+  let projectId = row.project_id ?? "";
+  if (!projectId && row.timeline_id) {
+    const t = await getTimeline(row.timeline_id);
+    projectId = t?.project_id ?? "";
+    row.project_id = projectId;
+  }
+  if (projectId && !isInlineJpeg(row.image_data) && row.full_asset) {
+    try {
+      row.image_data = await readFrameAssetBase64(projectId, row.full_asset);
+    } catch {
+      /* leave empty */
+    }
+  }
+  if (projectId && !isInlineJpeg(row.thumbnail_data) && row.thumbnail_asset) {
+    try {
+      row.thumbnail_data = await readFrameAssetBase64(projectId, row.thumbnail_asset);
+    } catch {
+      /* leave empty */
+    }
+  }
+  return row;
+}
+
 export async function listFramesMeta(timelineId: string) {
   const sql = await getSql();
   return sql<FrameRow>`
-    select id, timeline_id, frame_number, timestamp_ms, duration_ms, frame_type,
-      thumbnail_data, width, height, is_locked, notes, content_hash,
-      original_asset, active_asset, exposure_count, '' as image_data
-    from frames where timeline_id = ${timelineId} order by frame_number
+    select f.id, f.timeline_id, f.frame_number, f.timestamp_ms, f.duration_ms, f.frame_type,
+      '' as image_data, '' as thumbnail_data, f.width, f.height, f.is_locked, f.notes, f.content_hash,
+      f.original_asset, f.active_asset, f.exposure_count, f.full_asset, f.preview_asset, f.thumbnail_asset,
+      t.project_id
+    from frames f
+    join timelines t on t.id = f.timeline_id
+    where f.timeline_id = ${timelineId}
+    order by f.frame_number
   `;
+}
+
+export async function getFrameMeta(id: string) {
+  const sql = await getSql();
+  const rows = await sql<FrameRow>`
+    select f.id, f.timeline_id, f.frame_number, f.timestamp_ms, f.duration_ms, f.frame_type,
+      f.image_data, f.thumbnail_data, f.width, f.height, f.is_locked, f.notes, f.content_hash,
+      f.original_asset, f.active_asset, f.exposure_count, f.full_asset, f.preview_asset, f.thumbnail_asset,
+      t.project_id
+    from frames f
+    join timelines t on t.id = f.timeline_id
+    where f.id = ${id}
+    limit 1
+  `;
+  return rows[0] ?? null;
 }
 
 export async function listFramesFull(timelineId: string) {
   const sql = await getSql();
-  return sql<FrameRow>`
-    select id, timeline_id, frame_number, timestamp_ms, duration_ms, frame_type,
-      image_data, thumbnail_data, width, height, is_locked, notes, content_hash,
-      original_asset, active_asset, exposure_count
-    from frames where timeline_id = ${timelineId} order by frame_number
+  const rows = await sql<FrameRow>`
+    select f.id, f.timeline_id, f.frame_number, f.timestamp_ms, f.duration_ms, f.frame_type,
+      f.image_data, f.thumbnail_data, f.width, f.height, f.is_locked, f.notes, f.content_hash,
+      f.original_asset, f.active_asset, f.exposure_count, f.full_asset, f.preview_asset, f.thumbnail_asset,
+      t.project_id
+    from frames f
+    join timelines t on t.id = f.timeline_id
+    where f.timeline_id = ${timelineId}
+    order by f.frame_number
   `;
+  const out: FrameRow[] = [];
+  for (const row of rows) out.push(await hydrateFrame(row));
+  return out;
 }
 
 export async function getFrame(id: string) {
-  const sql = await getSql();
-  const rows = await sql<FrameRow>`
-    select id, timeline_id, frame_number, timestamp_ms, duration_ms, frame_type,
-      image_data, thumbnail_data, width, height, is_locked, notes, content_hash,
-      original_asset, active_asset, exposure_count
-    from frames where id = ${id} limit 1
-  `;
-  return rows[0] ?? null;
+  const row = await getFrameMeta(id);
+  if (!row) return null;
+  return hydrateFrame(row);
 }
 
 export async function getFrameByNumber(timelineId: string, n: number) {
   const sql = await getSql();
   const rows = await sql<FrameRow>`
-    select id, timeline_id, frame_number, timestamp_ms, duration_ms, frame_type,
-      image_data, thumbnail_data, width, height, is_locked, notes, content_hash,
-      original_asset, active_asset, exposure_count
-    from frames where timeline_id = ${timelineId} and frame_number = ${n} limit 1
+    select f.id, f.timeline_id, f.frame_number, f.timestamp_ms, f.duration_ms, f.frame_type,
+      f.image_data, f.thumbnail_data, f.width, f.height, f.is_locked, f.notes, f.content_hash,
+      f.original_asset, f.active_asset, f.exposure_count, f.full_asset, f.preview_asset, f.thumbnail_asset,
+      t.project_id
+    from frames f
+    join timelines t on t.id = f.timeline_id
+    where f.timeline_id = ${timelineId} and f.frame_number = ${n}
+    limit 1
   `;
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  return hydrateFrame(rows[0]);
 }
 
 export async function insertFrame(row: {
@@ -202,17 +270,39 @@ export async function insertFrame(row: {
   notes?: string;
   is_locked?: boolean;
 }) {
+  let full = "";
+  let preview = "";
+  let thumb = "";
+  let width = row.width;
+  let height = row.height;
+  let hash = row.content_hash;
+  let imageData = "";
+  let thumbnailData = "";
+  if (isInlineJpeg(row.image_data)) {
+    const assets = await persistInlineJpeg(row.timeline_id, row.frame_number, row.image_data);
+    if (assets) {
+      full = assets.full_asset;
+      preview = assets.preview_asset;
+      thumb = assets.thumbnail_asset;
+      width = assets.width;
+      height = assets.height;
+      hash = assets.content_hash;
+    } else {
+      imageData = row.image_data;
+      thumbnailData = row.thumbnail_data ?? "";
+    }
+  }
   const sql = await getSql();
   await sql`
     insert into frames (
       id, timeline_id, frame_number, timestamp_ms, duration_ms, frame_type,
       image_data, thumbnail_data, width, height, is_locked, notes, content_hash,
-      original_asset, active_asset
+      original_asset, active_asset, full_asset, preview_asset, thumbnail_asset
     ) values (
       ${row.id}, ${row.timeline_id}, ${row.frame_number}, ${row.timestamp_ms}, ${row.duration_ms},
-      ${row.frame_type}, ${row.image_data}, ${row.thumbnail_data}, ${row.width}, ${row.height},
-      ${row.is_locked ?? false}, ${row.notes ?? ""}, ${row.content_hash},
-      ${row.image_data ? "original" : ""}, ${row.image_data ? "active" : ""}
+      ${row.frame_type}, ${imageData}, ${thumbnailData}, ${width}, ${height},
+      ${row.is_locked ?? false}, ${row.notes ?? ""}, ${hash},
+      ${full || "original"}, ${full || "active"}, ${full}, ${preview}, ${thumb}
     )
   `;
 }
@@ -232,25 +322,55 @@ export async function updateFrame(
     original_asset: string;
     active_asset: string;
     exposure_count: number;
+    full_asset: string;
+    preview_asset: string;
+    thumbnail_asset: string;
   }>,
 ) {
   const sql = await getSql();
-  const cur = await getFrame(id);
+  const cur = await getFrameMeta(id);
   if (!cur) return;
+  let full = patch.full_asset ?? cur.full_asset ?? "";
+  let preview = patch.preview_asset ?? cur.preview_asset ?? "";
+  let thumb = patch.thumbnail_asset ?? cur.thumbnail_asset ?? "";
+  let width = patch.width ?? cur.width;
+  let height = patch.height ?? cur.height;
+  let hash = patch.content_hash ?? cur.content_hash;
+  const sourceJpeg = isInlineJpeg(patch.image_data)
+    ? patch.image_data
+    : !full && isInlineJpeg(cur.image_data)
+      ? cur.image_data
+      : "";
+  if (sourceJpeg) {
+    const assets = await persistInlineJpeg(cur.timeline_id, cur.frame_number, sourceJpeg);
+    if (assets) {
+      full = assets.full_asset;
+      preview = assets.preview_asset;
+      thumb = assets.thumbnail_asset;
+      width = assets.width;
+      height = assets.height;
+      hash = assets.content_hash;
+    }
+  }
+  const storedImage = full ? "" : (isInlineJpeg(cur.image_data) ? cur.image_data : "");
+  const storedThumb = thumb ? "" : (isInlineJpeg(cur.thumbnail_data) ? cur.thumbnail_data : "");
   await sql`
     update frames set
-      image_data = ${patch.image_data ?? cur.image_data},
-      thumbnail_data = ${patch.thumbnail_data ?? cur.thumbnail_data},
-      content_hash = ${patch.content_hash ?? cur.content_hash},
+      image_data = ${storedImage},
+      thumbnail_data = ${storedThumb},
+      content_hash = ${hash},
       frame_type = ${patch.frame_type ?? cur.frame_type},
       duration_ms = ${patch.duration_ms ?? cur.duration_ms},
       notes = ${patch.notes ?? cur.notes},
       is_locked = ${patch.is_locked ?? cur.is_locked},
-      width = ${patch.width ?? cur.width},
-      height = ${patch.height ?? cur.height},
-      original_asset = ${patch.original_asset ?? cur.original_asset ?? ""},
-      active_asset = ${patch.active_asset ?? cur.active_asset ?? ""},
+      width = ${width},
+      height = ${height},
+      original_asset = ${patch.original_asset ?? cur.original_asset ?? full},
+      active_asset = ${patch.active_asset ?? cur.active_asset ?? full},
       exposure_count = ${patch.exposure_count ?? cur.exposure_count ?? 1},
+      full_asset = ${full},
+      preview_asset = ${preview},
+      thumbnail_asset = ${thumb},
       updated_at = now()
     where id = ${id}
   `;

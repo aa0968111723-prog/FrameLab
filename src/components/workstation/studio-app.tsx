@@ -61,6 +61,7 @@ import type { InbetweenAskPayload } from "@/lib/domain/conversation";
 import { createEmptyContext, serializeContext, type SerializedContext } from "@/lib/domain/context-engine";
 import { curveCaption, curvePathD, spacingDots } from "@/lib/visual/motion-curve-visual";
 import { locateProblemBox } from "@/lib/visual/problem-locate";
+import { jpegUrl } from "@/lib/visual/jpeg-url";
 import { buildPresence } from "@/lib/visual/character-track";
 import { maskTrackMarks } from "@/lib/visual/timeline-virtual";
 import { suggestedFocusZoom, zoom100Percent } from "@/lib/visual/viewport";
@@ -160,11 +161,6 @@ function toolErrorZh(code: string, error: string) {
   if (e.includes("not found")) return "找不到對象";
   if (e.includes("required")) return "還少一個必要參數";
   return error ? `${code}: ${error}` : code;
-}
-
-function jpegUrl(b64?: string) {
-  if (!b64) return "";
-  return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
 }
 
 export function StudioApp({ projectId }: { projectId: string }) {
@@ -1849,7 +1845,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                           >
                             {f.thumbnailData ? (
                               <img
-                                src={f.thumbnailData.startsWith("data:") ? f.thumbnailData : `data:image/jpeg;base64,${f.thumbnailData}`}
+                                src={jpegUrl(f.thumbnailData)}
                                 alt=""
                                 className="h-full w-full object-cover"
                               />

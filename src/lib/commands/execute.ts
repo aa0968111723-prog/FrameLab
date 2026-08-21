@@ -105,8 +105,8 @@ async function loadOwnedFrame(ctx: CommandContext, args: Record<string, unknown>
 
 function snapshotFrame(frame: repo.FrameRow) {
   return {
-    imageData: frame.image_data,
-    thumbnailData: frame.thumbnail_data,
+    imageData: "",
+    thumbnailData: "",
     contentHash: frame.content_hash,
     frameType: frame.frame_type,
     durationMs: frame.duration_ms,
@@ -116,6 +116,9 @@ function snapshotFrame(frame: repo.FrameRow) {
     height: frame.height,
     originalAsset: frame.original_asset ?? null,
     activeAsset: frame.active_asset ?? null,
+    fullAsset: frame.full_asset ?? null,
+    previewAsset: frame.preview_asset ?? null,
+    thumbnailAsset: frame.thumbnail_asset ?? null,
   };
 }
 
@@ -1305,6 +1308,9 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
     notes?: string;
     originalAsset?: string | null;
     activeAsset?: string | null;
+    fullAsset?: string | null;
+    previewAsset?: string | null;
+    thumbnailAsset?: string | null;
     frames?: Array<{
       frameId: string;
       imageData: string;
@@ -1315,6 +1321,9 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
       notes?: string;
       originalAsset?: string | null;
       activeAsset?: string | null;
+      fullAsset?: string | null;
+      previewAsset?: string | null;
+      thumbnailAsset?: string | null;
     }>;
   };
   const apply = async (
@@ -1328,8 +1337,25 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
       notes?: string;
       originalAsset?: string | null;
       activeAsset?: string | null;
+      fullAsset?: string | null;
+      previewAsset?: string | null;
+      thumbnailAsset?: string | null;
     },
   ) => {
+    if (snap.fullAsset) {
+      await repo.updateFrame(frameId, {
+        content_hash: snap.contentHash,
+        frame_type: snap.frameType,
+        duration_ms: snap.durationMs,
+        notes: snap.notes,
+        original_asset: snap.originalAsset ?? undefined,
+        active_asset: snap.activeAsset ?? snap.originalAsset ?? undefined,
+        full_asset: snap.fullAsset,
+        preview_asset: snap.previewAsset ?? undefined,
+        thumbnail_asset: snap.thumbnailAsset ?? undefined,
+      });
+      return;
+    }
     if (!snap.imageData) return;
     await repo.updateFrame(frameId, {
       image_data: snap.imageData,
