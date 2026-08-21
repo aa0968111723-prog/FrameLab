@@ -12,10 +12,10 @@ function Login() {
           FrameLab
         </Link>
         <h1 className="mt-4 font-sans text-2xl font-medium tracking-tight text-fg">
-          Sign in
+          登入
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Projects, frames, and MCP tokens stay on your account.
+          專案、影格與 MCP token 都綁在你的帳號上。
         </p>
         <div className="mt-6 space-y-2">
           {authEnabled ? (
@@ -27,11 +27,11 @@ function Login() {
                 className="w-full"
                 onClick={() => void signIn(p.providerId, { callbackURL: "/studio" })}
               >
-                Continue with {p.label}
+                使用 {p.label} 繼續
               </Button>
             ))
           ) : (
-            <p className="text-sm text-muted">Sign-in is disabled.</p>
+            <p className="text-sm text-muted">登入已停用。</p>
           )}
         </div>
       </div>

@@ -61,7 +61,6 @@ import { suggestedFocusZoom, zoom100Percent } from "@/lib/visual/viewport";
 import {
   MODE_BAR,
   PLAYBACK_SPEEDS,
-  TRAIL_LABEL,
   TRAIL_TARGETS,
   chromeForMode,
   defaultOverlayForMode,
@@ -85,6 +84,31 @@ import { ConstraintChips, MotionPlanVisual } from "./motion-plan-visual";
 import { AdvancedInspector } from "./inspector-advanced";
 import { ContextInspector } from "./context-inspector";
 import { RegionSelectorStatus } from "./region-selector";
+
+const MODE_LABEL: Record<WorkspaceMode, string> = {
+  ANIMATE: "動畫",
+  ANALYZE: "分析",
+  REPAIR: "修復",
+  REVIEW: "檢視",
+  GENERATE: "生成",
+};
+
+const TOOL_LABEL: Record<CanvasTool, string> = {
+  pan: "平移",
+  region: "選區",
+  point: "錨點",
+  character: "角色",
+};
+
+const TRAIL_ZH: Record<TrailTarget, string> = {
+  head: "頭",
+  left_hand: "左手",
+  right_hand: "右手",
+  hip: "髖",
+  foot: "腳",
+  object: "物件",
+  custom: "自訂",
+};
 
 function jpegUrl(b64?: string) {
   if (!b64) return "";
@@ -146,6 +170,11 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [regionBox, setRegionBox] = useState({ x: 40, y: 40, w: 64, h: 64 });
   const [regionLive, setRegionLive] = useState(false);
   const [regionKind, setRegionKind] = useState("custom");
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [contextVersion, setContextVersion] = useState(1);
+  const [contextLocked, setContextLocked] = useState(false);
+  const [frozenContext, setFrozenContext] = useState<Record<string, unknown> | null>(null);
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [askBusy, setAskBusy] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(() => {
@@ -155,7 +184,22 @@ function StudioInner({ projectId }: { projectId: string }) {
       return null;
     }
   });
-  const [sessionId] = useState(() => `ses-${projectId.slice(0, 12)}`);
+  const [sessionId] = useState(() => {
+    try {
+      const key = `fl-ses:${projectId}`;
+      let id = sessionStorage.getItem(key);
+      if (!id) {
+        id =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? `ses-${crypto.randomUUID()}`
+            : `ses-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        sessionStorage.setItem(key, id);
+      }
+      return id;
+    } catch {
+      return `ses-${projectId.slice(0, 8)}-${Date.now().toString(36)}`;
+    }
+  });
   const [providerId, setProviderId] = useState("grok");
   const [askMode, setAskMode] = useState<"ASK" | "ASSIST">("ASSIST");
   const [aiState, setAiState] = useState<"idle" | "looking" | "analyzing" | "suggestion" | "problem">("idle");
@@ -233,6 +277,22 @@ function StudioInner({ projectId }: { projectId: string }) {
     () => (bundle.data?.ok ? (bundle.data.assignments ?? []) : []),
     [bundle.data],
   );
+
+  useEffect(() => {
+    if (contextLocked) return;
+    setContextVersion((v) => v + 1);
+  }, [
+    engine.currentFrame,
+    engine.selectedRange,
+    regionLive,
+    regionBox.x,
+    regionBox.y,
+    regionBox.w,
+    regionBox.h,
+    selectedCharacterId,
+    selectedObjectId,
+    contextLocked,
+  ]);
 
   useEffect(() => {
     if (!bundle.data?.ok) return;
@@ -606,40 +666,43 @@ function StudioInner({ projectId }: { projectId: string }) {
     selected_range:
       inb.start != null && inb.end != null ? ([inb.start, inb.end] as [number, number]) : engine.selectedRange,
     selected_frames: engine.selectedFrames,
-    selected_character: characters[0]?.id ?? null,
-    selected_object: objects[0]?.id ?? null,
-    selected_region: current
-      ? {
-          frameId: current.id,
-          frameNumber: current.frameNumber,
-          x: regionBox.x / Math.max(1, current.width),
-          y: regionBox.y / Math.max(1, current.height),
-          width: regionBox.w / Math.max(1, current.width),
-          height: regionBox.h / Math.max(1, current.height),
-          selectionType: "rectangle",
-        }
-      : null,
+    selected_character: selectedCharacterId,
+    selected_object: selectedObjectId,
+    selected_region:
+      regionLive && current
+        ? {
+            frameId: current.id,
+            frameNumber: current.frameNumber,
+            x: regionBox.x / Math.max(1, current.width),
+            y: regionBox.y / Math.max(1, current.height),
+            width: regionBox.w / Math.max(1, current.width),
+            height: regionBox.h / Math.max(1, current.height),
+            selectionType: "rectangle",
+          }
+        : null,
     onion_skin: engine.onionSkin,
     overlay: { pose: overlayStack.primary === "pose", tracking: overlayStack.primary === "track", motion: overlayStack.primary === "motion" },
     viewport: { zoom: engine.zoom, panX: 0, panY: 0 },
     conversation_id: conversationId,
     session_id: sessionId,
-    context_version: engine.currentFrame,
+    context_version: contextVersion,
   };
+
+  const activeLive = (frozenContext as typeof liveContext | null) ?? liveContext;
 
   const effectiveSnap = {
     project_id: projectId,
     video_id: null,
     timeline_id: timelineId ?? null,
-    current_frame: engine.currentFrame,
-    current_frame_id: current?.id ?? null,
+    current_frame: activeLive.current_frame,
+    current_frame_id: activeLive.current_frame_id,
     timestamp_ms: current?.timestampMs ?? null,
-    selected_range: engine.selectedRange,
-    selected_frames: engine.selectedFrames,
-    selected_character: characters[0]?.id ?? null,
-    selected_object: objects[0]?.id ?? null,
-    selected_region: liveContext.selected_region
-      ? { type: "rectangle" as const, ...liveContext.selected_region, selectionType: "rectangle" as const }
+    selected_range: activeLive.selected_range,
+    selected_frames: activeLive.selected_frames,
+    selected_character: activeLive.selected_character,
+    selected_object: activeLive.selected_object,
+    selected_region: activeLive.selected_region
+      ? { type: "rectangle" as const, ...activeLive.selected_region, selectionType: "rectangle" as const }
       : null,
     onion_skin: {
       enabled: engine.onionSkin.enabled,
@@ -660,7 +723,7 @@ function StudioInner({ projectId }: { projectId: string }) {
     analysis_available: [] as string[],
     conversation_id: conversationId,
     session_id: sessionId,
-    context_version: engine.currentFrame,
+    context_version: activeLive.context_version,
     viewport: { zoom: engine.zoom },
     focus: "current_frame" as const,
   };
@@ -723,7 +786,7 @@ function StudioInner({ projectId }: { projectId: string }) {
     setAiState("analyzing");
     setChat((c) => [...c, { id: `u-${Date.now()}`, role: "user", content: text }]);
     try {
-      await syncWorkspaceSessionFn({ data: { sessionId, projectId, context: liveContext } });
+      await syncWorkspaceSessionFn({ data: { sessionId, projectId, context: activeLive } });
       const r = await sendAskFn({
         data: {
           sessionId,
@@ -731,11 +794,11 @@ function StudioInner({ projectId }: { projectId: string }) {
           providerId,
           userMessage: text,
           liveContext: {
-            ...liveContext,
+            ...activeLive,
             selected_range:
               inb.start != null && inb.end != null
                 ? [inb.start, inb.end]
-                : engine.selectedRange ?? liveContext.selected_range,
+                : engine.selectedRange ?? activeLive.selected_range,
           },
           fps: engine.fps,
           frameCount: engine.frameCount,
@@ -842,7 +905,7 @@ function StudioInner({ projectId }: { projectId: string }) {
     );
   }
   if (!bundle.data?.ok) {
-    return <div className="grid min-h-screen place-items-center bg-bg text-muted">Project not found.</div>;
+    return <div className="grid min-h-screen place-items-center bg-bg text-muted">找不到專案。</div>;
   }
 
   const project = bundle.data.project;
@@ -870,7 +933,7 @@ function StudioInner({ projectId }: { projectId: string }) {
     setMaskTrack(next.map((n) => ({ frame: n.frame, mask: n.mask, lost: n.lost, confidence: n.confidence })));
     setHighlightRange([start, end]);
     setOverlayStack({ primary: "mask", extras: ["problems"] });
-    toast.message(`Mask on F${start}–F${end}`);
+    toast.message(`遮罩已套用 F${start}–F${end}`);
   }
 
   return (
@@ -883,10 +946,10 @@ function StudioInner({ projectId }: { projectId: string }) {
         <span className="truncate text-sm">{project.name}</span>
         <span className="text-[11px] text-faint">{project.fps} fps</span>
         <div className="mx-auto flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => seek(s, 0))} aria-label="First">
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => seek(s, 0))} aria-label="第一格">
             <SkipBack className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="size-8" onClick={() => step(-1)} aria-label="Previous">
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => step(-1)} aria-label="上一格">
             <ChevronLeft className="size-4" />
           </Button>
           <Button
@@ -894,14 +957,14 @@ function StudioInner({ projectId }: { projectId: string }) {
             size="icon"
             className="size-8"
             onClick={() => setEngine((s) => ({ ...s, isPlaying: !s.isPlaying }))}
-            aria-label={engine.isPlaying ? "Pause" : "Play"}
+            aria-label={engine.isPlaying ? "暫停" : "播放"}
           >
             {engine.isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
           </Button>
-          <Button variant="ghost" size="icon" className="size-8" onClick={() => step(1)} aria-label="Next">
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => step(1)} aria-label="下一格">
             <ChevronRight className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => seek(s, s.frameCount - 1))} aria-label="Last">
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => seek(s, s.frameCount - 1))} aria-label="最後一格">
             <SkipForward className="size-4" />
           </Button>
           <span className="ml-2 font-mono text-sm tabular-nums">{padFrame(engine.currentFrame)}</span>
@@ -929,13 +992,13 @@ function StudioInner({ projectId }: { projectId: string }) {
                 workspaceMode === m ? "bg-raised text-fg" : "text-faint hover:text-fg",
               )}
             >
-              {m}
+              {MODE_LABEL[m]}
             </button>
           ))}
         </div>
         <Button variant={engine.onionSkin.enabled ? "secondary" : "ghost"} size="sm" onClick={() => setEngine((s) => setOnionSkin(s, { enabled: !s.onionSkin.enabled }))}>
           <FlipHorizontal className="size-3.5" />
-          Onion
+          洋蔥皮
         </Button>
         <Button
           variant={engine.loopRange ? "secondary" : "ghost"}
@@ -947,7 +1010,7 @@ function StudioInner({ projectId }: { projectId: string }) {
           }
         >
           <Repeat className="size-3.5" />
-          Loop
+          循環
         </Button>
         <Button
           variant={flicker ? "secondary" : "ghost"}
@@ -959,12 +1022,12 @@ function StudioInner({ projectId }: { projectId: string }) {
             setCompareMode("flicker");
           }}
         >
-          Flicker
+          閃爍比對
         </Button>
         <Button variant={focusMode ? "secondary" : "ghost"} size="sm" onClick={() => setFocusMode((v) => !v)}>
-          Focus
+          對焦
         </Button>
-        <Button variant="ghost" size="icon" className="size-8" onClick={() => setHelp(true)} aria-label="Shortcuts">
+        <Button variant="ghost" size="icon" className="size-8" onClick={() => setHelp(true)} aria-label="快捷鍵">
           <Keyboard className="size-4" />
         </Button>
         <UserButton />
@@ -979,42 +1042,60 @@ function StudioInner({ projectId }: { projectId: string }) {
       <div className="flex min-h-0 flex-1">
         {chrome.left && (
           <aside className="hidden w-[148px] shrink-0 overflow-y-auto border-r border-border bg-surface p-2 text-[11px] md:block">
-            <p className="px-1 text-[10px] uppercase tracking-wide text-faint">Layers</p>
+            <p className="px-1 text-[10px] uppercase tracking-wide text-faint">圖層</p>
+            {characters.length === 0 && objects.length === 0 && (
+              <p className="mt-1 px-1 text-[10px] text-faint">尚未選取角色或物件</p>
+            )}
+            {characters.map((c) => {
+              const on = selectedCharacterId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="mt-1 flex w-full items-center justify-between rounded-[var(--radius-xs)] px-1.5 py-1 text-left text-muted hover:bg-raised hover:text-fg"
+                  onClick={() => {
+                    setSelectedCharacterId(on ? null : c.id);
+                    setCharTrack(!on);
+                  }}
+                >
+                  <span>{c.name}</span>
+                  {on && charTrack ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+                </button>
+              );
+            })}
+            {objects.map((o) => {
+              const on = selectedObjectId === o.id;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  className="mt-1 flex w-full items-center justify-between rounded-[var(--radius-xs)] px-1.5 py-1 text-left text-muted hover:bg-raised hover:text-fg"
+                  onClick={() => setSelectedObjectId(on ? null : o.id)}
+                >
+                  <span>{o.name}</span>
+                  {on ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
+                </button>
+              );
+            })}
             {[
-              { id: "character", label: characters[0]?.name ?? "Character" },
-              { id: "object", label: objects[0]?.name ?? "Object" },
-              { id: "pose", label: "Pose" },
-              { id: "motion", label: "Motion" },
-              { id: "problems", label: "Problems" },
+              { id: "pose" as const, label: "姿態" },
+              { id: "motion" as const, label: "運動" },
+              { id: "problems" as const, label: "問題" },
             ].map((l) => {
-              const on =
-                l.id === "pose"
-                  ? overlayStack.primary === "pose" || overlayStack.extras.includes("pose")
-                  : l.id === "motion"
-                    ? overlayStack.primary === "motion" || overlayStack.extras.includes("motion")
-                    : l.id === "problems"
-                      ? overlayStack.primary === "problems" || overlayStack.extras.includes("problems")
-                      : l.id === "character"
-                        ? !charTrack || true
-                        : true;
+              const on = overlayStack.primary === l.id || overlayStack.extras.includes(l.id);
               return (
                 <button
                   key={l.id}
                   type="button"
                   className="mt-1 flex w-full items-center justify-between rounded-[var(--radius-xs)] px-1.5 py-1 text-left text-muted hover:bg-raised hover:text-fg"
-                  onClick={() => {
-                    if (l.id === "pose" || l.id === "motion" || l.id === "problems") {
-                      setOverlayStack((s) => setPrimary(s, l.id as OverlayStack["primary"]));
-                    }
-                    if (l.id === "character") setCharTrack((v) => !v);
-                  }}
+                  onClick={() => setOverlayStack((s) => setPrimary(s, l.id))}
                 >
                   <span>{l.label}</span>
                   {on ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
                 </button>
               );
             })}
-            <p className="mt-3 px-1 text-[10px] uppercase tracking-wide text-faint">Trail</p>
+            <p className="mt-3 px-1 text-[10px] uppercase tracking-wide text-faint">軌跡</p>
             {TRAIL_TARGETS.map((t) => (
               <button
                 key={t}
@@ -1028,21 +1109,21 @@ function StudioInner({ projectId }: { projectId: string }) {
                 }}
                 className={cn("mt-0.5 block w-full rounded-[var(--radius-xs)] px-1.5 py-0.5 text-left", trailTarget === t ? "bg-raised text-fg" : "text-faint")}
               >
-                {TRAIL_LABEL[t]}
+                {TRAIL_ZH[t]}
               </button>
             ))}
-            <p className="mt-3 px-1 text-[10px] uppercase tracking-wide text-faint">Tool</p>
+            <p className="mt-3 px-1 text-[10px] uppercase tracking-wide text-faint">工具</p>
             {(["pan", "region", "point", "character"] as CanvasTool[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setCanvasTool(t)}
-                className={cn("mt-0.5 block w-full rounded-[var(--radius-xs)] px-1.5 py-0.5 text-left capitalize", canvasTool === t ? "bg-raised text-fg" : "text-faint")}
+                className={cn("mt-0.5 block w-full rounded-[var(--radius-xs)] px-1.5 py-0.5 text-left", canvasTool === t ? "bg-raised text-fg" : "text-faint")}
               >
-                {t}
+                {TOOL_LABEL[t]}
               </button>
             ))}
-            {charTrack && <p className="mt-3 px-1 text-[10px] text-faint">Character track on — frames without the character are dimmed.</p>}
+            {charTrack && selectedCharacterId && <p className="mt-3 px-1 text-[10px] text-faint">角色軌道開啟 — 沒有此角色的影格會變暗。</p>}
           </aside>
         )}
 
@@ -1060,6 +1141,7 @@ function StudioInner({ projectId }: { projectId: string }) {
               annotations={annotations}
               pixelView={pixelView}
               regionBox={regionBox}
+              regionLive={regionLive}
               tool={canvasTool}
               trailTarget={trailTarget}
               selectedJoint={selectedJoint}
@@ -1088,18 +1170,20 @@ function StudioInner({ projectId }: { projectId: string }) {
                 if (!current) return;
                 if (canvasTool === "region") return;
                 if (canvasTool === "character") {
-                  const existing = characters[0];
-                  if (existing) {
-                    tool.mutate({ tool: "assign_character", args: { frameId: current.id, characterId: existing.id } });
+                  if (selectedCharacterId) {
+                    tool.mutate({ tool: "assign_character", args: { frameId: current.id, characterId: selectedCharacterId } });
                   } else {
-                    tool.mutate({ tool: "create_character", args: { projectId, name: `chr-${engine.currentFrame}` } });
+                    toast.message("請先在圖層選取角色，或到進階面板新增角色");
                   }
                 }
                 tool.mutate({
                   tool: "create_tracking_point",
                   args: {
                     projectId,
-                    name: canvasTool === "character" ? (characters[0]?.name ?? `chr-${engine.currentFrame}`) : `pt-${engine.currentFrame}`,
+                    name:
+                      canvasTool === "character"
+                        ? (characters.find((c) => c.id === selectedCharacterId)?.name ?? `pt-${engine.currentFrame}`)
+                        : `pt-${engine.currentFrame}`,
                     x,
                     y,
                     frameNumber: engine.currentFrame,
@@ -1140,14 +1224,14 @@ function StudioInner({ projectId }: { projectId: string }) {
             />
             {problemMenu && (
               <div className="absolute right-3 top-3 z-20 w-56 rounded-[var(--radius-sm)] border border-border bg-surface p-2 text-[11px] shadow-[var(--shadow-panel)]">
-                <p className="text-fg">F{engine.currentFrame} problem</p>
-                <p className="mt-1 text-faint">{problemList.find((p) => p.peak === engine.currentFrame)?.reason ?? "Jump neighbors, ask, or plan a repair."}</p>
+                <p className="text-fg">F{engine.currentFrame} 問題</p>
+                <p className="mt-1 text-faint">{problemList.find((p) => p.peak === engine.currentFrame)?.reason ?? "跳鄰近格、詢問，或規劃修復。"}</p>
                 <div className="mt-2 flex flex-col gap-1">
                   <Button size="sm" variant="ghost" onClick={() => { setCompareFrame(Math.max(0, engine.currentFrame - 1)); setFlicker(true); setOverlayStack({ primary: "compare", extras: [] }); }}>
-                    Neighbors
+                    鄰近格
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setAiOpen(true); void sendAsk("這裡為什麼怪怪的？"); }}>
-                    Ask AI
+                    問 AI
                   </Button>
                   <Button
                     size="sm"
@@ -1159,7 +1243,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                       setProblemMenu(false);
                     }}
                   >
-                    Create repair
+                    規劃修復
                   </Button>
                   <Button
                     size="sm"
@@ -1188,9 +1272,9 @@ function StudioInner({ projectId }: { projectId: string }) {
                       setHoldCompare(m === "hold");
                       setCompareFrame((n) => n ?? Math.max(0, engine.currentFrame - 1));
                     }}
-                    className={cn("rounded-[var(--radius-xs)] px-2 py-0.5 text-[10px] capitalize", compareMode === m ? "bg-raised text-fg" : "text-faint")}
+                    className={cn("rounded-[var(--radius-xs)] px-2 py-0.5 text-[10px]", compareMode === m ? "bg-raised text-fg" : "text-faint")}
                   >
-                    {m === "side" ? "Side by side" : m === "diff" ? "Difference" : m}
+                    {m === "side" ? "並排" : m === "diff" ? "差異" : m === "hold" ? "長按" : m === "flicker" ? "閃爍" : "疊加"}
                   </button>
                 ))}
               </div>
@@ -1198,13 +1282,13 @@ function StudioInner({ projectId }: { projectId: string }) {
             {chrome.onionPeek && engine.onionSkin.enabled && (
               <div className="pointer-events-auto absolute bottom-3 left-3 flex items-end gap-1.5">
                 {[
-                  { label: "Prev 3", n: engine.currentFrame - 3 },
+                  { label: "前 3", n: engine.currentFrame - 3 },
                   { label: "−2", n: engine.currentFrame - 2 },
                   { label: "−1", n: engine.currentFrame - 1 },
-                  { label: "Now", n: engine.currentFrame },
+                  { label: "現在", n: engine.currentFrame },
                   { label: "+1", n: engine.currentFrame + 1 },
                   { label: "+2", n: engine.currentFrame + 2 },
-                  { label: "Next 3", n: engine.currentFrame + 3 },
+                  { label: "後 3", n: engine.currentFrame + 3 },
                 ].map((s) => {
                   const f = frames.find((x) => x.frameNumber === s.n);
                   const src = f ? jpegUrl(imageMap.get(f.id) || f.thumbnailData || "") : "";
@@ -1227,7 +1311,7 @@ function StudioInner({ projectId }: { projectId: string }) {
             )}
             {repairViz && workspaceMode === "REPAIR" && (
               <div className="absolute left-3 top-3 z-10 rounded-[var(--radius-sm)] border border-repair/40 bg-surface/90 px-2 py-1 text-[11px]">
-                Only F{repairViz[0]}{repairViz[0] !== repairViz[1] ? `–F${repairViz[1]}` : ""} will change.
+                只會改 F{repairViz[0]}{repairViz[0] !== repairViz[1] ? `–F${repairViz[1]}` : ""}。
               </div>
             )}
           </div>
@@ -1241,13 +1325,24 @@ function StudioInner({ projectId }: { projectId: string }) {
               providers={llm.data ?? []}
               providerId={providerId}
               onProvider={setProviderId}
-              chips={chipsFromSnapshot(effectiveSnap, characters[0]?.name)}
-              following
-              lockLabel="Locked"
-              onToggleLock={() => undefined}
+              chips={chipsFromSnapshot(
+                effectiveSnap,
+                characters.find((c) => c.id === selectedCharacterId)?.name,
+              )}
+              following={!contextLocked}
+              lockLabel="已鎖定上下文"
+              onToggleLock={() => {
+                if (contextLocked) {
+                  setFrozenContext(null);
+                  setContextLocked(false);
+                } else {
+                  setFrozenContext({ ...liveContext });
+                  setContextLocked(true);
+                }
+              }}
               messages={chat}
               sending={askBusy}
-              toolStatus={askBusy ? "Looking at neighbors…" : null}
+              toolStatus={askBusy ? "正在看鄰近影格…" : null}
               stale={false}
               onSend={sendAsk}
               onViewRange={(a, b, peak) => viewProblem(peak, [a, b])}
@@ -1272,7 +1367,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                   const start = act.frame_range?.[0] ?? inb.start;
                   const end = act.frame_range?.[1] ?? inb.end;
                   if (start == null || end == null) {
-                    toast.error("Set start and end keys first");
+                    toast.error("請先設定起點與終點關鍵影格");
                     return;
                   }
                   setWorkspaceMode("GENERATE");
@@ -1402,9 +1497,9 @@ function StudioInner({ projectId }: { projectId: string }) {
                   key={t}
                   type="button"
                   onClick={() => setRightTab(t)}
-                  className={cn("rounded-[var(--radius-xs)] px-2 py-1 text-[10px] uppercase tracking-wide", rightTab === t ? "bg-raised text-fg" : "text-faint")}
+                  className={cn("rounded-[var(--radius-xs)] px-2 py-1 text-[10px] tracking-wide", rightTab === t ? "bg-raised text-fg" : "text-faint")}
                 >
-                  {t}
+                  {t === "problems" ? "問題" : t === "inbetween" ? "中間影格" : "進階"}
                 </button>
               ))}
             </div>
@@ -1421,8 +1516,8 @@ function StudioInner({ projectId }: { projectId: string }) {
                   />
                   {repairViz && (
                     <div className="rounded-[var(--radius-sm)] border border-repair/40 p-2 text-[11px]">
-                      <p>Repair window F{repairViz[0]}–F{repairViz[1]}</p>
-                      <p className="text-faint">Protected keys stay put. Only interior frames change.</p>
+                      <p>修復範圍 F{repairViz[0]}–F{repairViz[1]}</p>
+                      <p className="text-faint">受保護的關鍵影格不動，只改中間影格。</p>
                       <Button
                         size="sm"
                         className="mt-2"
@@ -1440,24 +1535,24 @@ function StudioInner({ projectId }: { projectId: string }) {
                         }}
                       >
                         <Wand2 className="size-3.5" />
-                        Confirm repair
+                        確認修復
                       </Button>
                     </div>
                   )}
                   <ConsistencyStrips frames={frames} imageMap={imageMap} consMap={consMap} onSeek={(n) => setEngine((s) => seek(s, n))} />
                   <div className="mt-3">
-                    <p className="text-[10px] uppercase tracking-wide text-faint">AI conversations {conversationCounts[engine.currentFrame] ? "💬" : ""}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-faint">AI 對話 {conversationCounts[engine.currentFrame] ? "💬" : ""}</p>
                     {conversationId ? (
                       <button
                         type="button"
                         className="mt-1 text-[11px] text-accent"
                         onClick={() => onOpenConversation(conversationId)}
                       >
-                        Reopen conversation on this frame
+                        重開此影格的對話
                       </button>
                     ) : (
                       <button type="button" className="mt-1 text-[11px] text-accent" onClick={openThread}>
-                        Ask about this frame
+                        問這一格
                       </button>
                     )}
                   </div>
@@ -1466,14 +1561,14 @@ function StudioInner({ projectId }: { projectId: string }) {
                     region={regionLive ? effectiveSnap.selected_region : null}
                     onClear={() => setRegionLive(false)}
                   />
-                  {regionMode && <p className="text-[10px] text-faint">Region tool — drag on the canvas.</p>}
+                  {regionMode && <p className="text-[10px] text-faint">選區工具 — 在畫布上拖曳。</p>}
                 </div>
               )}
               {rightTab === "inbetween" && (
                 <div className="space-y-3">
                   {workspaceMode === "GENERATE" && (
                     <div className="rounded-[var(--radius-sm)] border border-border p-2 text-[11px] text-muted">
-                      <p className="text-[10px] uppercase tracking-wide text-faint">Generate story</p>
+                      <p className="text-[10px] uppercase tracking-wide text-faint">生成流程</p>
                       <div className="mt-1 flex items-center gap-1 overflow-x-auto">
                         <span className="font-mono text-key">★ F{inb.start ?? "—"}</span>
                         <span className="text-faint">→</span>
@@ -1514,7 +1609,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                       engine.selectedRange && setInb((s) => ({ ...s, start: engine.selectedRange![0], end: engine.selectedRange![1] }))
                     }
                     onAnalyze={() => {
-                      if (!timelineId || inb.start == null || inb.end == null) return toast.error("Set start and end keys");
+                      if (!timelineId || inb.start == null || inb.end == null) return toast.error("請先設定起點與終點關鍵影格");
                       setInb((s) => ({ ...s, busy: true }));
                       tool.mutate({
                         tool: "create_inbetween_plan",
@@ -1653,9 +1748,15 @@ function StudioInner({ projectId }: { projectId: string }) {
                   onRestore={(id) => restoreRevisionFn({ data: { revisionId: id } }).then(refresh)}
                   onExport={() => void exportWebm(frames, imageMap, project.fps)}
                   onCreateCharacter={(name) => tool.mutate({ tool: "create_character", args: { projectId, name } })}
-                  onAssign={(id) => tool.mutate({ tool: "assign_character", args: { frameId: current.id, characterId: id } })}
+                  onAssign={(id) => {
+                    setSelectedCharacterId(id);
+                    tool.mutate({ tool: "assign_character", args: { frameId: current.id, characterId: id } });
+                  }}
                   onCreateObject={(name) => tool.mutate({ tool: "create_object", args: { projectId, name } })}
-                  onAssignObject={(id) => tool.mutate({ tool: "assign_object", args: { frameId: current.id, objectId: id } })}
+                  onAssignObject={(id) => {
+                    setSelectedObjectId(id);
+                    tool.mutate({ tool: "assign_object", args: { frameId: current.id, objectId: id } });
+                  }}
                   onDetectKeys={() => timelineId && tool.mutate({ tool: "detect_keyframes", args: { timelineId } })}
                 />
               )}
@@ -1669,7 +1770,7 @@ function StudioInner({ projectId }: { projectId: string }) {
           type="button"
           onClick={() => setAiOpen(true)}
           className="fixed bottom-4 right-4 z-30 flex h-11 items-center gap-2 rounded-[var(--radius-md)] border border-border bg-surface px-3 text-sm shadow-[var(--shadow-panel)]"
-          aria-label="Open AI"
+          aria-label="開啟 AI"
         >
           <MessageSquare className="size-4" />
           AI
@@ -1685,15 +1786,15 @@ function StudioInner({ projectId }: { projectId: string }) {
       {help && (
         <button type="button" className="fixed inset-0 z-40 grid place-items-center bg-bg/70" onClick={() => setHelp(false)}>
           <div className="w-[min(440px,92vw)] rounded-[var(--radius-md)] border border-border bg-surface p-5 text-left text-sm">
-            <p className="font-medium">Shortcuts</p>
+            <p className="font-medium">快捷鍵</p>
             <ul className="mt-3 space-y-1 text-muted">
-              <li>Space — play / pause · ← → or , . — flipbook</li>
-              <li>K keyframe · B breakdown · O onion · L loop · P pixel</li>
-              <li>A open AI · C consistency scan</li>
-              <li>U undo · Y redo · F focus · ` flicker · hold H</li>
-              <li>1–5 workspace modes · Shift-click overlay to stack</li>
-              <li>Region tool — drag on canvas to box a problem</li>
-              <li>Esc — clear region / return to fit</li>
+              <li>空白鍵 — 播放／暫停 · ← → 或 , . — 翻頁</li>
+              <li>K 關鍵影格 · B 分解影格 · O 洋蔥皮 · L 循環 · P 像素</li>
+              <li>A 開啟 AI · C 一致性掃描</li>
+              <li>U 復原 · Y 重做 · F 對焦 · ` 閃爍比對 · 按住 H</li>
+              <li>1–5 工作模式 · Shift 點疊加層可堆疊</li>
+              <li>選區工具 — 在畫布上拖出問題區域</li>
+              <li>Esc — 清除選區／回到符合畫面</li>
             </ul>
           </div>
         </button>
@@ -1708,7 +1809,7 @@ async function exportWebm(
   fps: number,
 ) {
   if (frames.length === 0) {
-    toast.error("No frames");
+    toast.error("沒有影格");
     return;
   }
   const first = frames[0];
@@ -1753,7 +1854,7 @@ async function exportPngSequence(
   candidate?: { frameNumber: number; thumbnailData?: string; imageData?: string }[],
 ) {
   if (frames.length === 0) {
-    toast.error("No frames");
+    toast.error("沒有影格");
     return;
   }
   const canvas = document.createElement("canvas");
@@ -1784,5 +1885,5 @@ async function exportPngSequence(
     n += 1;
     await new Promise((r) => setTimeout(r, 80));
   }
-  toast.message(`Exported ${n} PNG frames`);
+  toast.message(`已匯出 ${n} 張 PNG`);
 }

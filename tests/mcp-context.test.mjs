@@ -82,16 +82,16 @@ describe("MCP Context Bridge (spec §22–24, §29–30)", () => {
 
   it("overlay conversation attaches current frame / region / range", () => {
     assert.match(panel, /chipsFromSnapshot/);
-    assert.match(panel, /Region selected/);
+    assert.match(panel, /已選區域/);
     assert.match(panel, /F\$\{snap\.current_frame\}/);
-    assert.match(studio, /chipsFromSnapshot\(effectiveSnap/);
+    assert.match(studio, /chipsFromSnapshot\(/);
     assert.match(studio, /regionMode/);
     assert.match(studio, /commitRegion/);
   });
 
   it("timeline conversation marker can reopen the thread", () => {
     assert.match(studio, /onOpenConversation/);
-    assert.match(studio, /Reopen conversation on this frame/);
+    assert.match(studio, /重開此影格的對話/);
     assert.match(studio, /openThread/);
   });
 });

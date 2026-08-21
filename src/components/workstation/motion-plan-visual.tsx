@@ -6,7 +6,7 @@ export function MotionPlanVisual({ plan }: { plan: MotionPlanView | null }) {
   const objs = plan.objects ?? [];
   return (
     <div className="rounded-[var(--radius-sm)] border border-border bg-subtle p-2 text-[11px]">
-      <p className="text-[10px] uppercase tracking-wide text-faint">Motion plan</p>
+      <p className="text-[10px] uppercase tracking-wide text-faint">動作計畫</p>
       <ul className="mt-2 space-y-1 text-muted">
         {chars.map((c) => (
           <li key={c.character_id} className="flex justify-between gap-2">
@@ -23,11 +23,11 @@ export function MotionPlanVisual({ plan }: { plan: MotionPlanView | null }) {
           </li>
         ))}
         <li className="flex justify-between">
-          <span>Camera</span>
-          <span>{plan.camera?.movement ?? "unknown"}</span>
+          <span>相機</span>
+          <span>{plan.camera?.movement ?? "未知"}</span>
         </li>
         <li className="flex justify-between">
-          <span>Curve</span>
+          <span>曲線</span>
           <span>{plan.curve}</span>
         </li>
       </ul>
@@ -50,14 +50,14 @@ export function ConstraintChips({
   };
 }) {
   const chips: { label: string; note?: string }[] = [];
-  if (constraints.preserveCharacter) chips.push({ label: "Character lock" });
-  if (constraints.preserveFace) chips.push({ label: "Face lock", note: "eval only" });
-  if (constraints.preserveHair) chips.push({ label: "Hair lock", note: "eval only" });
-  if (constraints.preserveClothing) chips.push({ label: "Clothing lock", note: "eval only" });
-  if (constraints.preserveBody) chips.push({ label: "Body lock", note: "eval only" });
-  if (constraints.preserveBackground) chips.push({ label: "Background lock", note: "eval only" });
-  if (constraints.maintainContact) chips.push({ label: "Hand ↔ object", note: "eval only" });
-  if (constraints.keepCameraStatic) chips.push({ label: "Camera locked" });
+  if (constraints.preserveCharacter) chips.push({ label: "鎖定角色" });
+  if (constraints.preserveFace) chips.push({ label: "鎖定臉", note: "僅評估" });
+  if (constraints.preserveHair) chips.push({ label: "鎖定頭髮", note: "僅評估" });
+  if (constraints.preserveClothing) chips.push({ label: "鎖定服裝", note: "僅評估" });
+  if (constraints.preserveBody) chips.push({ label: "鎖定身體", note: "僅評估" });
+  if (constraints.preserveBackground) chips.push({ label: "鎖定背景", note: "僅評估" });
+  if (constraints.maintainContact) chips.push({ label: "手 ↔ 物件", note: "僅評估" });
+  if (constraints.keepCameraStatic) chips.push({ label: "相機鎖定" });
   return (
     <div className="flex flex-wrap gap-1">
       {chips.map((c) => (

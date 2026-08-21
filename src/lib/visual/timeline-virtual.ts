@@ -65,19 +65,19 @@ function severityRank(s: string): number {
 export function frameTypeMark(type: string): { glyph: string; title: string } {
   switch (type) {
     case "KEY":
-      return { glyph: "★", title: "Keyframe" };
+      return { glyph: "★", title: "關鍵影格" };
     case "BREAKDOWN":
-      return { glyph: "◆", title: "Breakdown" };
+      return { glyph: "◆", title: "分解影格" };
     case "GENERATED_BREAKDOWN":
-      return { glyph: "◆", title: "Generated breakdown" };
+      return { glyph: "◆", title: "產生的分解影格" };
     case "GENERATED":
-      return { glyph: "G", title: "Generated" };
+      return { glyph: "G", title: "產生格" };
     case "REPAIRED":
-      return { glyph: "R", title: "Repaired" };
+      return { glyph: "R", title: "修復格" };
     case "HOLD":
-      return { glyph: "H", title: "Hold" };
+      return { glyph: "H", title: "停留格" };
     case "INBETWEEN":
-      return { glyph: "●", title: "Inbetween" };
+      return { glyph: "●", title: "中間影格" };
     default:
       return { glyph: "·", title: type };
   }

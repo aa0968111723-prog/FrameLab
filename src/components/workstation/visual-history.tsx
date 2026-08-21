@@ -22,26 +22,26 @@ export function VisualHistory({
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-faint">Visual history</p>
+      <p className="text-[10px] uppercase tracking-wide text-faint">視覺歷史</p>
       <div className="mt-1 flex gap-2 text-[11px]">
         <button type="button" className="text-accent" onClick={onUndo}>
-          Undo
+          復原
         </button>
         <button type="button" className="text-accent" onClick={onRedo}>
-          Redo
+          重做
         </button>
       </div>
       <ul className="mt-2 max-h-36 space-y-1 overflow-auto">
-        {rows.length === 0 && <li className="text-[11px] text-faint">Original · no revisions yet</li>}
+        {rows.length === 0 && <li className="text-[11px] text-faint">原圖 · 尚無修訂</li>}
         {rows.map((r) => (
           <li key={r.id} className="flex items-center justify-between gap-2 rounded-[var(--radius-xs)] border border-border px-2 py-1">
             <span className="truncate text-[11px] text-muted">{r.action}</span>
             <span className="flex gap-1">
               <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => onPreview(r.id)}>
-                Preview
+                預覽
               </Button>
               <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => onRestore(r.id)}>
-                Restore
+                還原
               </Button>
             </span>
           </li>

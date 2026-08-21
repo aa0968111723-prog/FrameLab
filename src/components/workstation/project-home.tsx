@@ -62,9 +62,9 @@ function HomeInner() {
   });
 
   const sample = useMutation({
-    mutationFn: () => createSample({ data: { name: "Classic bouncing ball" } }),
+    mutationFn: () => createSample({ data: { name: "經典彈跳球" } }),
     onSuccess: (r) => {
-      toast.success("Sample timeline ready");
+      toast.success("範例時間軸已就緒");
       void nav({ to: "/studio/$projectId", params: { projectId: r.projectId } });
     },
     onError: (e) => toast.error(e.message),
@@ -72,9 +72,9 @@ function HomeInner() {
 
   const create = useMutation({
     mutationFn: () =>
-      createProjectFn({ data: { name: name.trim() || "Untitled", fps: 24 } }),
+      createProjectFn({ data: { name: name.trim() || "未命名", fps: 24 } }),
     onSuccess: (r) => {
-      toast.success("Project created");
+      toast.success("專案已建立");
       void nav({ to: "/studio/$projectId", params: { projectId: r.projectId } });
     },
   });
@@ -90,7 +90,7 @@ function HomeInner() {
     mutationFn: () =>
       createMcpTokenFn({
         data: {
-          name: "Studio agent",
+          name: "工作室代理",
           scopes: "READ,ANALYZE,EDIT,GENERATE,RENDER",
         },
       }),
@@ -103,23 +103,23 @@ function HomeInner() {
   async function onFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     const files = [...list];
-    setBusy("Reading media…");
+    setBusy("讀取媒體…");
     try {
       const video = files.find((f) => f.type.startsWith("video/"));
       const frames = video
         ? await extractVideoFrames(video, {
             fps: 12,
             maxFrames: 72,
-            onProgress: (d, t) => setBusy(`Extracting ${d}/${t}`),
+            onProgress: (d, t) => setBusy(`擷取 ${d}/${t}`),
           })
         : await extractImageSequence(files, {
-            onProgress: (d, t) => setBusy(`Reading ${d}/${t}`),
+            onProgress: (d, t) => setBusy(`讀取 ${d}/${t}`),
           });
       if (frames.length === 0) {
-        toast.error("No frames extracted");
+        toast.error("沒有擷取到影格");
         return;
       }
-      setBusy("Saving timeline…");
+      setBusy("儲存時間軸…");
       const result = await ingestSequenceFn({
         data: {
           name: video?.name ?? "Image sequence",
@@ -134,13 +134,13 @@ function HomeInner() {
         toast.error(result.error);
         return;
       }
-      toast.success(`${result.frameCount} frames`);
+      toast.success(`${result.frameCount} 格`);
       void nav({
         to: "/studio/$projectId",
         params: { projectId: result.projectId },
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Import failed");
+      toast.error(err instanceof Error ? err.message : "匯入失敗");
     } finally {
       setBusy(null);
     }
@@ -149,7 +149,7 @@ function HomeInner() {
   async function onFfmpeg(list: FileList | null) {
     if (!list || list.length === 0) return;
     const file = list[0];
-    setBusy("Uploading for FFmpeg…");
+    setBusy("上傳給 FFmpeg…");
     try {
       const body = new FormData();
       body.set("file", file);
@@ -164,10 +164,10 @@ function HomeInner() {
         jobId?: string;
       };
       if (!json.ok || !json.projectId) {
-        toast.error(json.error || "FFmpeg extract failed");
+        toast.error(json.error || "FFmpeg 擷取失敗");
         return;
       }
-      toast.success(`${json.frameCount ?? "?"} frames via FFmpeg`);
+      toast.success(`${json.frameCount ?? "?"} 格（FFmpeg）`);
       void nav({ to: "/studio/$projectId", params: { projectId: json.projectId } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "FFmpeg failed");
@@ -196,9 +196,9 @@ function HomeInner() {
         <section>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-medium tracking-tight">Projects</h1>
+              <h1 className="text-2xl font-medium tracking-tight">專案</h1>
               <p className="mt-1 text-sm text-muted">
-                Open a timeline or start from the classic ball.
+                開啟時間軸，或從經典彈跳球開始。
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -212,7 +212,7 @@ function HomeInner() {
                 ) : (
                   <Sparkles className="size-4" />
                 )}
-                Classic ball
+                經典彈跳球
               </Button>
               <Button
                 variant="secondary"
@@ -220,7 +220,7 @@ function HomeInner() {
                 disabled={Boolean(busy)}
               >
                 <Upload className="size-4" />
-                Import
+                匯入
               </Button>
               <Button
                 variant="ghost"
@@ -265,19 +265,18 @@ function HomeInner() {
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="New empty project"
+              placeholder="新建空白專案"
             />
             <Button type="submit" disabled={create.isPending}>
               <Plus className="size-4" />
-              Create
+              建立
             </Button>
           </form>
 
           <ul className="mt-6 divide-y divide-border rounded-[var(--radius-md)] border border-border bg-surface">
             {(projects.data ?? []).length === 0 && (
               <li className="px-4 py-10 text-center text-sm text-muted">
-                No projects yet. Start with the bouncing ball — onion skin is
-                the point.
+                還沒有專案。從彈跳球開始 — 洋蔥皮才是重點。
               </li>
             )}
             {(projects.data ?? []).map((p) => (
@@ -298,9 +297,9 @@ function HomeInner() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label="Delete project"
+                  aria-label="刪除專案"
                   onClick={() => {
-                    if (confirm(`Delete ${p.name}?`)) remove.mutate(p.id);
+                    if (confirm(`刪除 ${p.name}？`)) remove.mutate(p.id);
                   }}
                 >
                   <Trash2 className="size-4" />
@@ -312,17 +311,17 @@ function HomeInner() {
 
         <aside className="space-y-6">
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
-            <h2 className="text-sm font-medium">Ready providers</h2>
+            <h2 className="text-sm font-medium">可用供應商</h2>
             <ul className="mt-3 space-y-2 text-sm">
               {ready.map((m) => (
                 <li key={m.id} className="flex justify-between gap-2">
                   <span>{m.modelName}</span>
-                  <span className="text-good">ready</span>
+                  <span className="text-good">就緒</span>
                 </li>
               ))}
             </ul>
             <h3 className="mt-4 text-xs uppercase tracking-wide text-faint">
-              Not loaded
+              未載入
             </h3>
             <ul className="mt-2 space-y-1 text-xs text-muted">
               {missing.map((m) => (
@@ -335,14 +334,13 @@ function HomeInner() {
 
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium">MCP tokens</h2>
+              <h2 className="text-sm font-medium">MCP token</h2>
               <Button size="sm" variant="secondary" onClick={() => mint.mutate()}>
-                Issue
+                簽發
               </Button>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              POST /api/mcp with Bearer token. Tokens are hashed; the secret is
-              shown once.
+              POST /api/mcp 帶 Bearer token。token 會雜湊儲存；密鑰只顯示一次。
             </p>
             {tokenPlain && (
               <pre className="mt-3 overflow-x-auto rounded-[var(--radius-sm)] bg-bg p-2 text-[11px] text-key">

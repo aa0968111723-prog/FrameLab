@@ -310,7 +310,7 @@ export async function createInbetweenPlanCmd(ctx: CommandContext, args: Record<s
     provider: inb.id,
     available: inb.available(),
     confirmation: {
-      title: "Generate Inbetweens",
+      title: "產生中間影格",
       start: pair.start_frame_number,
       end: pair.end_frame_number,
       frames: pair.desired_inbetween_count,

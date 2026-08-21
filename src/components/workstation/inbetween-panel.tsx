@@ -134,39 +134,39 @@ export function InbetweenPanel({
 
   return (
     <div className="space-y-3 rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
-      <p className="text-xs uppercase tracking-wide text-faint">Inbetween</p>
+      <p className="text-xs uppercase tracking-wide text-faint">中間影格</p>
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div>
-          <p className="text-faint">Start</p>
+          <p className="text-faint">起點</p>
           <p className="font-mono text-sm">
             {state.start != null ? `F${state.start} ★` : "—"}
           </p>
           <Button size="sm" variant="ghost" onClick={onSetStart} disabled={state.busy}>
-            Set F{currentFrame}
+            設為 F{currentFrame}
           </Button>
         </div>
         <div>
-          <p className="text-faint">End</p>
+          <p className="text-faint">終點</p>
           <p className="font-mono text-sm">
             {state.end != null ? `F${state.end} ★` : "—"}
           </p>
           <Button size="sm" variant="ghost" onClick={onSetEnd} disabled={state.busy}>
-            Set F{currentFrame}
+            設為 F{currentFrame}
           </Button>
         </div>
       </div>
       {selectedRange && (
         <Button size="sm" variant="ghost" onClick={onUseRange} disabled={state.busy}>
-          Use range F{selectedRange[0]}–F{selectedRange[1]}
+          使用範圍 F{selectedRange[0]}–F{selectedRange[1]}
         </Button>
       )}
       {gap != null && (
         <p className="text-[11px] text-muted">
-          Gap: {gap} frames · Generated: {generated}
+          間隔：{gap} 格 · 將產生：{generated}
         </p>
       )}
       <label className="block text-xs text-muted">
-        Frames
+        影格數
         <Input
           type="number"
           className="mt-1"
@@ -177,7 +177,7 @@ export function InbetweenPanel({
         />
       </label>
       <fieldset className="space-y-1">
-        <legend className="text-xs text-muted">Motion</legend>
+        <legend className="text-xs text-muted">運動曲線</legend>
         {(["linear", "ease_in", "ease_out", "ease_in_out", "hold"] as const).map((c) => (
           <label key={c} className="flex items-center gap-2 text-[11px] text-fg">
             <input
@@ -187,38 +187,38 @@ export function InbetweenPanel({
               onChange={() => onCurve(c)}
             />
             {c === "linear"
-              ? "Linear"
+              ? "線性"
               : c === "ease_in"
-                ? "Ease In"
+                ? "緩入"
                 : c === "ease_out"
-                  ? "Ease Out"
+                  ? "緩出"
                   : c === "ease_in_out"
-                    ? "Ease In Out"
-                    : "Hold"}
+                    ? "緩入緩出"
+                    : "停留"}
           </label>
         ))}
       </fieldset>
       <label className="block text-xs text-muted">
-        Quality
+        品質
         <select
           className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm text-fg"
           value={state.quality}
           onChange={(e) => onQuality(e.target.value === "production" ? "production" : "preview")}
         >
-          <option value="preview">Preview</option>
-          <option value="production">Production</option>
+          <option value="preview">預覽</option>
+          <option value="production">成品</option>
         </select>
       </label>
-      <p className="text-[11px] text-faint">Provider: Auto (linear-blend). Wan / RIFE / ComfyUI unavailable.</p>
+      <p className="text-[11px] text-faint">供應商：自動（線性混合）。Wan／RIFE／ComfyUI 不可用。</p>
       <fieldset className="space-y-1">
-        <legend className="text-xs text-muted">Constraints</legend>
+        <legend className="text-xs text-muted">約束</legend>
         {(
           [
-            ["preserveCharacter", "Character"],
-            ["preserveFace", "Face"],
-            ["preserveBackground", "Background"],
-            ["maintainContact", "Hand ↔ Suitcase"],
-            ["keepCameraStatic", "Camera static"],
+            ["preserveCharacter", "角色"],
+            ["preserveFace", "臉"],
+            ["preserveBackground", "背景"],
+            ["maintainContact", "手 ↔ 行李箱"],
+            ["keepCameraStatic", "相機靜止"],
           ] as const
         ).map(([k, label]) => (
           <label key={k} className="flex items-center gap-2 text-[11px]">
@@ -233,26 +233,26 @@ export function InbetweenPanel({
       </fieldset>
       {state.plan && (
         <div className="space-y-1 rounded-[var(--radius-sm)] border border-border p-2 text-[11px]">
-          <p className="text-xs uppercase tracking-wide text-faint">Motion Plan v{state.plan.version}</p>
+          <p className="text-xs uppercase tracking-wide text-faint">動作計畫 v{state.plan.version}</p>
           <p className="text-muted">
-            Curve {state.plan.curve}
-            {state.plan.timing ? ` · ${state.plan.timing.frames} frames @ ${state.plan.timing.fps} fps` : ""}
+            曲線 {state.plan.curve}
+            {state.plan.timing ? ` · ${state.plan.timing.frames} 格 @ ${state.plan.timing.fps} fps` : ""}
           </p>
-          <p className="text-muted">Camera: {state.plan.camera?.movement ?? "unknown"}</p>
+          <p className="text-muted">相機：{state.plan.camera?.movement ?? "未知"}</p>
           {(state.plan.characters ?? []).length > 0 ? (
             <ul className="text-fg">
               {(state.plan.characters ?? []).map((c) => (
                 <li key={c.character_id}>
-                  Character {String(c.pose_transition?.name ?? c.character_id.slice(0, 8))} · {c.motion.direction} · dist{" "}
+                  角色 {String(c.pose_transition?.name ?? c.character_id.slice(0, 8))} · {c.motion.direction} · 距離{" "}
                   {c.motion.distance_normalized.toFixed(2)}
                   {typeof c.pose_transition.pose_displacement === "number"
-                    ? ` · pose Δ ${Number(c.pose_transition.pose_displacement).toFixed(2)}`
+                    ? ` · 姿態 Δ ${Number(c.pose_transition.pose_displacement).toFixed(2)}`
                     : ""}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-faint">No character assignment on the start key.</p>
+            <p className="text-faint">起點關鍵影格尚未指定角色。</p>
           )}
           {(state.plan.objects ?? []).length > 0 && (
             <ul>
@@ -263,7 +263,7 @@ export function InbetweenPanel({
           )}
           {(state.plan.constraints ?? []).length > 0 && (
             <p className="text-muted">
-              Constraints: {(state.plan.constraints ?? []).map((c) => c.kind.replaceAll("_", " ")).join(" · ")}
+              約束：{(state.plan.constraints ?? []).map((c) => c.kind.replaceAll("_", " ")).join(" · ")}
             </p>
           )}
           {(state.plan.breakdowns ?? []).length > 0 && (
@@ -279,7 +279,7 @@ export function InbetweenPanel({
       {state.analysis && (
         <div className="space-y-1 text-[11px] text-muted">
           <p>
-            Complexity {state.analysis.complexity} ({Math.round(state.analysis.score * 100)}%)
+            複雜度 {state.analysis.complexity}（{Math.round(state.analysis.score * 100)}%）
           </p>
           <p>{state.analysis.strategy.reason}</p>
           {state.analysis.suggest_breakdown && state.analysis.suggested_breakdown != null && (
@@ -296,11 +296,11 @@ export function InbetweenPanel({
       )}
       <div className="grid grid-cols-2 gap-2">
         <Button size="sm" variant="secondary" disabled={state.busy} onClick={onAnalyze}>
-          Analyze Transition
+          分析轉場
         </Button>
         <Button size="sm" variant="secondary" disabled={state.busy} onClick={onPlan}>
           <Sparkles className="size-3.5" />
-          Generate
+          產生計畫
         </Button>
       </div>
 
@@ -311,9 +311,9 @@ export function InbetweenPanel({
             F{state.confirmation.start} → F{state.confirmation.end}
           </p>
           <ul className="text-[11px] text-muted">
-            <li>Frames: {state.confirmation.frames}</li>
-            <li>Motion: {state.confirmation.curve}</li>
-            <li>Provider: {state.confirmation.provider}</li>
+            <li>影格數：{state.confirmation.frames}</li>
+            <li>運動：{state.confirmation.curve}</li>
+            <li>供應商：{state.confirmation.provider}</li>
           </ul>
           {state.confirmation.constraints.length > 0 && (
             <ul className="text-[11px] text-fg">
@@ -347,10 +347,10 @@ export function InbetweenPanel({
           ) : (
             <div className="flex gap-1">
               <Button size="sm" variant="secondary" disabled={state.busy} onClick={onConfirmGenerate}>
-                Generate
+                產生
               </Button>
               <Button size="sm" variant="ghost" disabled={state.busy} onClick={onCancelConfirm}>
-                Cancel
+                取消
               </Button>
             </div>
           )}
@@ -360,9 +360,9 @@ export function InbetweenPanel({
       {state.candidate && (
         <div className="space-y-2 rounded-[var(--radius-sm)] border border-gen/40 p-2">
           <p className="text-xs font-medium">
-            {state.candidate.count} frames generated · {state.candidate.provider} · {state.candidate.quality}
+            {state.candidate.count} 格已產生 · {state.candidate.provider} · {state.candidate.quality === "production" ? "成品" : "預覽"}
           </p>
-          <p className="text-[11px] text-faint">Candidate only — active timeline unchanged.</p>
+          <p className="text-[11px] text-faint">僅為候選版本 — 尚未寫入時間軸。</p>
           {state.candidate.frames.length > 0 && (
             <div className="flex gap-1 overflow-x-auto scrollbar-thin">
               {state.candidate.frames.map((f) => (
@@ -393,7 +393,7 @@ export function InbetweenPanel({
           )}
           {(state.candidate.evaluation?.problems ?? []).length > 0 && (
             <div className="text-[11px] text-warn">
-              <p>Problems:</p>
+              <p>問題：</p>
               <ul>
                 {(state.candidate.evaluation?.problems ?? []).slice(0, 6).map((p) => (
                   <li key={`${p.frame_number}-${p.category}`}>
@@ -410,23 +410,23 @@ export function InbetweenPanel({
           ))}
           <div className="flex flex-wrap gap-1">
             <Button size="sm" variant="secondary" disabled={state.busy} onClick={onViewCandidate}>
-              View
+              查看
             </Button>
             {state.candidate.previousCandidateId && (state.candidate.previousFrames?.length ?? 0) > 0 && (
               <Button size="sm" variant="secondary" disabled={state.busy} onClick={onCompareCandidates}>
-                Compare A / B
+                比較 A／B
               </Button>
             )}
             {(state.candidate.evaluation?.problems ?? []).length > 0 && (
               <Button size="sm" variant="secondary" disabled={state.busy} onClick={onRegenerate}>
-                Regenerate problem frames
+                只重產問題格
               </Button>
             )}
             <Button size="sm" variant="secondary" disabled={state.busy} onClick={onAccept}>
-              Accept
+              接受
             </Button>
             <Button size="sm" variant="ghost" disabled={state.busy} onClick={onReject}>
-              Reject
+              拒絕
             </Button>
           </div>
         </div>
@@ -434,10 +434,10 @@ export function InbetweenPanel({
 
       <div className="flex flex-wrap gap-1">
         <Button size="sm" variant="ghost" disabled={state.busy} onClick={onExportSequence}>
-          Export PNG sequence
+          匯出 PNG 序列
         </Button>
         <Button size="sm" variant="ghost" disabled={state.busy} onClick={onRenderPreview}>
-          Render preview
+          渲染預覽
         </Button>
       </div>
     </div>

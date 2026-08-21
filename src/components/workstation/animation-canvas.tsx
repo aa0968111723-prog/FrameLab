@@ -56,6 +56,7 @@ export function AnimationCanvas({
   annotations,
   pixelView,
   regionBox,
+  regionLive = false,
   tool,
   trailTarget,
   selectedJoint,
@@ -86,6 +87,7 @@ export function AnimationCanvas({
   annotations: VisualAnnotation[];
   pixelView: boolean;
   regionBox: { x: number; y: number; w: number; h: number };
+  regionLive?: boolean;
   tool: CanvasTool;
   trailTarget: TrailTarget;
   selectedJoint: string | null;
@@ -364,18 +366,18 @@ export function AnimationCanvas({
         ctx.fillRect(dx, dy, current.width * scale, current.height * scale);
         const label =
           annotations.find((a) => a.frame_number === engine.currentFrame && a.type !== "RANGE")?.label ??
-          "Problem on this frame";
+          "這一格有問題";
         bubbleRef.current = drawProblemBubble(ctx, dx + current.width * scale * 0.58, dy + 12, label);
       }
     }
 
     const maskHere = maskTrack?.find((m) => m.frame === engine.currentFrame);
-    if ((layers.has("mask") || overlay.primary === "mask" || tool === "region") && !maskHere) {
-      drawRegionOutline(ctx, vt, regionBox, { label: "Region", fill: true });
+    if (regionLive && (layers.has("mask") || overlay.primary === "mask" || tool === "region") && !maskHere) {
+      drawRegionOutline(ctx, vt, regionBox, { label: "選區", fill: true });
     }
     if (maskHere) {
       drawRegionOutline(ctx, vt, maskHere.mask, {
-        label: maskHere.lost ? "Mask lost" : "Mask",
+        label: maskHere.lost ? "遮罩遺失" : "遮罩",
         tone: maskHere.lost ? "rgba(196,120,120,0.95)" : "rgba(155,176,160,0.9)",
         fill: true,
       });
@@ -418,6 +420,7 @@ export function AnimationCanvas({
     load,
     pixelView,
     regionBox,
+    regionLive,
     dragBox,
     trailTarget,
     selectedJoint,

@@ -96,10 +96,10 @@ export function ConversationPanel({
           </button>
         )}
         <span className="ml-auto flex gap-1">
-          <Button variant="ghost" size="icon" onClick={onMinimize} aria-label="Minimize">
+          <Button variant="ghost" size="icon" onClick={onMinimize} aria-label="縮小">
             <Minus className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="關閉">
             <X className="size-4" />
           </Button>
         </span>
@@ -125,16 +125,16 @@ export function ConversationPanel({
           className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted hover:text-fg"
         >
           {following ? <LockOpen className="size-3" /> : <Lock className="size-3" />}
-          {following ? "Following workspace" : lockLabel}
+          {following ? "跟隨工作區" : lockLabel}
         </button>
       </div>
 
       {providerStatus === "NOT_CONFIGURED" && (
-        <p className="border-b border-border px-3 py-1.5 text-[11px] text-warn">AI provider is not configured.</p>
+        <p className="border-b border-border px-3 py-1.5 text-[11px] text-warn">尚未設定 AI 供應商。</p>
       )}
 
       <div className="flex flex-wrap gap-1 border-b border-border px-3 py-2">
-        {chips.length === 0 && <span className="text-[11px] text-faint">No selection</span>}
+        {chips.length === 0 && <span className="text-[11px] text-faint">尚未選取</span>}
         {chips.map((c) => (
           <span key={c} className="rounded-[var(--radius-xs)] bg-raised px-1.5 py-0.5 font-mono text-[10px] text-muted">
             {c}
@@ -143,23 +143,23 @@ export function ConversationPanel({
       </div>
 
       {stale && (
-        <p className="border-b border-warn/30 bg-warn/10 px-3 py-1.5 text-[11px] text-warn">This answer refers to an earlier selection.</p>
+        <p className="border-b border-warn/30 bg-warn/10 px-3 py-1.5 text-[11px] text-warn">這則回覆對應的是較早的選取。</p>
       )}
 
       <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
         {messages.length === 0 && (
           <p className="text-xs leading-relaxed text-muted">
             {mode === "ASSIST"
-              ? "Box a region or stop on a frame, then ask. FrameLab will point at the problem — it will not edit until you confirm."
-              : "Point at a frame, drag a range, box a region, then ask. The assistant only reads this workspace."}
+              ? "框選區域或停在某一格再提問。FrameLab 會指出問題，確認前不會改畫面。"
+              : "指定影格、拖出範圍、框選區域後再問。助手只讀這個工作區。"}
           </p>
         )}
         {messages.map((m) => (
           <div key={m.id} className={cn("text-sm", m.role === "user" ? "text-fg" : "text-muted")}>
             <p className="text-[10px] uppercase tracking-wide text-faint">
-              {m.role === "user" ? "You" : "Assistant"}
-              {m.stale ? " · earlier selection" : ""}
-              {m.assist?.context_label ? ` · Based on ${m.assist.context_label}` : ""}
+              {m.role === "user" ? "你" : "助手"}
+              {m.stale ? " · 較早的選取" : ""}
+              {m.assist?.context_label ? ` · 依據 ${m.assist.context_label}` : ""}
             </p>
             <p className="mt-1 whitespace-pre-wrap leading-relaxed">{visibleText(m.content)}</p>
             {m.assist?.problem_ranges?.length ? (
@@ -175,13 +175,13 @@ export function ConversationPanel({
                       className="text-accent"
                       onClick={() => onViewRange?.(r.start, r.end, r.peak_frame)}
                     >
-                      View
+                      查看
                     </button>
                   </div>
                 ))}
                 {m.assist.repair_plan ? (
                   <p className="text-warn">
-                    Repair F{m.assist.repair_plan.repair_range[0]}–F{m.assist.repair_plan.repair_range[1]} (confirm)
+                    修復 F{m.assist.repair_plan.repair_range[0]}–F{m.assist.repair_plan.repair_range[1]}（需確認）
                   </p>
                 ) : null}
               </div>
@@ -197,7 +197,7 @@ export function ConversationPanel({
             ) : null}
           </div>
         ))}
-        {(sending || toolStatus) && <p className="text-[11px] text-faint">{toolStatus || "Looking at neighbors…"}</p>}
+        {(sending || toolStatus) && <p className="text-[11px] text-faint">{toolStatus || "正在看鄰近影格…"}</p>}
       </div>
 
       <form
@@ -226,7 +226,7 @@ export function ConversationPanel({
             }
           }}
         />
-        <Button type="submit" size="icon" disabled={sending || !draft.trim()} aria-label="Send">
+        <Button type="submit" size="icon" disabled={sending || !draft.trim()} aria-label="送出">
           <Send className="size-4" />
         </Button>
       </form>
@@ -245,11 +245,11 @@ export function chipsFromSnapshot(snap: SerializedContext | null, characterName?
   if (snap.selected_range && snap.selected_range[0] !== snap.selected_range[1]) {
     chips.push(`F${snap.selected_range[0]}–F${snap.selected_range[1]}`);
   }
-  if (characterName) chips.push(`Character ${characterName}`);
-  else if (snap.selected_character) chips.push("Character");
-  if (snap.selected_region) chips.push("Region selected");
+  if (characterName) chips.push(`角色 ${characterName}`);
+  else if (snap.selected_character) chips.push("角色");
+  if (snap.selected_region) chips.push("已選區域");
   if (snap.onion_skin.enabled) {
-    chips.push(`Onion ${snap.onion_skin.previousFrames}/${snap.onion_skin.nextFrames}`);
+    chips.push(`洋蔥皮 ${snap.onion_skin.previousFrames}/${snap.onion_skin.nextFrames}`);
   }
   return chips;
 }

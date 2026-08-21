@@ -75,9 +75,9 @@ export function ConsistencyStrips({
 }) {
   return (
     <div>
-      <Strip title="Face strip" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} />
-      <Strip title="Hand strip" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} />
-      <Strip title="Object strip" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} objectTop={false} />
+      <Strip title="臉" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} />
+      <Strip title="手" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} />
+      <Strip title="物件" frames={frames} imageMap={imageMap} consMap={consMap} onSeek={onSeek} objectTop={false} />
     </div>
   );
 }

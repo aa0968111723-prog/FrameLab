@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { categoryLabel } from "@/lib/domain/visual-annotation";
-import { matchesProblemFilter, PROBLEM_FILTERS, type ProblemFilter } from "@/lib/visual/workspace-mode";
+import { matchesProblemFilter, PROBLEM_FILTERS, PROBLEM_FILTER_LABEL, type ProblemFilter } from "@/lib/visual/workspace-mode";
 import { cn } from "@/lib/utils";
 
 export type ProblemItem = {
@@ -30,7 +30,7 @@ export function ProblemNavigator({
   const shown = items.filter((p) => matchesProblemFilter(p.category, filter));
   return (
     <div className="space-y-2">
-      <p className="text-[10px] uppercase tracking-wide text-faint">Problems</p>
+      <p className="text-[10px] uppercase tracking-wide text-faint">問題</p>
       <div className="flex flex-wrap gap-1">
         {PROBLEM_FILTERS.map((f) => (
           <button
@@ -42,12 +42,12 @@ export function ProblemNavigator({
               filter === f ? "bg-raised text-fg" : "text-faint hover:text-fg",
             )}
           >
-            {f}
+            {PROBLEM_FILTER_LABEL[f]}
           </button>
         ))}
       </div>
       {shown.length === 0 && (
-        <p className="text-[11px] text-faint">Nothing marked. Scan the range — FrameLab will not invent issues.</p>
+        <p className="text-[11px] text-faint">尚未標記。掃描範圍 — FrameLab 不會捏造問題。</p>
       )}
       {shown.map((p) => (
         <button
@@ -60,11 +60,11 @@ export function ProblemNavigator({
             F{p.range[0]}–F{p.range[1]} · {categoryLabel(p.category)}
           </p>
           <p className="text-[11px] text-faint">{p.reason}</p>
-          <span className="mt-1 inline-flex gap-2 text-[10px] text-accent">View · Compare · Repair</span>
+          <span className="mt-1 inline-flex gap-2 text-[10px] text-accent">查看 · 比對 · 修復</span>
         </button>
       ))}
       <Button size="sm" variant="secondary" disabled={busy} onClick={onScan}>
-        Scan range
+        掃描範圍
       </Button>
     </div>
   );

@@ -137,27 +137,27 @@ export function fromNormalized(
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
-  FACE: "Face",
-  HAND: "Hand",
-  BODY: "Body",
-  CHARACTER_IDENTITY: "Character",
-  CHARACTER_STABILITY: "Character",
-  OBJECT: "Object",
-  OBJECT_STABILITY: "Object",
-  BACKGROUND: "Background",
-  CONTACT: "Contact",
-  CONTACT_CONTINUITY: "Contact",
-  MOTION: "Motion",
-  MOTION_CONTINUITY: "Motion",
-  POSE: "Pose",
-  POSE_CONTINUITY: "Pose",
-  TRACKING_CONTINUITY: "Track",
-  TEMPORAL_FLICKER: "Flicker",
-  CAMERA: "Camera",
+  FACE: "臉",
+  HAND: "手",
+  BODY: "身體",
+  CHARACTER_IDENTITY: "角色",
+  CHARACTER_STABILITY: "角色",
+  OBJECT: "物件",
+  OBJECT_STABILITY: "物件",
+  BACKGROUND: "背景",
+  CONTACT: "接觸",
+  CONTACT_CONTINUITY: "接觸",
+  MOTION: "運動",
+  MOTION_CONTINUITY: "運動",
+  POSE: "姿態",
+  POSE_CONTINUITY: "姿態",
+  TRACKING_CONTINUITY: "追蹤",
+  TEMPORAL_FLICKER: "閃爍",
+  CAMERA: "相機",
 };
 
 export function categoryLabel(category?: string | null): string {
-  if (!category) return "Problem";
+  if (!category) return "問題";
   return CATEGORY_LABEL[category] ?? category.replaceAll("_", " ").toLowerCase();
 }
 

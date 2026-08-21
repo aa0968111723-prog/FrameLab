@@ -27,11 +27,11 @@ export function jobStageLabel(
 ): string {
   if (stage?.label && (state === "running" || state === "queued")) return stage.label;
   if (type === "GENERATE_INBETWEENS" && (state === "running" || state === "queued")) {
-    if (progress < 15) return "Analyzing keyframes...";
-    if (progress < 30) return "Creating motion plan...";
-    if (progress < 70) return `Generating frames... ${progress}%`;
-    if (progress < 90) return "Evaluating generated frames...";
-    if (progress < 100) return "Checking consistency...";
+    if (progress < 15) return "正在分析關鍵影格…";
+    if (progress < 30) return "正在建立動作計畫…";
+    if (progress < 70) return `正在產生影格… ${progress}%`;
+    if (progress < 90) return "正在評估產生的影格…";
+    if (progress < 100) return "正在檢查一致性…";
   }
   const frames =
     stage?.current != null && stage?.total != null
@@ -39,19 +39,19 @@ export function jobStageLabel(
       : null;
   const running = state === "running" || state === "queued";
   if (running && type === "OPTICAL_FLOW") {
-    return frames ? `Analyzing Motion ${frames}` : `Analyzing Motion ${progress}%`;
+    return frames ? `分析運動 ${frames}` : `分析運動 ${progress}%`;
   }
   if (running && type === "POSE_ANALYSIS") {
-    return frames ? `Analyzing Pose ${frames}` : `Analyzing Pose ${progress}%`;
+    return frames ? `分析姿態 ${frames}` : `分析姿態 ${progress}%`;
   }
   if (running && type === "POINT_TRACKING") {
-    return frames ? `Analyzing Tracking ${frames}` : `Analyzing Tracking ${progress}%`;
+    return frames ? `分析追蹤 ${frames}` : `分析追蹤 ${progress}%`;
   }
   if (running && type === "CONSISTENCY_ANALYSIS") {
-    return frames ? `Evaluating Consistency ${frames}` : `Evaluating Consistency ${progress}%`;
+    return frames ? `評估一致性 ${frames}` : `評估一致性 ${progress}%`;
   }
   if (running && type === "REPAIR_INTERPOLATION") {
-    return frames ? `Repair interpolation ${frames}` : `Repair interpolation ${progress}%`;
+    return frames ? `修復插值 ${frames}` : `修復插值 ${progress}%`;
   }
   if (stage?.label && running) return stage.label;
   return `${type} · ${state} · ${progress}%`;

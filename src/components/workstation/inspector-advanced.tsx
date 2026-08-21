@@ -113,7 +113,7 @@ export function AdvancedInspector({
       <p className="font-mono text-lg tabular-nums">{padFrame(current.frameNumber)}</p>
       <Badge tone={typeTone(current.frameType)}>{current.frameType}</Badge>
       <label className="block text-xs text-muted">
-        Type
+        類型
         <select
           className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm"
           value={current.frameType}
@@ -125,12 +125,12 @@ export function AdvancedInspector({
         </select>
       </label>
       <label className="block text-xs text-muted">
-        Duration (ms)
+        時長（毫秒）
         <Input type="number" className="mt-1" value={current.durationMs} onChange={(e) => onDuration(Number(e.target.value))} />
       </label>
       {onExposure && (
         <label className="block text-xs text-muted">
-          Exposure (ones / twos / threes)
+          曝光（ones / twos / threes）
           <select
             className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm"
             defaultValue="1"
@@ -143,11 +143,11 @@ export function AdvancedInspector({
         </label>
       )}
       <label className="flex items-center justify-between text-xs text-muted">
-        Locked
+        鎖定
         <Switch checked={current.isLocked} onCheckedChange={onLock} />
       </label>
       <label className="block text-xs text-muted">
-        Notes
+        備註
         <textarea
           className="mt-1 h-16 w-full rounded-[var(--radius-sm)] border border-border bg-subtle p-2 text-sm"
           value={notes}
@@ -156,16 +156,16 @@ export function AdvancedInspector({
         />
       </label>
       <div>
-        <p className="text-xs text-muted">Onion prev / next</p>
+        <p className="text-xs text-muted">洋蔥皮 前／後</p>
         <Slider className="mt-2" min={0} max={3} step={1} value={[onion.prev]} onValueChange={([v]) => setOnion({ prev: v })} />
         <Slider className="mt-2" min={0} max={3} step={1} value={[onion.next]} onValueChange={([v]) => setOnion({ next: v })} />
-        <p className="mt-2 text-[10px] text-faint">Opacity prev / next</p>
+        <p className="mt-2 text-[10px] text-faint">透明度 前／後</p>
         <Slider className="mt-2" min={0.05} max={0.8} step={0.05} value={[onion.opacityPrev]} onValueChange={([v]) => setOnion({ opacityPrev: v })} />
         <Slider className="mt-2" min={0.05} max={0.8} step={0.05} value={[onion.opacityNext]} onValueChange={([v]) => setOnion({ opacityNext: v })} />
       </div>
       {scores && (
         <details className="text-[11px]">
-          <summary className="cursor-pointer text-faint">Advanced scores</summary>
+          <summary className="cursor-pointer text-faint">進階分數</summary>
           <ul className="mt-1 space-y-1 font-mono">
             {Object.entries(scores).map(([k, v]) => (
               <li key={k} className="flex justify-between text-faint">
@@ -181,32 +181,32 @@ export function AdvancedInspector({
           Grok
         </Button>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onPose}>
-          Pose-lite
+          姿態精簡
         </Button>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onMotion}>
-          Motion
+          運動
         </Button>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onTrack}>
-          Track
+          追蹤
         </Button>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onDetectKeys}>
-          Keys
+          關鍵格
         </Button>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onRepair}>
-          Blend repair
+          混合修復
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onRepairRegion}>
-          Region blend
+          區域混合
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onDuplicate}>
-          Duplicate
+          複製
         </Button>
         <Button size="sm" variant="danger" disabled={busy} onClick={onDelete}>
-          Delete
+          刪除
         </Button>
         <Button size="sm" variant="secondary" onClick={onExport}>
           <Download className="size-3.5" />
-          Export
+          匯出
         </Button>
       </div>
       <div className="grid grid-cols-4 gap-1">
@@ -222,9 +222,9 @@ export function AdvancedInspector({
           <option key={k}>{k}</option>
         ))}
       </select>
-      <p className="text-[10px] text-faint">SAM2 named masks: MODEL_NOT_AVAILABLE. Rectangle is real.</p>
+      <p className="text-[10px] text-faint">SAM2 具名遮罩：MODEL_NOT_AVAILABLE。矩形選區是真的。</p>
       <div>
-        <p className="text-xs text-muted">Characters</p>
+        <p className="text-xs text-muted">角色</p>
         {characters.map((c) => (
           <button key={c.id} type="button" className="mr-2 text-[11px] text-accent" onClick={() => onAssign(c.id)}>
             {c.name}
@@ -239,25 +239,25 @@ export function AdvancedInspector({
             setCharName("");
           }}
         >
-          <Input value={charName} onChange={(e) => setCharName(e.target.value)} className="h-8" placeholder="Name" />
+          <Input value={charName} onChange={(e) => setCharName(e.target.value)} className="h-8" placeholder="名稱" />
           <Button type="submit" size="sm" variant="secondary">
-            Add
+            新增
           </Button>
         </form>
       </div>
       <div>
-        <p className="text-xs text-muted">Objects</p>
+        <p className="text-xs text-muted">物件</p>
         {objects.map((o) => (
           <button key={o.id} type="button" className="mr-2 text-[11px] text-accent" onClick={() => onAssignObject(o.id)}>
             {o.name}
           </button>
         ))}
         <Button size="sm" variant="ghost" className="mt-1" onClick={() => onCreateObject("Suitcase")}>
-          Add suitcase
+          新增行李箱
         </Button>
       </div>
       <p className="text-[11px] text-faint">
-        Tracks this frame:{" "}
+        這一格的軌道：{" "}
         {tracking
           .filter((t) => t.frame_number === current.frameNumber)
           .map((t) => `${t.name}${t.score != null ? ` ${"●".repeat(Math.round((t.score ?? 0) * 4))}${"○".repeat(4 - Math.round((t.score ?? 0) * 4))}` : ""}`)

@@ -297,6 +297,6 @@ describe("workspace + motion visuals", () => {
     const easeOut = spacingDots(5, "ease_out");
     assert.ok(easeIn[1] < easeOut[1]);
     assert.ok(curvePathD("linear").startsWith("M"));
-    assert.match(curveCaption("ease_in"), /Ease In/);
+    assert.match(curveCaption("ease_in"), /緩入/);
   });
 });

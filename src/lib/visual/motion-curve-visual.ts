@@ -39,15 +39,15 @@ export function spacingDots(count: number, curve: MotionCurve | string): number[
 export function curveCaption(curve: MotionCurve | string): string {
   switch (curve) {
     case "ease_in":
-      return "Ease In · accelerates";
+      return "緩入 · 加速";
     case "ease_out":
-      return "Ease Out · decelerates";
+      return "緩出 · 減速";
     case "ease_in_out":
-      return "Ease In Out · slow–fast–slow";
+      return "緩入緩出 · 慢—快—慢";
     case "hold":
-      return "Hold · no motion until the end";
+      return "停留 · 結尾才動";
     case "linear":
-      return "Linear · even spacing";
+      return "線性 · 均勻間距";
     default:
       return String(curve);
   }

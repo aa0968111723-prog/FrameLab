@@ -23,14 +23,14 @@ function Home() {
               to="/studio"
               className="rounded-[var(--radius-sm)] bg-accent px-3 py-2 font-medium text-accent-fg"
             >
-              Open studio
+              開啟工作室
             </Link>
           ) : (
             <Link
               to="/login"
               className="rounded-[var(--radius-sm)] border border-border px-3 py-2 text-muted hover:text-fg"
             >
-              Sign in
+              登入
             </Link>
           )}
         </nav>
@@ -39,16 +39,15 @@ function Home() {
       <section className="mx-auto grid max-w-6xl gap-10 px-6 pb-20 pt-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pt-16">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-muted">
-            Frame-by-frame workstation
+            逐幀動畫工作站
           </p>
           <h1 className="mt-4 max-w-xl text-4xl font-medium leading-[1.12] tracking-[-0.03em] text-fg sm:text-5xl">
-            Give it keyframes. Repair only the frames that break.
+            給它關鍵影格。只修壞掉的那幾格。
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            FrameLab is not a NLE, not a generator site. It is a timeline of
-            frames with a graph behind them — onion skin, keys, inbetweens,
-            pixel consistency, and an MCP protocol so an agent can work the
-            same commands you do.
+            FrameLab 不是剪輯軟體，也不是生成網站。它是一條有影格圖的時間軸 —
+            洋蔥皮、關鍵格、中間格、像素一致性，以及 MCP 協定，讓外部 AI
+            用同一套指令工作。
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             {user ? (
@@ -56,7 +55,7 @@ function Home() {
                 to="/studio"
                 className="inline-flex h-11 items-center gap-2 rounded-[var(--radius-sm)] bg-accent px-4 text-sm font-medium text-accent-fg"
               >
-                Continue in studio
+                繼續進入工作室
                 <ArrowRight className="size-4" />
               </Link>
             ) : (
@@ -64,7 +63,7 @@ function Home() {
                 to="/login"
                 className="inline-flex h-11 items-center gap-2 rounded-[var(--radius-sm)] bg-accent px-4 text-sm font-medium text-accent-fg"
               >
-                Sign in to the studio
+                登入工作室
                 <ArrowRight className="size-4" />
               </Link>
             )}
@@ -72,29 +71,28 @@ function Home() {
               href="/api/health"
               className="inline-flex h-11 items-center rounded-[var(--radius-sm)] border border-border px-4 text-sm text-muted hover:text-fg"
             >
-              System status
+              系統狀態
             </a>
           </div>
           <dl className="mt-10 grid grid-cols-3 gap-4 text-sm">
             <div>
-              <dt className="text-faint">Inbetween</dt>
-              <dd className="mt-1 text-fg">Motion plan + linear-blend</dd>
+              <dt className="text-faint">中間影格</dt>
+              <dd className="mt-1 text-fg">動作計畫 + 線性混合</dd>
             </div>
             <div>
-              <dt className="text-faint">Consistency</dt>
-              <dd className="mt-1 text-fg">Pixel metrics, real</dd>
+              <dt className="text-faint">一致性</dt>
+              <dd className="mt-1 text-fg">真實像素指標</dd>
             </div>
             <div>
-              <dt className="text-faint">Agents</dt>
-              <dd className="mt-1 text-fg">MCP + scopes</dd>
+              <dt className="text-faint">代理</dt>
+              <dd className="mt-1 text-fg">MCP + 權限範圍</dd>
             </div>
           </dl>
         </div>
         <div className="rounded-[var(--radius-lg)] border border-border bg-surface p-3">
           <HeroStage />
           <p className="mt-3 px-1 text-xs text-faint">
-            Onion skin of a 2-bounce squash-and-stretch. Same shot ships as a
-            sample timeline after you sign in.
+            兩次彈跳的壓扁拉長洋蔥皮。登入後同一鏡頭會成為範例時間軸。
           </p>
         </div>
       </section>
@@ -102,16 +100,16 @@ function Home() {
       <section className="mx-auto grid max-w-6xl gap-4 px-6 pb-24 sm:grid-cols-3">
         {[
           {
-            title: "What is loaded",
-            body: "Pixel MAE, histogram flicker, 16×16 block matching, motion-plan inbetweens (linear-blend candidate), neighborhood repair, Grok vision on frames you pick.",
+            title: "已載入",
+            body: "像素 MAE、直方圖閃爍、16×16 區塊比對、動作計畫中間格（線性混合候選）、鄰域修復、你指定影格的 Grok 視覺。",
           },
           {
-            title: "What is reserved",
-            body: "SAM 2, RTMPose, SEA-RAFT, LocoTrack, Depth Anything, RIFE, Wan. Adapters exist. They return MODEL_NOT_AVAILABLE until a checkpoint is registered.",
+            title: "保留未載入",
+            body: "SAM 2、RTMPose、SEA-RAFT、LocoTrack、Depth Anything、RIFE、Wan。適配器存在，回傳 MODEL_NOT_AVAILABLE，直到註冊檢查點。",
           },
           {
-            title: "How agents work",
-            body: "Issue an MCP token in the studio. POST /api/mcp with Bearer. Same commands as the UI — analyze_consistency, generate_inbetweens, repair_frame_range — with scopes and an audit log.",
+            title: "代理怎麼接",
+            body: "在工作室簽發 MCP token。POST /api/mcp 帶 Bearer。與介面同一套指令 — analyze_consistency、generate_inbetweens、repair_frame_range — 有權限範圍與稽核紀錄。",
           },
         ].map((card) => (
           <article

@@ -20,21 +20,21 @@ export function RegionActions({
   if (!visible) return null;
   return (
     <div className="pointer-events-auto absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-[var(--radius-sm)] border border-border bg-surface/95 px-2 py-1.5 shadow-[var(--shadow-panel)]">
-      <span className="mr-1 font-mono text-[10px] text-faint">F{frame} region</span>
+      <span className="mr-1 font-mono text-[10px] text-faint">F{frame} 選區</span>
       <Button size="sm" variant="secondary" onClick={onAnalyze}>
-        Ask AI
+        問 AI
       </Button>
       <Button size="sm" variant="ghost" onClick={onTrack}>
-        Track
+        追蹤
       </Button>
       <Button size="sm" variant="ghost" onClick={onPropagate}>
-        Propagate ±5
+        傳播 ±5
       </Button>
       <Button size="sm" variant="secondary" onClick={onRepair}>
-        Repair here
+        在此修復
       </Button>
       <Button size="sm" variant="ghost" onClick={onClear}>
-        Clear
+        清除
       </Button>
     </div>
   );

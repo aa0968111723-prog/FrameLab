@@ -27,7 +27,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "AI-native frame-by-frame animation workstation. Keyframes, onion skin, inbetweens, consistency repair.",
+          "AI 原生逐幀動畫工作站。關鍵影格、洋蔥皮、中間影格、一致性修復。",
       },
       { name: "theme-color", content: "#0a0a0b" },
     ],
@@ -43,7 +43,7 @@ export const Route = createRootRoute({
 
 function Root() {
   return (
-    <html lang="en" className="antialiased" suppressHydrationWarning>
+    <html lang="zh-Hant" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

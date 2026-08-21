@@ -4,29 +4,29 @@ import type { SerializedContext } from "@/lib/domain/context-engine";
 export function ContextInspector({ snapshot }: { snapshot: SerializedContext }) {
   return (
     <div>
-      <p className="text-xs text-muted">Context inspector</p>
+      <p className="text-xs text-muted">上下文檢視</p>
       <ul className="mt-1 space-y-0.5 font-mono text-[10px] text-faint">
-        <li>frame {snapshot.current_frame ?? "—"}</li>
+        <li>影格 {snapshot.current_frame ?? "—"}</li>
         <li>
-          range{" "}
+          範圍{" "}
           {snapshot.selected_range
             ? `${snapshot.selected_range[0]}–${snapshot.selected_range[1]}`
             : "—"}
         </li>
         <li>
-          region{" "}
+          選區{" "}
           {snapshot.selected_region
             ? `F${snapshot.selected_region.frameNumber} x=${snapshot.selected_region.x.toFixed(3)} y=${snapshot.selected_region.y.toFixed(3)} w=${snapshot.selected_region.width.toFixed(3)} h=${snapshot.selected_region.height.toFixed(3)}`
             : "—"}
         </li>
-        <li>character {snapshot.selected_character ?? "—"}</li>
-        <li>object {snapshot.selected_object ?? "—"}</li>
+        <li>角色 {snapshot.selected_character ?? "—"}</li>
+        <li>物件 {snapshot.selected_object ?? "—"}</li>
         <li>
-          onion {snapshot.onion_skin.enabled ? "on" : "off"}{" "}
+          洋蔥皮 {snapshot.onion_skin.enabled ? "開" : "關"}{" "}
           {snapshot.onion_skin.previousFrames}/{snapshot.onion_skin.nextFrames}
         </li>
-        <li>focus {snapshot.focus}</li>
-        <li>conversation {snapshot.conversation_id ?? "—"}</li>
+        <li>焦點 {snapshot.focus}</li>
+        <li>對話 {snapshot.conversation_id ?? "—"}</li>
         <li>v{snapshot.context_version}</li>
       </ul>
     </div>

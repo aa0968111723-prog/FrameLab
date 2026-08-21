@@ -14,21 +14,21 @@ export function RegionSelectorStatus({
 }) {
   return (
     <div>
-      <p className="text-xs text-muted">Selected region</p>
+      <p className="text-xs text-muted">選取區域</p>
       {region ? (
         <div className="mt-1 space-y-0.5 font-mono text-[11px] text-faint">
-          <p>Frame: F{region.frameNumber}</p>
+          <p>影格: F{region.frameNumber}</p>
           <p>X: {region.x.toFixed(3)}</p>
           <p>Y: {region.y.toFixed(3)}</p>
           <p>W: {region.width.toFixed(3)}</p>
           <p>H: {region.height.toFixed(3)}</p>
           <button type="button" className="text-accent" onClick={onClear}>
-            Clear Selection
+            清除選取
           </button>
         </div>
       ) : (
         <p className="mt-1 text-[11px] text-faint">
-          None. Switch to Region click and drag on the canvas.
+          無。切到選區工具後在畫布上拖曳。
         </p>
       )}
     </div>
