@@ -5,11 +5,12 @@ import { blendRgba, motionField, motionGrid, type RegionBox, type RgbaFrame } fr
 import { cropRgba } from "@/lib/domain/lightweight-analysis";
 import type { MotionCurve } from "@/lib/domain/types";
 import { estimatePoseLite, type PoseEstimate } from "@/lib/domain/pose-lite";
-import { encodeJpegBuffer } from "@/lib/domain/image-codec";
+import { decodeJpegBuffer, encodeJpegBuffer } from "@/lib/domain/image-codec";
 import { rtmposeAvailable, rtmposeHealth, runRtmposeBatch, toPoseEstimate } from "@/lib/ai/rtmpose-worker";
 import { locotrackAvailable, locotrackHealth, runLocotrack } from "@/lib/ai/locotrack-worker";
 import { seaRaftAvailable, seaRaftHealth, runSeaRaft } from "@/lib/ai/sea-raft-worker";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { rifeAvailable, rifeHealth, runRife } from "@/lib/ai/rife-worker";
+import { mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { InbetweenCapabilities } from "@/lib/domain/animation-constraints";
@@ -212,13 +213,45 @@ export class LinearBlendInterpolation implements InterpolationProvider {
 export class RifeInterpolation implements InterpolationProvider {
   readonly id = "rife";
   available() {
-    return false;
+    return rifeAvailable();
   }
   health_check() {
-    return healthCheck(this);
+    const h = rifeHealth();
+    return Promise.resolve({
+      name: this.id,
+      version: "rife-4.25",
+      status: h.ok ? "ready" : "MODEL_NOT_AVAILABLE",
+      device: h.device,
+      capabilities: h.ok ? ["interpolation", "arbitrary_timestep"] : [],
+    } satisfies ProviderMeta);
   }
-  async interpolate(): Promise<RgbaFrame[]> {
-    fail("PROVIDER_NOT_AVAILABLE", "RIFE is not loaded. Use provider=linear-blend.");
+  async interpolate(
+    a: RgbaFrame,
+    b: RgbaFrame,
+    count: number,
+    config: { curve: MotionCurve; region?: RegionBox | null },
+  ): Promise<RgbaFrame[]> {
+    void config.region;
+    if (!this.available()) {
+      fail("PROVIDER_NOT_AVAILABLE", "RIFE worker is not loaded. Use provider=linear-blend for 快速預覽.");
+    }
+    const dir = path.join(tmpdir(), "framelab-rife", `interp-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    try {
+      const pathA = path.join(dir, "a.jpg");
+      const pathB = path.join(dir, "b.jpg");
+      writeFileSync(pathA, encodeJpegBuffer(a, 92));
+      writeFileSync(pathB, encodeJpegBuffer(b, 92));
+      const timesteps = Array.from({ length: count }, (_, i) => applyCurve((i + 1) / (count + 1), config.curve));
+      const { frames } = await runRife({ pathA, pathB, count, timesteps, outDir: path.join(dir, "out") });
+      return frames.map((f) => decodeJpegBuffer(readFileSync(f.path)));
+    } finally {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
   }
 }
 
@@ -569,6 +602,66 @@ export class LinearBlendInbetween implements InbetweenProvider {
   }
 }
 
+export class RifeInbetween implements InbetweenProvider {
+  readonly id = "rife";
+  readonly kind = "interpolation" as const;
+  available() {
+    return rifeAvailable();
+  }
+  health_check() {
+    const h = rifeHealth();
+    return Promise.resolve({
+      name: this.id,
+      version: "rife-4.25",
+      status: h.ok ? "ready" : "MODEL_NOT_AVAILABLE",
+      device: h.device,
+      capabilities: h.ok ? ["interpolation", "arbitrary_timestep"] : [],
+    } satisfies ProviderMeta);
+  }
+  capabilities() {
+    return linearBlendCapabilities();
+  }
+  async generate(input: {
+    start: RgbaFrame;
+    end: RgbaFrame;
+    count: number;
+    motionPlan: MotionPlan;
+  }): Promise<RgbaFrame[]> {
+    if (!this.available()) {
+      fail("PROVIDER_NOT_AVAILABLE", "RIFE worker is not loaded. Use provider=linear-blend for 快速預覽 (not AI).");
+    }
+    const dir = path.join(tmpdir(), "framelab-rife", `gen-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    try {
+      const pathA = path.join(dir, "a.jpg");
+      const pathB = path.join(dir, "b.jpg");
+      writeFileSync(pathA, encodeJpegBuffer(input.start, 92));
+      writeFileSync(pathB, encodeJpegBuffer(input.end, 92));
+      const timesteps = Array.from({ length: input.count }, (_, i) => {
+        const u = input.motionPlan.spacing[i] ?? applyCurve((i + 1) / (input.count + 1), input.motionPlan.curve);
+        return u;
+      });
+      const { frames } = await runRife({
+        pathA,
+        pathB,
+        count: input.count,
+        timesteps,
+        outDir: path.join(dir, "out"),
+      });
+      if (frames.length !== input.count) {
+        fail("GENERATION_FAILED", `RIFE returned ${frames.length} frames, expected ${input.count}.`);
+      }
+      return frames.map((f) => decodeJpegBuffer(readFileSync(f.path)));
+    } finally {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
 export class WanInbetween implements InbetweenProvider {
   readonly id = "wan";
   readonly kind = "generative" as const;
@@ -621,24 +714,14 @@ export class ComfyInbetween implements InbetweenProvider {
 }
 
 export const linearBlendInbetween = new LinearBlendInbetween();
+export const rifeInbetween = new RifeInbetween();
 export const wanInbetween = new WanInbetween();
 export const falInbetween = new FalInbetween();
 export const comfyInbetween = new ComfyInbetween();
 
 export function getInbetween(provider: string): InbetweenProvider {
-  if (provider === "linear-blend" || provider === "auto" || provider === "framelab") return linearBlendInbetween;
-  if (provider === "rife") {
-    return {
-      id: "rife",
-      kind: "interpolation",
-      available: () => false,
-      health_check: () => healthCheck({ id: "rife", available: () => false }),
-      capabilities: () => linearBlendCapabilities(),
-      generate: async () => {
-        fail("PROVIDER_NOT_AVAILABLE", "RIFE is not loaded. Use provider=linear-blend.");
-      },
-    };
-  }
+  if (provider === "linear-blend" || provider === "preview" || provider === "framelab") return linearBlendInbetween;
+  if (provider === "rife" || provider === "auto") return rifeInbetween;
   if (provider === "wan") return wanInbetween;
   if (provider === "fal.ai" || provider === "fal") return falInbetween;
   if (provider === "comfyui" || provider === "comfy") return comfyInbetween;

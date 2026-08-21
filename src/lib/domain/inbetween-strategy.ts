@@ -17,7 +17,7 @@ export function resolveInbetweenStrategy(input: {
   interpolationId?: string;
   generativeId?: string;
 }): InbetweenStrategy {
-  const interp = input.interpolationId ?? "linear-blend";
+  const interp = input.interpolationId ?? "rife";
   const gen = input.generativeId ?? "wan";
   if (input.complexity === "VERY_HIGH") {
     return {
@@ -39,7 +39,7 @@ export function resolveInbetweenStrategy(input: {
     return {
       kind: "interpolation",
       provider: interp,
-      reason: "生成式中間影格為 MODEL_NOT_AVAILABLE。改用線性混合插值。",
+      reason: "生成式中間影格為 MODEL_NOT_AVAILABLE。改用 RIFE 中割。",
     };
   }
   if (input.complexity === "MEDIUM") {

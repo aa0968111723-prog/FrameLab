@@ -173,12 +173,13 @@ export async function analyzeKeyframeTransition(ctx: CommandContext, args: Recor
     occlusion: Boolean(chars.some((c) => c.occluded && (c.frame_number === start || c.frame_number === end))),
   };
   const analysis = scoreTransition(features);
-  const interpolationAvailable = getInbetween("linear-blend").available();
+  const interpolationAvailable = getInbetween("rife").available() || getInbetween("linear-blend").available();
   const generativeAvailable = getInbetween("wan").available();
   const strategy = resolveInbetweenStrategy({
     complexity: analysis.complexity,
     interpolationAvailable,
     generativeAvailable,
+    interpolationId: "rife",
   });
   return {
     analysis,
@@ -284,7 +285,7 @@ export async function createMotionPlanCmd(ctx: CommandContext, args: Record<stri
     planJson: JSON.stringify(plan),
     curve: plan.curve,
   });
-  const caps = getInbetween(typeof args.provider === "string" ? args.provider : "linear-blend").capabilities();
+  const caps = getInbetween(typeof args.provider === "string" ? args.provider : "rife").capabilities();
   return {
     id,
     plan,
@@ -414,11 +415,16 @@ export async function generateInbetweensCmd(ctx: CommandContext, args: Record<st
     typeof args.provider === "string"
       ? args.provider
       : planned.strategy.provider === "wan" && !getInbetween("wan").available()
-        ? "linear-blend"
+        ? "rife"
         : planned.strategy.provider;
   const inb = getInbetween(providerName);
   if (!inb.available()) {
-    fail("PROVIDER_NOT_AVAILABLE", `${inb.id} is not loaded. Use provider=linear-blend.`);
+    fail(
+      "PROVIDER_NOT_AVAILABLE",
+      inb.id === "rife"
+        ? "RIFE worker is not loaded. Use provider=linear-blend for 快速預覽 (not AI inbetween)."
+        : `${inb.id} is not loaded. Use provider=linear-blend for 快速預覽.`,
+    );
   }
   if (planned.strategy.kind === "suggest_breakdown" && args.force !== true) {
     return {
@@ -1146,7 +1152,7 @@ export async function generateBreakdownFrameCmd(ctx: CommandContext, args: Recor
   if (existing?.is_locked || existing?.frame_type === "KEY") {
     fail("INVALID_KEYFRAME_PAIR", "Cannot overwrite a locked or KEY frame with a generated breakdown.");
   }
-  const inb = getInbetween("linear-blend");
+  const inb = getInbetween("rife");
   const ra = decodeJpegBase64(a.image_data);
   const rb = decodeJpegBase64(b.image_data);
   const size = resolveGenerationSize(ra, "preview");

@@ -17,6 +17,7 @@ pip install -r workers/gpu-worker/requirements.txt
 python3 workers/gpu-worker/rtmpose_worker.py --health
 python3 workers/gpu-worker/locotrack_worker.py --health
 python3 workers/gpu-worker/sea_raft_worker.py --health
+python3 workers/gpu-worker/rife_worker.py --health
 ```
 
 ## SEA-RAFT
@@ -24,4 +25,11 @@ python3 workers/gpu-worker/sea_raft_worker.py --health
 `UI → analyze_motion → OPTICAL_FLOW job → sea_raft_worker.py → SEA-RAFT-S → flow JSON → canvas sampled vectors + path`
 
 Two frames run real inference. `block-match-16` is CPU fallback only.
+
+## RIFE
+
+`Keyframe A/B → generate_inbetweens → RIFE-4.25 → Candidate Timeline → Preview → Accept/Reject`
+
+`linear-blend` is **快速預覽** only. It is not AI inbetweening.
+
 

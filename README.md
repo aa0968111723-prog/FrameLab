@@ -10,7 +10,7 @@ The studio is **visual-first**: canvas, timeline, onion skin, pose ghost, motion
 
 V0.1 core loop: import → frames → timeline → onion skin → frame/region select → Ask overlay → Context Engine → MCP → lightweight analysis.
 
-V0.3 Inbetween: pick two keys, get a Motion Plan (timing + spacing + constraints), generate a **candidate** with linear-blend, evaluate, regenerate only bad frames, then Accept. Wan / RIFE stay `PROVIDER_NOT_AVAILABLE`.
+V0.3 Inbetween: pick two keys, get a Motion Plan, generate a **RIFE candidate**, Preview, then Accept/Reject. `linear-blend` is **快速預覽** only — not AI inbetweening. Wan stays `PROVIDER_NOT_AVAILABLE`.
 
 V0.4 Visual workspace: unified overlay renderer, virtualized timeline, pose ghost, motion trails, AI `VisualAnnotation`, region repair UX, flicker / difference compare.
 
@@ -46,11 +46,11 @@ npm run build
 
 ## CPU mode
 
-Pixel metrics, linear-blend inbetweens, neighborhood repair, timeline, onion skin, revisions, MCP, FFmpeg extract, and Grok vision (API) run without a GPU.
+Pixel metrics, RIFE inbetweens, neighborhood repair, timeline, onion skin, revisions, MCP, FFmpeg extract, and Grok vision (API) run without a GPU. linear-blend is 快速預覽 only.
 
 ## GPU mode
 
-CUDA adapters (SAM 2, RIFE, Wan, Video Depth Anything) are reserved. **RTMPose**, **LocoTrack-S**, and **SEA-RAFT-S** run through Python workers on CUDA when present, otherwise CPU.
+CUDA adapters (SAM 2, Wan, Video Depth Anything) are reserved. **RTMPose**, **LocoTrack-S**, **SEA-RAFT-S**, and **RIFE** run through Python workers on CUDA when present, otherwise CPU.
 
 ## Web UI
 
@@ -95,13 +95,14 @@ TypeScript client: `packages/sdk`.
 | Provider | Status |
 | --- | --- |
 | pixel-metrics (MAE, histogram, luma flicker, 16×16 block match) | **ready** |
-| linear-blend interpolation + motion curves | **ready** |
+| linear-blend 快速預覽 (not AI) | **ready** |
+| RIFE-4.25 (Python worker) | **ready** (CUDA or CPU) |
 | FFmpeg frame extract | **ready** |
 | xAI grok-4.5 vision (user-initiated frames only) | **ready** if `XAI_API_KEY` |
 | RTMPose-s + YOLOX-tiny (Python worker) | **ready** (CUDA or CPU) |
 | LocoTrack-S (Python worker) | **ready** (CUDA or CPU) |
 | SEA-RAFT-S (Python worker) | **ready** (CUDA or CPU) |
-| SAM 2, Depth Anything, RIFE, Wan | adapter only — `MODEL_NOT_AVAILABLE` |
+| SAM 2, Depth Anything, Wan | adapter only — `MODEL_NOT_AVAILABLE` |
 
 No random poses. No fake depth. No hardcoded consistency.
 

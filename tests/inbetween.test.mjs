@@ -176,7 +176,7 @@ describe("provider routing", () => {
       generativeAvailable: false,
     });
     assert.equal(s.kind, "interpolation");
-    assert.equal(s.provider, "linear-blend");
+    assert.equal(s.provider, "rife");
   });
 
   it("large pose suggests breakdown", () => {
@@ -201,7 +201,7 @@ describe("provider routing", () => {
     assert.equal(s.kind, "suggest_breakdown");
   });
 
-  it("HIGH without generative falls back to linear-blend", () => {
+  it("HIGH without generative falls back to RIFE", () => {
     const s = resolveInbetweenStrategy({
       complexity: "HIGH",
       interpolationAvailable: true,
@@ -211,16 +211,16 @@ describe("provider routing", () => {
     assert.match(s.reason, /MODEL_NOT_AVAILABLE/);
   });
 
-  it("wan / rife / fal / comfyui are unavailable and do not fake pixels", () => {
+  it("wan / fal / comfyui are unavailable; rife is a real worker; linear-blend is 快速預覽", () => {
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
     assert.match(src, /class WanInbetween/);
     assert.match(src, /class FalInbetween/);
     assert.match(src, /class ComfyInbetween/);
+    assert.match(src, /class RifeInbetween/);
     assert.match(src, /PROVIDER_NOT_AVAILABLE/);
-    assert.match(src, /MODEL_NOT_AVAILABLE/);
     assert.doesNotMatch(src, /TEST_ONLY/);
     assert.doesNotMatch(src, /random image|solid color fake/i);
-    assert.match(src, /RIFE is not loaded/);
+    assert.match(src, /快速預覽/);
   });
 
   it("capability mismatch warns instead of pretending to enforce", () => {

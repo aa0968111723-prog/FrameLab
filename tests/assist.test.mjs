@@ -54,7 +54,7 @@ describe("motion provider", () => {
     assert.ok(pairs.some((p) => p.mean_motion >= 0));
   });
 
-  it("rife stays unavailable; rtmpose, locotrack and sea-raft are real workers", () => {
+  it("rife, rtmpose, locotrack and sea-raft are real workers", () => {
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
     assert.match(src, /class RtmposeProvider/);
     assert.match(src, /class LocotrackProvider/);
@@ -63,7 +63,7 @@ describe("motion provider", () => {
     assert.doesNotMatch(src, /new Reserved\("locotrack"\)/);
     assert.doesNotMatch(src, /new Reserved\("sea-raft"\)/);
     assert.match(src, /class RifeInterpolation/);
-    assert.match(src, /RIFE is not loaded/);
+    assert.match(src, /class RifeInbetween/);
     assert.doesNotMatch(src, /fake (SEA-RAFT|RTMPose|LocoTrack|RIFE)/i);
   });
 });

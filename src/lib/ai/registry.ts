@@ -1,6 +1,7 @@
 import { rtmposeHealth } from "@/lib/ai/rtmpose-worker";
 import { locotrackHealth } from "@/lib/ai/locotrack-worker";
 import { seaRaftHealth } from "@/lib/ai/sea-raft-worker";
+import { rifeHealth } from "@/lib/ai/rife-worker";
 
 export type ProviderStatus =
   | "ready"
@@ -227,17 +228,17 @@ export function listModels(): ModelInfo[] {
     },
     {
       id: "rife",
-      provider: "rife",
-      modelName: "rife",
-      modelVersion: "unwired",
-      checkpoint: "none",
-      license: "MIT (code) / check checkpoint",
+      provider: "hzwer",
+      modelName: "rife-4.25",
+      modelVersion: "practical",
+      checkpoint: "train_log/flownet.pkl",
+      license: "MIT",
       commercialUse: true,
-      device: "cuda",
-      precision: "fp16",
-      status: "unavailable",
+      device: rifeHealth().device,
+      precision: "fp32",
+      status: rifeHealth().ok ? "ready" : "unavailable",
       role: "interpolation",
-      notes: "Reserved. Use linear-blend until a RIFE checkpoint is registered.",
+      notes: "Real Practical-RIFE. linear-blend is 快速預覽 only — not AI inbetweening.",
     },
     {
       id: "wan",

@@ -208,11 +208,13 @@ export function InbetweenPanel({
           value={state.quality}
           onChange={(e) => onQuality(e.target.value === "production" ? "production" : "preview")}
         >
-          <option value="preview">預覽</option>
-          <option value="production">成品</option>
+          <option value="preview">快速預覽（非 AI）</option>
+          <option value="production">RIFE 中割</option>
         </select>
       </label>
-      <p className="text-[11px] text-faint">供應商：自動（線性混合）。Wan／RIFE／ComfyUI 不可用。</p>
+      <p className="text-[11px] text-faint">
+        成品用 RIFE 中割。快速預覽是線性混合，不是 AI 中割。
+      </p>
       <fieldset className="space-y-1">
         <legend className="text-xs text-muted">約束</legend>
         {(
@@ -467,9 +469,9 @@ function complexityZh(c: string) {
 }
 
 function providerZh(p: string) {
-  if (p.includes("linear-blend")) return p.includes("unavailable") ? "線性混合（不可用）" : "線性混合";
+  if (p.includes("linear-blend") || p.includes("preview")) return "快速預覽";
   if (p.includes("wan")) return "Wan（未載入）";
-  if (p.includes("rife")) return "RIFE（未載入）";
+  if (p.includes("rife")) return p.includes("unavailable") ? "RIFE（未載入）" : "RIFE";
   return p;
 }
 

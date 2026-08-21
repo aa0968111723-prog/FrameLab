@@ -15,6 +15,7 @@ data/
 
 # LocoTrack / RTMPose checkpoints (downloaded on first run)
 workers/gpu-worker/locotrack/weights/*.ckpt
+workers/gpu-worker/rife/train_log/*.pkl
 workers/gpu-worker/**/__pycache__/
 
 # Workspace scratch
