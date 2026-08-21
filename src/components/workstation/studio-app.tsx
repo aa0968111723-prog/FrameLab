@@ -138,6 +138,10 @@ const TOOL_DONE_ZH: Record<string, string> = {
   repair_frame_range: "範圍已修復",
   regenerate_region: "區域已混合",
   duplicate_frame: "影格已複製",
+  add_frame: "已新增影格",
+  insert_frame: "已插入影格",
+  clear_frame: "影格已清空",
+  hold_frame: "已設為停格",
   delete_frame: "影格已刪除",
   undo: "已復原",
   redo: "已重做",
@@ -599,6 +603,20 @@ function StudioInner({ projectId }: { projectId: string }) {
       } else if (input.tool === "replace_frame") {
         refresh();
         return;
+      } else if (
+        input.tool === "add_frame" ||
+        input.tool === "insert_frame" ||
+        input.tool === "duplicate_frame"
+      ) {
+        toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
+        if (r.payload) {
+          try {
+            const d = JSON.parse(r.payload) as { frameNumber?: number };
+            if (typeof d.frameNumber === "number") setEngine((s) => seek(s, d.frameNumber!));
+          } catch {
+            /* ignore */
+          }
+        }
       } else {
         toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
       }
@@ -1825,6 +1843,33 @@ function StudioInner({ projectId }: { projectId: string }) {
             }}
             onScrub={(n) => setEngine((s) => seek(s, n))}
             onZoomTimeline={setTimelineZoom}
+            ops={{
+              busy: tool.isPending,
+              onAdd: () => {
+                if (!timelineId) return;
+                tool.mutate({ tool: "add_frame", args: { timelineId, frameNumber: engine.currentFrame } });
+              },
+              onInsert: () => {
+                if (!timelineId) return;
+                tool.mutate({ tool: "insert_frame", args: { timelineId, frameNumber: engine.currentFrame } });
+              },
+              onDuplicate: () => {
+                if (!current) return;
+                tool.mutate({ tool: "duplicate_frame", args: { frameId: current.id } });
+              },
+              onClear: () => {
+                if (!current) return;
+                tool.mutate({ tool: "clear_frame", args: { frameId: current.id } });
+              },
+              onHold: () => {
+                if (!current) return;
+                tool.mutate({ tool: "hold_frame", args: { frameId: current.id } });
+              },
+              onDelete: () => {
+                if (!current) return;
+                tool.mutate({ tool: "delete_frame", args: { frameId: current.id } });
+              },
+            }}
           />
           <SpacingStrip dots={spacingDots(inb.count, inb.curve)} caption={curveCaption(inb.curve)} />
         </div>
@@ -2185,6 +2230,10 @@ function StudioInner({ projectId }: { projectId: string }) {
                   }}
                   onDuplicate={() => tool.mutate({ tool: "duplicate_frame", args: { frameId: current.id } })}
                   onDelete={() => tool.mutate({ tool: "delete_frame", args: { frameId: current.id } })}
+                  onAddFrame={() => timelineId && tool.mutate({ tool: "add_frame", args: { timelineId, frameNumber: current.frameNumber } })}
+                  onInsertFrame={() => timelineId && tool.mutate({ tool: "insert_frame", args: { timelineId, frameNumber: current.frameNumber } })}
+                  onClearFrame={() => tool.mutate({ tool: "clear_frame", args: { frameId: current.id } })}
+                  onHoldFrame={() => tool.mutate({ tool: "hold_frame", args: { frameId: current.id } })}
                   onUndo={() => tool.mutate({ tool: "undo", args: { projectId, frameId: current.id } })}
                   onRedo={() => tool.mutate({ tool: "redo", args: { projectId, frameId: current.id } })}
                   onPreview={(id, data) => {

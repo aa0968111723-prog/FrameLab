@@ -77,6 +77,10 @@ export function AdvancedInspector({
   onRepairRegion,
   onDuplicate,
   onDelete,
+  onAddFrame,
+  onInsertFrame,
+  onClearFrame,
+  onHoldFrame,
   onUndo,
   onRedo,
   onPreview,
@@ -129,6 +133,10 @@ export function AdvancedInspector({
   onRepairRegion: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onAddFrame?: () => void;
+  onInsertFrame?: () => void;
+  onClearFrame?: () => void;
+  onHoldFrame?: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onPreview: (id: string, previewData?: string | null) => void;
@@ -254,9 +262,29 @@ export function AdvancedInspector({
         <Button size="sm" variant="ghost" disabled={busy || !regionLive || regionBox.w < 8 || regionBox.h < 8} onClick={onRepairRegion}>
           區域混合
         </Button>
+        {onAddFrame && (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onAddFrame}>
+            新增
+          </Button>
+        )}
+        {onInsertFrame && (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onInsertFrame}>
+            插入
+          </Button>
+        )}
         <Button size="sm" variant="ghost" disabled={busy} onClick={onDuplicate}>
           複製
         </Button>
+        {onHoldFrame && (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onHoldFrame}>
+            停格
+          </Button>
+        )}
+        {onClearFrame && (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onClearFrame}>
+            清空
+          </Button>
+        )}
         <Button size="sm" variant="danger" disabled={busy} onClick={onDelete}>
           刪除
         </Button>

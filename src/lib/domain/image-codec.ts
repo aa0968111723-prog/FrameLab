@@ -28,6 +28,24 @@ export function encodeJpegBase64(frame: RgbaFrame, quality = 78): string {
   return encodeJpegBuffer(frame, quality).toString("base64");
 }
 
+export function blankRgba(width: number, height: number, rgb: [number, number, number] = [244, 244, 245]): RgbaFrame {
+  const w = Math.max(1, Math.round(width));
+  const h = Math.max(1, Math.round(height));
+  const data = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i += 1) {
+    const o = i * 4;
+    data[o] = rgb[0]!;
+    data[o + 1] = rgb[1]!;
+    data[o + 2] = rgb[2]!;
+    data[o + 3] = 255;
+  }
+  return { data, width: w, height: h };
+}
+
+export function blankJpegBase64(width: number, height: number): string {
+  return encodeJpegBase64(blankRgba(width, height), 85);
+}
+
 function crc32(bytes: Uint8Array): number {
   let c = 0xffffffff;
   for (let i = 0; i < bytes.length; i += 1) {

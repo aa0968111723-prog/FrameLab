@@ -42,6 +42,7 @@ export function VisualTimeline({
   onScrub,
   onZoomTimeline,
   onConversation,
+  ops,
 }: {
   frames: TimelineFrame[];
   engine: TimelineEngineState;
@@ -57,6 +58,15 @@ export function VisualTimeline({
   onScrub: (n: number) => void;
   onZoomTimeline: (z: number) => void;
   onConversation?: (n: number) => void;
+  ops?: {
+    busy?: boolean;
+    onAdd: () => void;
+    onInsert: () => void;
+    onDuplicate: () => void;
+    onClear: () => void;
+    onHold: () => void;
+    onDelete: () => void;
+  };
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -112,13 +122,40 @@ export function VisualTimeline({
         generated={frames.filter((f) => f.frameType === "GENERATED" || f.frameType === "REPAIRED").map((f) => f.frameNumber)}
         onJump={(n) => onSeek(n, false)}
       />
-      <div className="flex items-center justify-between px-3 py-0.5 text-[11px] text-faint">
+      <div className="flex items-center justify-between gap-2 px-3 py-0.5 text-[11px] text-faint">
         <span className="truncate">
           時間軸
           {engine.loopRange ? ` · 循環 F${engine.loopRange[0]}–F${engine.loopRange[1]}` : ""}
           {highlightRange ? ` · F${highlightRange[0]}–F${highlightRange[1]}` : ""}
           {repairRange ? ` · 修復 F${repairRange[0]}–F${repairRange[1]}` : ""}
         </span>
+        {ops ? (
+          <div className="flex shrink-0 items-center gap-0.5">
+            {(
+              [
+                ["新增", ops.onAdd],
+                ["插入", ops.onInsert],
+                ["複製", ops.onDuplicate],
+                ["停格", ops.onHold],
+                ["清空", ops.onClear],
+                ["刪除", ops.onDelete],
+              ] as const
+            ).map(([label, fn]) => (
+              <button
+                key={label}
+                type="button"
+                disabled={ops.busy}
+                onClick={fn}
+                className={cn(
+                  "rounded-[var(--radius-xs)] px-1.5 py-0.5 text-[10px] text-muted hover:bg-raised hover:text-fg disabled:opacity-40",
+                  label === "刪除" && "hover:text-warn",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <label className="flex items-center gap-2">
           縮放
           <input

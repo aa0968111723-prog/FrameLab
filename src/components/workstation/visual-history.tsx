@@ -23,6 +23,18 @@ function actionZh(action: string) {
       return "範圍修復";
     case "replace_frame":
       return "手繪影格";
+    case "add_frame":
+      return "新增影格";
+    case "insert_frame":
+      return "插入影格";
+    case "duplicate_frame":
+      return "複製影格";
+    case "delete_frame":
+      return "刪除影格";
+    case "clear_frame":
+      return "清空影格";
+    case "hold_frame":
+      return "停格";
     case "generate_inbetweens":
       return "產生中間影格";
     case "create_keyframe":

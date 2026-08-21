@@ -331,12 +331,32 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       return setType(ctx, args, "BREAKDOWN");
     case "mark_inbetween":
       return setType(ctx, args, "INBETWEEN");
-    case "duplicate_frame":
-      return duplicateFrame(ctx, args);
+    case "duplicate_frame": {
+      const { duplicateFrameCmd } = await import("./timeline-edit");
+      return duplicateFrameCmd(ctx, args);
+    }
+    case "add_frame": {
+      const { addFrameCmd } = await import("./timeline-edit");
+      return addFrameCmd(ctx, args);
+    }
+    case "insert_frame": {
+      const { insertFrameCmd } = await import("./timeline-edit");
+      return insertFrameCmd(ctx, args);
+    }
+    case "clear_frame": {
+      const { clearFrameCmd } = await import("./timeline-edit");
+      return clearFrameCmd(ctx, args);
+    }
+    case "hold_frame": {
+      const { holdFrameCmd } = await import("./timeline-edit");
+      return holdFrameCmd(ctx, args);
+    }
     case "replace_frame":
       return replaceFrame(ctx, args);
-    case "delete_frame":
-      return deleteFrame(ctx, args);
+    case "delete_frame": {
+      const { deleteFrameCmd } = await import("./timeline-edit");
+      return deleteFrameCmd(ctx, args);
+    }
     case "set_frame_duration":
       return setDuration(ctx, args);
     case "set_frame_type":
@@ -965,31 +985,6 @@ async function setLocked(ctx: CommandContext, args: Record<string, unknown>, loc
   return { id: frame.id, isLocked: locked };
 }
 
-async function duplicateFrame(ctx: CommandContext, args: Record<string, unknown>) {
-  const frame = await loadOwnedFrame(ctx, args);
-  const t = await ownTimeline(ctx, frame.timeline_id);
-  await repo.shiftFramesAfter(t.id, frame.frame_number + 1, 1);
-  const id = nid("frm");
-  await repo.insertFrame({
-    id,
-    timeline_id: t.id,
-    frame_number: frame.frame_number + 1,
-    timestamp_ms: frame.timestamp_ms + frame.duration_ms,
-    duration_ms: frame.duration_ms,
-    frame_type: "HOLD",
-    image_data: frame.image_data,
-    thumbnail_data: frame.thumbnail_data,
-    width: frame.width,
-    height: frame.height,
-    content_hash: frame.content_hash,
-    notes: frame.notes,
-    is_locked: false,
-  });
-  const count = (await repo.listFramesMeta(t.id)).length;
-  await repo.setTimelineFrameCount(t.id, count);
-  return { id, frameNumber: frame.frame_number + 1 };
-}
-
 async function replaceFrame(ctx: CommandContext, args: Record<string, unknown>) {
   const frame = await loadOwnedFrame(ctx, args);
   const t = await ownTimeline(ctx, frame.timeline_id);
@@ -1009,21 +1004,6 @@ async function replaceFrame(ctx: CommandContext, args: Record<string, unknown>) 
   const revisionId = await recordRevision(ctx, "replace_frame", t.project_id, frame.id, prev, {
     contentHash,
   });
-  return { id: frame.id, revisionId };
-}
-
-async function deleteFrame(ctx: CommandContext, args: Record<string, unknown>) {
-  const frame = await loadOwnedFrame(ctx, args);
-  const t = await ownTimeline(ctx, frame.timeline_id);
-  const prev = snapshotFrame(frame);
-  const revisionId = await recordRevision(ctx, "delete_frame", t.project_id, frame.id, {
-    ...prev,
-    frameNumber: frame.frame_number,
-  }, { deleted: true });
-  await repo.deleteFrameRow(frame.id);
-  await repo.shiftFramesAfter(t.id, frame.frame_number + 1, -1);
-  const count = (await repo.listFramesMeta(t.id)).length;
-  await repo.setTimelineFrameCount(t.id, count);
   return { id: frame.id, revisionId };
 }
 
@@ -1267,7 +1247,7 @@ async function undoFrame(ctx: CommandContext, args: Record<string, unknown>) {
   const projectId = str(args.projectId);
   await ownProject(ctx, projectId);
   const revs = await repo.listRevisions(projectId, typeof args.frameId === "string" ? args.frameId : undefined);
-  const latest = revs[0];
+  const latest = revs.find((r) => r.status !== "reverted") ?? revs[0];
   if (!latest) fail("FRAME_NOT_FOUND", "No revision to undo", 404);
   return restoreRevision(ctx, latest.id);
 }
@@ -1278,18 +1258,21 @@ async function redoFrame(ctx: CommandContext, args: Record<string, unknown>) {
   const revs = await repo.listRevisions(projectId, typeof args.frameId === "string" ? args.frameId : undefined);
   const undone = revs.find((r) => r.status === "reverted");
   if (!undone) fail("FRAME_NOT_FOUND", "No undone revision to redo", 404);
-  const next = JSON.parse(undone.new_json || "{}") as {
-    imageData?: string;
-    thumbnailData?: string;
-    contentHash?: string;
-    frameType?: string;
-  };
-  if (!undone.frame_id || !next.imageData) fail("FRAME_NOT_FOUND", "Redo snapshot missing", 404);
+  const next = JSON.parse(undone.new_json || "{}") as Record<string, unknown>;
+  const { isTimelineEdit, applyTimelineEdit } = await import("./timeline-edit");
+  if (isTimelineEdit(next)) {
+    await applyTimelineEdit(ctx, next, "redo");
+    await repo.updateRevisionStatus(undone.id, "open");
+    return { id: undone.id, status: "open" };
+  }
+  if (!undone.frame_id || typeof next.imageData !== "string" || !next.imageData) {
+    fail("FRAME_NOT_FOUND", "Redo snapshot missing", 404);
+  }
   await repo.updateFrame(undone.frame_id, {
-    image_data: next.imageData,
-    thumbnail_data: next.thumbnailData ?? "",
-    content_hash: next.contentHash ?? hashBytes(next.imageData),
-    frame_type: next.frameType,
+    image_data: String(next.imageData),
+    thumbnail_data: typeof next.thumbnailData === "string" ? next.thumbnailData : "",
+    content_hash: typeof next.contentHash === "string" ? next.contentHash : hashBytes(String(next.imageData)),
+    frame_type: typeof next.frameType === "string" ? next.frameType : undefined,
   });
   await repo.updateRevisionStatus(undone.id, "open");
   return { id: undone.id, status: "open" };
@@ -1299,7 +1282,14 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
   const rev = await repo.getRevision(revisionId);
   if (!rev) fail("FRAME_NOT_FOUND", "Revision not found", 404);
   await ownProject(ctx, rev.project_id);
-  const prev = JSON.parse(rev.previous_json || "{}") as {
+  const prev = JSON.parse(rev.previous_json || "{}") as Record<string, unknown>;
+  const { isTimelineEdit, applyTimelineEdit } = await import("./timeline-edit");
+  if (isTimelineEdit(prev)) {
+    await applyTimelineEdit(ctx, prev, "undo");
+    await repo.updateRevisionStatus(revisionId, "reverted");
+    return { id: revisionId, status: "reverted" };
+  }
+  const typed = prev as {
     imageData?: string;
     thumbnailData?: string;
     contentHash?: string;
@@ -1368,12 +1358,12 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
       active_asset: snap.activeAsset ?? snap.originalAsset ?? undefined,
     });
   };
-  if (Array.isArray(prev.frames) && prev.frames.length) {
-    for (const f of prev.frames) {
+  if (Array.isArray(typed.frames) && typed.frames.length) {
+    for (const f of typed.frames) {
       await apply(f.frameId, f);
     }
   } else if (rev.frame_id) {
-    await apply(rev.frame_id, prev);
+    await apply(rev.frame_id, typed);
   }
   await repo.updateRevisionStatus(revisionId, "reverted");
   return { id: revisionId, status: "reverted" };
