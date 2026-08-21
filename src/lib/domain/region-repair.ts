@@ -251,8 +251,23 @@ export function constraintHonesty(kind: string, providerCaps: { pose?: boolean; 
   const needsPose = /face|character|hair|clothing|body/i.test(kind);
   const guaranteed = needsPose ? Boolean(providerCaps.pose) : true;
   return {
-    label: kind,
+    label: constraintKindZh(kind),
     guaranteed,
-    note: guaranteed ? "Enforced" : "Evaluation only",
+    note: guaranteed ? "已套用" : "僅評估",
   };
+}
+
+function constraintKindZh(kind: string) {
+  const k = kind.toLowerCase();
+  if (k.includes("character")) return "角色";
+  if (k.includes("face")) return "臉";
+  if (k.includes("hair")) return "頭髮";
+  if (k.includes("clothing") || k.includes("cloth")) return "服裝";
+  if (k.includes("body")) return "身體";
+  if (k.includes("background")) return "背景";
+  if (k.includes("contact")) return "接觸";
+  if (k.includes("camera")) return "相機";
+  if (k.includes("object")) return "物件";
+  if (k.includes("pose")) return "姿態";
+  return "約束";
 }

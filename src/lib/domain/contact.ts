@@ -58,7 +58,7 @@ export function detectContactBreaks(points: TrackPoint[]): ContactEvent[] {
           pair: [names[i], names[j]],
           distance: Math.round(d * 10) / 10,
           median: Math.round(median * 10) / 10,
-          note: "CONTACT_BREAK from tracking-point distance, not a pose model.",
+          note: "接觸中斷：依追蹤點距離判斷，不是姿態模型。",
         });
       }
     }

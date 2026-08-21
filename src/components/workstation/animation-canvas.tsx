@@ -20,6 +20,7 @@ import {
   inferContact,
   composeTrail,
   motionPathPoints,
+  overlayNameZh,
   type PoseJoint,
   type TrackSample,
 } from "@/lib/visual/overlay-renderer";
@@ -715,7 +716,7 @@ export function AnimationCanvas({
         ctx.stroke();
         ctx.fillStyle = "#c8ccd4";
         ctx.font = "10px sans-serif";
-        ctx.fillText(p.name, v.x + 8, v.y - 6);
+        ctx.fillText(overlayNameZh(p.name) || "錨點", v.x + 8, v.y - 6);
       }
     }
   }, [

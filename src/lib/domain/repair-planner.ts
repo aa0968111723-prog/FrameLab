@@ -57,11 +57,11 @@ export function planRepairWindow(
   }
 
   const reasonParts = [
-    `Problem F${problem.start}–F${problem.end} (peak F${problem.peak_frame}).`,
-    "Expand to stable neighbors.",
+    `問題在 F${problem.start}–F${problem.end}（峰值 F${problem.peak_frame}）。`,
+    "會擴到穩定的鄰近影格。",
   ];
   if (protectedFrames.length) {
-    reasonParts.push(`Preserve boundary/locked frames F${protectedFrames.join(", F")}.`);
+    reasonParts.push(`邊界／鎖定影格 F${protectedFrames.join("、F")} 不會改。`);
   }
 
   return {

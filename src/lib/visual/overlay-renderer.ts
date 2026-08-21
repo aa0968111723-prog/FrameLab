@@ -21,6 +21,45 @@ export type TrackSample = {
   score?: number;
 };
 
+const OVERLAY_NAME_ZH: Record<string, string> = {
+  nose: "鼻",
+  left_eye: "左眼",
+  right_eye: "右眼",
+  left_ear: "左耳",
+  right_ear: "右耳",
+  left_shoulder: "左肩",
+  right_shoulder: "右肩",
+  left_elbow: "左肘",
+  right_elbow: "右肘",
+  left_wrist: "左手腕",
+  right_wrist: "右手腕",
+  left_hip: "左髖",
+  right_hip: "右髖",
+  left_knee: "左膝",
+  right_knee: "右膝",
+  left_ankle: "左踝",
+  right_ankle: "右踝",
+  left_hand: "左手",
+  right_hand: "右手",
+  head: "頭",
+  hip: "髖",
+  foot: "腳",
+  object: "物件",
+  custom: "自訂",
+};
+
+/** Human-facing overlay name. Schema ids (right_wrist) stay English in data. */
+export function overlayNameZh(name: string | null | undefined): string {
+  if (!name) return "";
+  if (OVERLAY_NAME_ZH[name]) return OVERLAY_NAME_ZH[name];
+  const lower = name.toLowerCase();
+  if (OVERLAY_NAME_ZH[lower]) return OVERLAY_NAME_ZH[lower];
+  if (/^click-F/i.test(name) || /^region-F/i.test(name)) return "錨點";
+  if (/[\u4e00-\u9fff]/.test(name)) return name;
+  if (/^[a-z][a-z0-9_]*$/i.test(name) && name.includes("_")) return "關節";
+  return name;
+}
+
 export type OverlayDrawInput = {
   vt: ViewportTransform;
   currentFrame: number;
@@ -732,7 +771,7 @@ export function inferContact(
     bx: b.x * frameWidth,
     by: b.y * frameHeight,
     broken,
-    label: broken ? `接觸中斷 F${currentFrame}` : `${hand.name} ↔ ${obj.name}`,
+    label: broken ? `接觸中斷 F${currentFrame}` : `${overlayNameZh(hand.name)} ↔ ${overlayNameZh(obj.name)}`,
   };
 }
 

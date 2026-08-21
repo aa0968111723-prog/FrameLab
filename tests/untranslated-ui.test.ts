@@ -14,8 +14,14 @@ const EXTRA = [
   "src/lib/domain/animation-command.ts",
   "src/lib/domain/inbetween-strategy.ts",
   "src/lib/domain/job-progress.ts",
+  "src/lib/domain/repair-planner.ts",
+  "src/lib/domain/contact.ts",
+  "src/lib/domain/assist.ts",
+  "src/lib/domain/exposure.ts",
   "src/lib/visual/timeline-virtual.ts",
   "src/lib/visual/motion-curve-visual.ts",
+  "src/lib/visual/overlay-renderer.ts",
+  "src/lib/visual/workspace-mode.ts",
   "src/lib/auth/client.ts",
   "src/lib/extract-frames.ts",
   "src/lib/commands/region-repair-tools.ts",
@@ -23,10 +29,27 @@ const EXTRA = [
 ];
 
 const BARE_ENGLISH =
-  /\b(Generate|Timeline|Repair|Loading|Analyze|Analyzing|Animate|Review|Export|Import|Untitled|Breakdown|Workspace|Inbetween|Overlay|Provider|Ready|Failed|Success|Settings|Cancel|Confirm|Delete|Undo|Redo|Original|Problems|Error|Warning|Save|Close|Open|Play|Pause|Help|Next|Previous|Back|Home|Search|Filter|bbox|Sign-in|Sign in|Pop-up)\b/;
+  /\b(Generate|Timeline|Repair|Loading|Analyze|Analyzing|Animate|Review|Export|Import|Untitled|Breakdown|Workspace|Inbetween|Overlay|Provider|Ready|Failed|Success|Settings|Cancel|Confirm|Delete|Undo|Redo|Original|Problems|Error|Warning|Save|Close|Open|Play|Pause|Help|Next|Previous|Back|Home|Search|Filter|bbox|Sign-in|Sign in|Pop-up|Enforced)\b/;
 
 const ALLOW =
-  /\b(FrameLab|SAM|RIFE|RTMPose|LocoTrack|SEA-RAFT|Grok|Google|GitHub|FPS|AI|JPG|PNG|WebM|JSON|Esc|Shift|Ctrl|Alt|Enter|WebM|Wan)\b/;
+  /\b(FrameLab|SAM|RIFE|RTMPose|LocoTrack|SEA-RAFT|Grok|Google|GitHub|FPS|AI|JPG|PNG|WebM|JSON|Esc|Shift|Ctrl|Alt|Enter|Wan|JPEG|GPU|CPU)\b/;
+
+const KEY_EVENT = new Set([
+  "Home",
+  "End",
+  "Escape",
+  "Space",
+  "Enter",
+  "Tab",
+  "Delete",
+  "Backspace",
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "PageUp",
+  "PageDown",
+]);
 
 function walk(dir: string, acc: string[] = []): string[] {
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -39,6 +62,18 @@ function walk(dir: string, acc: string[] = []): string[] {
 
 function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+function isCssOrCode(t: string): boolean {
+  if (!t) return true;
+  if (t.startsWith("/") || t.includes("://") || t.startsWith(".") || t.startsWith("@")) return true;
+  if (/^(flex|grid|w-|h-|text-|bg-|border-|px-|py-|mt-|mb-|ml-|mr-|gap-|rounded|absolute|relative|hidden|block|inline|min-|max-|items-|justify-|font-|tracking-|leading-|shadow-|cursor-|select-|pointer-|opacity-|z-|top-|left-|right-|bottom-|overflow|shrink|grow|size-|sr-only|antialiased|md:|lg:|sm:|xl:|2xl:|hover:|focus:|disabled:|data-|peer |rgba\(|sans-serif)/.test(t)) {
+    return true;
+  }
+  if (/^[a-z0-9_./:-]+$/.test(t)) return true;
+  if (/^[A-Z][A-Z0-9_]+$/.test(t)) return true;
+  if (KEY_EVENT.has(t)) return true;
+  return false;
 }
 
 function collectUiStrings(src: string): string[] {
@@ -54,10 +89,15 @@ function collectUiStrings(src: string): string[] {
     const t = m[1].trim();
     if (t) out.push(t);
   }
-  const quoted = /\b(?:toast\.(?:success|error|message)|confirm)\(\s*["'`]([^"'`\n]+)["'`]/g;
+  const quoted = /\b(?:toast\.(?:success|error|message)|confirm|prompt|fillText)\(\s*["'`]([^"'`\n]+)["'`]/g;
   while ((m = quoted.exec(src))) {
     const t = m[1].trim();
     if (t) out.push(t);
+  }
+  const expr = /\{[^}\n]{0,160}["'`]([^"'`\n]{2,80})["'`]/g;
+  while ((m = expr.exec(src))) {
+    const t = m[1].trim();
+    if (t && !isCssOrCode(t)) out.push(t);
   }
   return out;
 }
@@ -68,24 +108,32 @@ function collectQuoted(src: string): string[] {
   let m: RegExpExecArray | null;
   while ((m = quoted.exec(src))) {
     const t = m[1].trim();
-    if (t && !t.startsWith("/") && !t.includes("://") && !t.startsWith(".")) out.push(t);
+    if (!t || t.startsWith("/") || t.includes("://") || t.startsWith(".")) continue;
+    if (isCssOrCode(t)) continue;
+    if (src.includes(`.includes("${t}"`) || src.includes(`.includes('${t}'`)) continue;
+    out.push(t);
   }
   return out;
 }
 
+function hitsFor(strings: string[], file: string): string[] {
+  const hits: string[] = [];
+  for (const s of strings) {
+    const cleaned = s.replace(ALLOW, " ");
+    if (BARE_ENGLISH.test(cleaned)) hits.push(`${file}: ${s}`);
+  }
+  return hits;
+}
+
 describe("untranslated UI strings", () => {
   it("human-facing TSX has no bare English Generate/Timeline/Repair/Loading", () => {
-    const files = ROOTS.flatMap((d) => walk(d));
+    const files = ROOTS.flatMap((d) => walk(d)).filter((f) => !f.includes("/routes/api/"));
     assert.ok(files.length > 8, "expected UI files");
     const hits: string[] = [];
     for (const file of files) {
-      const strings = collectUiStrings(stripComments(fs.readFileSync(file, "utf8")));
-      for (const s of strings) {
-        const cleaned = s.replace(ALLOW, " ");
-        if (BARE_ENGLISH.test(cleaned)) {
-          hits.push(`${path.relative(process.cwd(), file)}: ${s}`);
-        }
-      }
+      const rel = path.relative(process.cwd(), file);
+      const src = stripComments(fs.readFileSync(file, "utf8"));
+      hits.push(...hitsFor(collectUiStrings(src), rel));
     }
     assert.deepEqual(hits, []);
   });
@@ -94,11 +142,8 @@ describe("untranslated UI strings", () => {
     const hits: string[] = [];
     for (const rel of EXTRA) {
       const file = path.join(process.cwd(), rel);
-      const strings = collectQuoted(stripComments(fs.readFileSync(file, "utf8")));
-      for (const s of strings) {
-        const cleaned = s.replace(ALLOW, " ");
-        if (BARE_ENGLISH.test(cleaned)) hits.push(`${rel}: ${s}`);
-      }
+      const src = stripComments(fs.readFileSync(file, "utf8"));
+      hits.push(...hitsFor(collectQuoted(src), rel));
     }
     assert.deepEqual(hits, []);
   });
@@ -110,6 +155,8 @@ describe("untranslated UI strings", () => {
     const home = fs.readFileSync(path.join(process.cwd(), "src/components/workstation/project-home.tsx"), "utf8");
     const login = fs.readFileSync(path.join(process.cwd(), "src/routes/login.tsx"), "utf8");
     const marks = fs.readFileSync(path.join(process.cwd(), "src/lib/visual/timeline-virtual.ts"), "utf8");
+    const modes = fs.readFileSync(path.join(process.cwd(), "src/lib/visual/workspace-mode.ts"), "utf8");
+    const planner = fs.readFileSync(path.join(process.cwd(), "src/lib/domain/repair-planner.ts"), "utf8");
     assert.match(root, /lang="zh-TW"/);
     assert.doesNotMatch(root, /lang="zh-Hant"/);
     assert.match(exec, /未命名動畫/);
@@ -121,10 +168,18 @@ describe("untranslated UI strings", () => {
     assert.match(studio, /動畫/);
     assert.match(studio, /修復/);
     assert.match(studio, /生成/);
+    assert.doesNotMatch(studio, />Generate</);
+    assert.doesNotMatch(studio, />Timeline</);
+    assert.doesNotMatch(studio, />Repair</);
+    assert.doesNotMatch(studio, />Loading</);
     assert.match(login, /進入工作室/);
     assert.match(marks, /glyph: "生"/);
     assert.match(marks, /glyph: "修"/);
     assert.match(marks, /glyph: "停"/);
+    assert.match(modes, /label: "原圖"/);
+    assert.match(modes, /label: "洋蔥皮"/);
+    assert.match(planner, /問題在 F/);
+    assert.doesNotMatch(planner, /Expand to stable neighbors/);
   });
 
   it("Code/API/DB/MCP schema stays English", () => {

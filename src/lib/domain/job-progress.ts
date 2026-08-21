@@ -25,7 +25,9 @@ export function jobStageLabel(
   progress: number,
   stage?: JobStageInfo | null,
 ): string {
-  if (stage?.label && (state === "running" || state === "queued")) return stage.label;
+  if (stage?.label && (state === "running" || state === "queued") && /[\u4e00-\u9fff]/.test(stage.label)) {
+    return stage.label;
+  }
   if (type === "GENERATE_INBETWEENS" && (state === "running" || state === "queued")) {
     if (progress < 15) return "正在分析關鍵影格…";
     if (progress < 30) return "正在建立動作計畫…";
@@ -62,7 +64,7 @@ export function jobStageLabel(
   if (running && type === "GENERATIVE_REPAIR") {
     return "區域生成修復";
   }
-  if (stage?.label && running) return stage.label;
+  if (stage?.label && running && /[\u4e00-\u9fff]/.test(stage.label)) return stage.label;
   return `${jobTypeZh(type)} · ${jobStateZh(state)} · ${progress}%`;
 }
 
