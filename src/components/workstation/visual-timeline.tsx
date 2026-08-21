@@ -333,7 +333,7 @@ export function VisualTimeline({
                         "absolute right-0.5 top-3 size-1.5 rounded-full",
                         mask === "ok" ? "bg-good" : mask === "warn" ? "bg-warn" : "bg-danger",
                       )}
-                      title={mask === "lost" ? "遮罩遺失" : "遮罩"}
+                      title={mask === "lost" ? "遮罩遺失" : mask === "warn" ? "遮罩信心不足" : "遮罩"}
                     />
                   )}
                 </button>

@@ -289,17 +289,22 @@ export function listModels(): ModelInfo[] {
 
 export function getDeviceInfo() {
   const pose = rtmposeHealth();
+  const sam = sam2Health();
+  const workers = [pose, sam].filter((w) => w.ok);
   return {
     cpu: true,
-    cuda: pose.cuda === true,
+    cuda: pose.cuda === true || sam.cuda === true,
     mps: false,
-    gpu: pose.cuda ? "cuda" : null,
+    gpu: pose.cuda || sam.cuda ? "cuda" : null,
     vram_gb: 0,
-    runtime: pose.ok ? "python+node" : "node",
+    runtime: workers.length ? "python+node" : "node",
     rtmpose: pose,
-    note: pose.ok
-      ? `RTMPose worker ready on ${pose.device}. Other CUDA adapters remain reserved.`
-      : "RTMPose worker not loaded. Pixel metrics, NCC, block-match, linear blend, and xAI vision run on CPU/API.",
+    sam2: sam,
+    note: sam.ok
+      ? `SAM 2 worker ready on ${sam.device}. Click mask + forward/backward propagate.`
+      : pose.ok
+        ? `RTMPose worker ready on ${pose.device}. SAM 2 worker not loaded.`
+        : "SAM 2 / RTMPose workers not loaded. Pixel metrics, NCC, block-match, linear blend, and xAI vision run on CPU/API.",
   };
 }
 

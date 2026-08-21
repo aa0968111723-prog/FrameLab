@@ -30,6 +30,7 @@ MIN_AREA = 0.002
 # A click that paints almost the whole frame is almost never a real object.
 MAX_AREA = 0.92
 
+
 def emit(obj: dict) -> None:
     sys.stdout.write(json.dumps(obj, ensure_ascii=False))
     sys.stdout.write("\n")
@@ -93,8 +94,12 @@ def load_predictor(device: str):
     return _PREDICTOR
 
 
-def to_pixels(x: float, y: float, width: int, height: int) -> tuple[float, float]:
-    """Canvas and tests send pixels. Values in [0,1]x[0,1] are treated as normalised."""
+def to_pixels(x: float, y: float, width: int, height: int, normalized=None) -> tuple[float, float]:
+    """Canvas sends pixels. Tests may send [0,1]. Explicit flag wins."""
+    if normalized is True:
+        return x * max(1, width), y * max(1, height)
+    if normalized is False:
+        return x, y
     if 0.0 <= x <= 1.0 and 0.0 <= y <= 1.0:
         return x * max(1, width), y * max(1, height)
     return x, y
@@ -230,7 +235,13 @@ def run(payload: dict) -> dict:
         )
         video_w = int(state.get("video_width") or window[click_idx].get("width") or 1)
         video_h = int(state.get("video_height") or window[click_idx].get("height") or 1)
-        px, py = to_pixels(float(click["x"]), float(click["y"]), video_w, video_h)
+        px, py = to_pixels(
+            float(click["x"]),
+            float(click["y"]),
+            video_w,
+            video_h,
+            click.get("normalized"),
+        )
         import numpy as np
 
         # SAM2 always multiplies by image_size after this step. With
@@ -271,7 +282,7 @@ def run(payload: dict) -> dict:
                 warnings.append(f"F{packed['frameNumber']} {packed['warning']}")
             return packed["area"]
 
-        prev = ingest(click_idx, click_masks, "seed", None)
+        seed_area = ingest(click_idx, click_masks, "seed", None)
         seed = collected.get(click_idx)
         if seed is None or seed["status"] == "lost" or seed["area"] < MIN_AREA:
             return {
@@ -284,11 +295,13 @@ def run(payload: dict) -> dict:
                 "warnings": warnings or ["空遮罩"],
             }
         if direction in ("backward", "both") and click_idx > 0:
+            prev = seed_area
             for fi, _ids, logits in predictor.propagate_in_video(
                 state, start_frame_idx=click_idx, reverse=True
             ):
                 prev = ingest(fi, logits, "backward", prev if fi != click_idx else None)
         if direction in ("forward", "both") and click_idx < len(window) - 1:
+            prev = seed_area
             for fi, _ids, logits in predictor.propagate_in_video(
                 state, start_frame_idx=click_idx, reverse=False
             ):

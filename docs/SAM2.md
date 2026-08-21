@@ -8,6 +8,8 @@ Canvas click → segment_object → SEGMENTATION job → sam2_worker.py → SAM 
 
 Clicks are pixels. The worker passes them to `SAM2VideoPredictor.add_new_points_or_box(..., normalize_coords=True)`.
 
+Switch the overlay to **遮罩**, then click. Direction chips: 向後 / 雙向 / 向前.
+
 ## Confidence
 
 | status | meaning |

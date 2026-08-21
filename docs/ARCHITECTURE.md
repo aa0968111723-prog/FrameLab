@@ -8,7 +8,7 @@ The product spec described a Python FastAPI + Next.js + Redis + GPU worker split
 2. The workstation has to run where the preview/deploy lives (Node, Postgres or PGLite, no apt, no guaranteed CUDA).
 3. Half a Python API that cannot start would violate the “no fake success” rule.
 
-GPU Python workers remain the right long-term home for SAM 2 / RIFE / Wan. They attach behind the existing provider interfaces (`src/lib/ai/providers.ts`) without changing commands or MCP tool names.
+GPU Python workers run RTMPose, LocoTrack, SEA-RAFT, RIFE, and SAM 2 behind the existing provider interfaces (`src/lib/ai/providers.ts`) without changing commands or MCP tool names. Wan remains reserved.
 
 V0.2 Assist path:
 

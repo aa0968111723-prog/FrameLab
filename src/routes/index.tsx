@@ -101,11 +101,11 @@ function Home() {
         {[
           {
             title: "已載入",
-            body: "像素 MAE、直方圖閃爍、16×16 區塊比對、動作計畫中間格（線性混合候選）、鄰域修復、你指定影格的 Grok 視覺。",
+            body: "像素 MAE、直方圖閃爍、16×16 區塊比對、RTMPose、LocoTrack、SEA-RAFT、RIFE、SAM 2 真實遮罩、動作計畫中間格、鄰域修復、你指定影格的 Grok 視覺。",
           },
           {
             title: "保留未載入",
-            body: "SAM 2、RTMPose、SEA-RAFT、LocoTrack、Depth Anything、RIFE、Wan。適配器存在，回傳 MODEL_NOT_AVAILABLE，直到註冊檢查點。",
+            body: "Depth Anything、Wan。適配器存在，回傳 MODEL_NOT_AVAILABLE，不會假裝成功。",
           },
           {
             title: "代理怎麼接",

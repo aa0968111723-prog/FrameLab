@@ -290,6 +290,7 @@ function StudioInner({ projectId }: { projectId: string }) {
     }[]
   >([]);
   const [maskClick, setMaskClick] = useState<{ x: number; y: number; frame: number } | null>(null);
+  const [maskDirection, setMaskDirection] = useState<"both" | "forward" | "backward">("both");
   const [problemMenu, setProblemMenu] = useState(false);
   const [inb, setInb] = useState<InbetweenPanelState>({
     start: null,
@@ -1258,7 +1259,7 @@ function StudioInner({ projectId }: { projectId: string }) {
         x: click.x,
         y: click.y,
         frameNumber: click.frame,
-        direction: "both",
+        direction: maskDirection,
         objectId: selectedCharacterId || selectedObjectId || `click-F${click.frame}`,
         startFrame: Math.max(0, click.frame - 24),
         endFrame: click.frame + 24,
@@ -1456,6 +1457,7 @@ function StudioInner({ projectId }: { projectId: string }) {
             {[
               { id: "pose" as const, label: "骨架" },
               { id: "motion" as const, label: "動作" },
+              { id: "mask" as const, label: "遮罩" },
               { id: "problems" as const, label: "問題" },
             ].map((l) => {
               const on = overlayStack.primary === l.id || overlayStack.extras.includes(l.id);
@@ -1464,7 +1466,10 @@ function StudioInner({ projectId }: { projectId: string }) {
                   key={l.id}
                   type="button"
                   className="mt-1 flex w-full items-center justify-between rounded-[var(--radius-xs)] px-1.5 py-1 text-left text-muted hover:bg-raised hover:text-fg"
-                  onClick={() => setOverlayStack((s) => setPrimary(s, l.id))}
+                  onClick={() => {
+                    setOverlayStack((s) => setPrimary(s, l.id));
+                    if (l.id === "mask" || l.id === "pose") setCanvasTool("pan");
+                  }}
                 >
                   <span>{l.label}</span>
                   {on ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
@@ -1620,6 +1625,13 @@ function StudioInner({ projectId }: { projectId: string }) {
               onPlacePoint={(x, y) => {
                 if (!current) return;
                 if (canvasTool === "region" || isDrawTool(canvasTool)) return;
+                if (
+                  tool.isPending &&
+                  (canvasTool === "character" || overlayStack.primary === "mask")
+                ) {
+                  toast.message("SAM 2 還在跑");
+                  return;
+                }
                 if (canvasTool === "character") {
                   if (selectedCharacterId) {
                     tool.mutate({ tool: "assign_character", args: { frameId: current.id, characterId: selectedCharacterId } });
@@ -1630,6 +1642,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                 if (canvasTool === "character" || overlayStack.primary === "mask") {
                   if (!timelineId) return;
                   setMaskClick({ x, y, frame: engine.currentFrame });
+                  setOverlayStack({ primary: "mask", extras: ["problems"] });
                   tool.mutate({
                     tool: "segment_object",
                     args: {
@@ -1637,7 +1650,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                       x,
                       y,
                       frameNumber: engine.currentFrame,
-                      direction: "both",
+                      direction: maskDirection,
                       objectId: selectedCharacterId || selectedObjectId || `click-F${engine.currentFrame}`,
                     },
                   });
@@ -2035,7 +2048,26 @@ function StudioInner({ projectId }: { projectId: string }) {
               <span className="hidden text-[10px] text-faint sm:inline">拖動路徑點可改這一格，不會動關鍵影格</span>
             ) : null}
             {overlayStack.primary === "mask" ? (
-              <span className="hidden text-[10px] text-faint sm:inline">點角色／物件切真實遮罩，可向前向後傳播</span>
+              <span className="ml-1 inline-flex items-center gap-1 text-[10px] text-faint">
+                點角色／物件
+                {([
+                  ["backward", "向後"],
+                  ["both", "雙向"],
+                  ["forward", "向前"],
+                ] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={cn(
+                      "rounded-[var(--radius-xs)] px-1.5 py-0.5",
+                      maskDirection === id ? "bg-raised text-fg" : "text-muted hover:text-fg",
+                    )}
+                    onClick={() => setMaskDirection(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </span>
             ) : null}
             {isDrawTool(canvasTool) ? (
               <label className="ml-1 flex items-center gap-1 text-[10px] text-faint">
@@ -2586,6 +2618,11 @@ function StudioInner({ projectId }: { projectId: string }) {
                       args: { timelineId, provider: "framelab-pose-lite" },
                     })
                   }
+                  onSegment={() => {
+                    setOverlayStack({ primary: "mask", extras: [] });
+                    setCanvasTool("pan");
+                    toast.message("點畫布上的角色或物件，SAM 2 會切真實遮罩");
+                  }}
                   onRepair={() => tool.mutate({ tool: "repair_frame", args: { frameId: current.id, method: "blend" } })}
                   onRepairRegion={() => {
                     if (!regionLive || regionBox.w < 8 || regionBox.h < 8) {

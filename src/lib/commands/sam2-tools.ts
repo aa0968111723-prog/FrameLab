@@ -125,7 +125,7 @@ export async function segmentObjectCmd(ctx: CommandContext, args: Record<string,
         await progress(20, { current: 0, total: inputs.length, label: "SAM 2 推論" });
         const out = await runSam2({
           frames: inputs,
-          click: { x, y, frameNumber, label: 1 },
+          click: { x, y, frameNumber, label: 1, normalized: false },
           objectId,
           direction,
         });

@@ -17,7 +17,32 @@ describe("SAM 2 worker", () => {
     assert.equal(h.provider, "sam2");
   });
 
-  it("clicks a blob and returns a real mask", async () => {
+  it("classifies low confidence as warn/lost, never ok", () => {
+    const r = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import importlib.util
+spec = importlib.util.spec_from_file_location("sam2_worker", "workers/gpu-worker/sam2_worker.py")
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+assert m.classify(0.2, 0.05, None)[0] == "lost"
+assert m.classify(0.4, 0.05, None)[0] == "warn"
+assert m.classify(0.9, 0.05, None)[0] == "ok"
+assert m.classify(0.9, 0.95, None)[0] == "lost"
+st, msg = m.classify(0.9, 0.04, 0.2)
+assert st == "warn", (st, msg)
+print("ok")
+`,
+      ],
+      { encoding: "utf8", cwd: process.cwd() },
+    );
+    assert.equal(r.status, 0, `${r.stderr}\n${r.stdout}`);
+    assert.match(r.stdout, /ok/);
+  });
+
+  it("clicks a blob and returns a real mask, forward and backward", { timeout: 180_000 }, async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sam2-"));
     const py = `
 import cv2, numpy as np, json, sys
@@ -43,25 +68,28 @@ print(json.dumps(frames))
     }[];
     const out = await runSam2({
       frames,
-      click: { x: 42, y: 56, frameNumber: 0 },
+      click: { x: 60, y: 56, frameNumber: 1, normalized: false },
       objectId: "blob",
       direction: "both",
     });
     assert.equal(out.model, "sam2.1-hiera-tiny");
-    assert.ok(out.masks.length >= 1, "expected at least the seed mask");
-    const seed = out.masks.find((m) => m.frameNumber === 0);
+    assert.ok(out.masks.length >= 3, `expected seed + forward + backward, got ${out.masks.length}`);
+    const seed = out.masks.find((m) => m.frameNumber === 1);
     assert.ok(seed, "seed frame missing");
     assert.ok(seed!.area > 0.01, `seed area ${seed!.area}`);
     assert.ok(seed!.contour.length >= 3, "need a real contour, not a box stub");
-    const last = out.masks.find((m) => m.frameNumber === out.masks.at(-1)!.frameNumber);
-    assert.ok(last);
-    if (out.masks.length > 1) {
-      const xs = out.masks.map((m) => m.bbox.x + m.bbox.w / 2);
-      assert.ok(xs.at(-1)! > xs[0]!, `mask should follow the blob ${xs}`);
-    }
+    assert.notEqual(seed!.status, "lost");
+    const back = out.masks.find((m) => m.frameNumber === 0);
+    const fwd = out.masks.find((m) => m.frameNumber === 2);
+    assert.ok(back, "backward propagate missing");
+    assert.ok(fwd, "forward propagate missing");
+    assert.ok((back!.area ?? 0) > 0.005, `backward area ${back!.area}`);
+    assert.ok((fwd!.area ?? 0) > 0.005, `forward area ${fwd!.area}`);
+    const xs = out.masks.map((m) => m.bbox.x + m.bbox.w / 2);
+    assert.ok(xs.at(-1)! > xs[0]!, `mask should follow the blob ${xs}`);
   });
 
-  it("warns instead of faking success on a dead click", async () => {
+  it("warns instead of faking success on a dead click", { timeout: 180_000 }, async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "sam2-empty-"));
     const py = `
 import cv2, numpy as np, json, sys
@@ -84,7 +112,7 @@ print(json.dumps([{"id":"f0","path":p,"frameNumber":0,"width":80,"height":80}]))
     try {
       out = await runSam2({
         frames,
-        click: { x: 4, y: 4, frameNumber: 0 },
+        click: { x: 4, y: 4, frameNumber: 0, normalized: false },
         objectId: "empty",
         direction: "both",
       });
@@ -106,6 +134,13 @@ print(json.dumps([{"id":"f0","path":p,"frameNumber":0,"width":80,"height":80}]))
     const providers = fs.readFileSync(path.join(process.cwd(), "src/lib/ai/providers.ts"), "utf8");
     const studio = fs.readFileSync(path.join(process.cwd(), "src/components/workstation/studio-app.tsx"), "utf8");
     const overlay = fs.readFileSync(path.join(process.cwd(), "src/lib/visual/overlay-renderer.ts"), "utf8");
+    const inspector = fs.readFileSync(
+      path.join(process.cwd(), "src/components/workstation/inspector-advanced.tsx"),
+      "utf8",
+    );
+    const gpu = fs.readFileSync(path.join(process.cwd(), "docs/GPU.md"), "utf8");
+    const landing = fs.readFileSync(path.join(process.cwd(), "src/routes/index.tsx"), "utf8");
+    const registry = fs.readFileSync(path.join(process.cwd(), "src/lib/ai/registry.ts"), "utf8");
     assert.match(worker, /SAM2VideoPredictor/);
     assert.match(worker, /propagate_in_video/);
     assert.match(worker, /reverse=True/);
@@ -117,8 +152,16 @@ print(json.dumps([{"id":"f0","path":p,"frameNumber":0,"width":80,"height":80}]))
     assert.doesNotMatch(providers, /new Reserved\("sam2"\)/);
     assert.match(studio, /tool: "segment_object"/);
     assert.match(studio, /未假裝成功/);
-    assert.match(studio, /direction: "both"/);
+    assert.match(studio, /maskDirection/);
+    assert.match(studio, /direction: maskDirection/);
     assert.match(overlay, /drawMaskOverlay/);
+    assert.doesNotMatch(inspector, /尚未提供/);
+    assert.match(inspector, /不會假裝成功/);
+    assert.match(gpu, /sam2_worker\.py/);
+    assert.doesNotMatch(gpu, /SAM 2.{0,40}stay reserved/);
+    assert.match(landing, /SAM 2 真實遮罩/);
+    assert.doesNotMatch(landing, /SAM 2、RTMPose/);
+    assert.match(registry, /sam2: sam/);
     assert.equal(TOOL_SCOPES.segment_object, "ANALYZE");
     assert.equal(isAskToolAllowed("segment_object"), false);
     assert.equal(isAssistToolAllowed("segment_object"), true);

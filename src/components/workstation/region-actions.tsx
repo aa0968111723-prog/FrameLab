@@ -28,7 +28,7 @@ export function RegionActions({
         追蹤
       </Button>
       <Button size="sm" variant="ghost" onClick={onPropagate}>
-        傳播 ±5
+        SAM 2 傳播
       </Button>
       <Button size="sm" variant="secondary" onClick={onRepair}>
         在此修復

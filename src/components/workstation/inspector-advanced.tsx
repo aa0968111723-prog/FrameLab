@@ -77,6 +77,7 @@ export function AdvancedInspector({
   onTrack,
   onPose,
   onPoseLite,
+  onSegment,
   onRepair,
   onRepairRegion,
   onDuplicate,
@@ -136,6 +137,7 @@ export function AdvancedInspector({
   onTrack: () => void;
   onPose: () => void;
   onPoseLite?: () => void;
+  onSegment?: () => void;
   onRepair: () => void;
   onRepairRegion: () => void;
   onDuplicate: () => void;
@@ -306,6 +308,11 @@ export function AdvancedInspector({
             精簡
           </Button>
         )}
+        {onSegment && (
+          <Button size="sm" variant="secondary" disabled={busy} onClick={onSegment}>
+            遮罩 SAM 2
+          </Button>
+        )}
         <Button size="sm" variant="secondary" disabled={busy} onClick={onMotion}>
           運動
         </Button>
@@ -372,7 +379,7 @@ export function AdvancedInspector({
         <option value="face">臉</option>
         <option value="object">物件</option>
       </select>
-      <p className="text-[10px] text-faint">SAM 2 具名遮罩尚未提供。矩形選區是真的。</p>
+      <p className="text-[10px] text-faint">切到遮罩圖層後點角色／物件。SAM 2 切真實遮罩並向前／向後傳播。低信心會警告，不會假裝成功。矩形選區不是 SAM 2。</p>
       <div>
         <p className="text-xs text-muted">角色</p>
         {characters.map((c) => (

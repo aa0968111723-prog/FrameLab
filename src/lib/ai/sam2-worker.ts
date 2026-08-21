@@ -105,7 +105,7 @@ export function sam2Health(): Sam2Health {
 
 export async function runSam2(input: {
   frames: Sam2FrameIn[];
-  click: { x: number; y: number; frameNumber: number; label?: number };
+  click: { x: number; y: number; frameNumber: number; label?: number; normalized?: boolean };
   objectId?: string;
   direction?: "forward" | "backward" | "both";
 }): Promise<{
