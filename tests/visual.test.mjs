@@ -94,7 +94,7 @@ describe("viewport transform", () => {
 
 describe("timeline virtualization", () => {
   it("does not grow DOM linearly with frame count", () => {
-    for (const total of [100, 500, 1000, 5000]) {
+    for (const total of [100, 500, 1000, 5000, 10000]) {
       const win = timelineWindow({ scrollLeft: 2400, containerWidth: 800, cellWidth: 40, total });
       assert.ok(win.visibleCount < 80, `visible ${win.visibleCount} for ${total}`);
       assert.equal(win.totalWidth, total * 40);

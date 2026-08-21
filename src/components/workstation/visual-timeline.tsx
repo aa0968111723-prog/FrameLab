@@ -10,12 +10,17 @@ import {
   mergeProblemSpans,
   timelineWindow,
   keyBreakdownFlow,
+  sliceVisible,
+  cellIndexAtX,
+  visibleFlowSegments,
+  visibleSpans,
   type ProblemSpan,
 } from "@/lib/visual/timeline-virtual";
-import { drawingAtTick, drawingAtX, exposureLabel, layoutExposureStrip } from "@/lib/domain/exposure";
+import { drawingAtTick, exposureLabel, layoutExposureStrip } from "@/lib/domain/exposure";
 import { cn } from "@/lib/utils";
 
 import { jpegUrl } from "@/lib/visual/jpeg-url";
+import { ThumbnailCache, createBrowserThumbLoader, neighborIds } from "@/lib/visual/thumbnail-cache";
 
 export type TimelineFrame = {
   id: string;
@@ -70,13 +75,18 @@ export function VisualTimeline({
   };
 }) {
   const scroller = useRef<HTMLDivElement>(null);
+  const cacheRef = useRef<ThumbnailCache | null>(null);
+  if (!cacheRef.current) cacheRef.current = new ThumbnailCache(96, createBrowserThumbLoader());
   const [scrollLeft, setScrollLeft] = useState(0);
   const [width, setWidth] = useState(800);
   const [hover, setHover] = useState<{ n: number; x: number; src: string } | null>(null);
   const dragging = useRef(false);
+  const pendingScroll = useRef(0);
+  const scrollRaf = useRef(0);
   const cell = cellWidthForZoom(timelineZoom);
   const layout = useMemo(() => layoutExposureStrip(frames, cell), [frames, cell]);
   const byNum = useMemo(() => new Map(layout.cells.map((c) => [c.frameNumber, c])), [layout]);
+  const byId = useMemo(() => new Map(frames.map((f) => [f.id, f])), [frames]);
   const win = timelineWindow({
     scrollLeft,
     containerWidth: width,
@@ -90,7 +100,10 @@ export function VisualTimeline({
     const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     setWidth(el.clientWidth);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -105,12 +118,34 @@ export function VisualTimeline({
     () => mergeProblemSpans(problemRanges as ProblemSpan[]),
     [problemRanges],
   );
-  const slice = useMemo(() => {
-    const pad = cell * 8;
-    return layout.cells.filter((c) => c.left + c.width >= scrollLeft - pad && c.left <= scrollLeft + width + pad);
-  }, [layout.cells, scrollLeft, width, cell]);
+  const slice = useMemo(
+    () => sliceVisible(layout.cells, scrollLeft, width, cell * 8),
+    [layout.cells, scrollLeft, width, cell],
+  );
   const flow = useMemo(() => keyBreakdownFlow(frames), [frames]);
+  const viewStart = slice[0]?.frameNumber ?? 0;
+  const viewEnd = slice[slice.length - 1]?.frameNumber ?? viewStart;
+  const flowInView = useMemo(
+    () => visibleFlowSegments(flow, viewStart, viewEnd),
+    [flow, viewStart, viewEnd],
+  );
+  const spansInView = useMemo(
+    () => visibleSpans(spans, viewStart, viewEnd),
+    [spans, viewStart, viewEnd],
+  );
   const maskBy = useMemo(() => new Map((maskTrack ?? []).map((m) => [m.frame, m.status])), [maskTrack]);
+
+  useEffect(() => {
+    const cache = cacheRef.current;
+    if (!cache) return;
+    const resolve = (id: string) => {
+      const f = byId.get(id);
+      return f?.thumbnailData ? jpegUrl(f.thumbnailData) : null;
+    };
+    const ids = neighborIds(frames, engine.currentFrame, 8);
+    for (const c of slice) ids.push(c.id);
+    cache.preload(ids, resolve);
+  }, [frames, engine.currentFrame, slice, byId]);
 
   function pxRange(start: number, end: number) {
     const a = byNum.get(Math.min(start, end));
@@ -122,9 +157,10 @@ export function VisualTimeline({
 
   function frameFromClientX(clientX: number) {
     const el = scroller.current;
-    if (!el) return 0;
+    if (!el || layout.cells.length === 0) return 0;
     const x = el.scrollLeft + (clientX - el.getBoundingClientRect().left);
-    return drawingAtX(frames, x, cell);
+    const idx = cellIndexAtX(layout.cells, x);
+    return layout.cells[idx]?.frameNumber ?? 0;
   }
 
   return (
@@ -133,8 +169,6 @@ export function VisualTimeline({
         frames={frames}
         current={engine.currentFrame}
         spans={spans}
-        keys={frames.filter((f) => f.frameType === "KEY").map((f) => f.frameNumber)}
-        generated={frames.filter((f) => f.frameType === "GENERATED" || f.frameType === "REPAIRED").map((f) => f.frameNumber)}
         onJump={(n) => onSeek(n, false)}
       />
       <div className="flex items-center justify-between gap-2 px-3 py-0.5 text-[11px] text-faint">
@@ -187,7 +221,15 @@ export function VisualTimeline({
       <div
         ref={scroller}
         className="relative overflow-x-auto px-2 pb-2 scrollbar-thin"
-        onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}
+        data-visible-cells={slice.length}
+        onScroll={(e) => {
+          pendingScroll.current = e.currentTarget.scrollLeft;
+          if (scrollRaf.current) return;
+          scrollRaf.current = requestAnimationFrame(() => {
+            scrollRaf.current = 0;
+            setScrollLeft(pendingScroll.current);
+          });
+        }}
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest("[data-cell]")) return;
           dragging.current = true;
@@ -203,7 +245,7 @@ export function VisualTimeline({
         }}
       >
         <div className="relative" style={{ width: layout.totalWidth || win.totalWidth, height: 78 }}>
-          {flow.map((f) =>
+          {flowInView.map((f) =>
             f.nextKey == null ? null : (
               <div
                 key={`flow-${f.key}-${f.nextKey}`}
@@ -216,7 +258,7 @@ export function VisualTimeline({
               />
             ),
           )}
-          {spans.map((s) => {
+          {spansInView.map((s) => {
             const r = pxRange(s.start, s.end);
             return (
             <button
@@ -277,7 +319,7 @@ export function VisualTimeline({
                 >
                   {f.thumbnailData ? (
                     <img
-                      src={jpegUrl(f.thumbnailData)}
+                      src={cacheRef.current?.remember(f.id, jpegUrl(f.thumbnailData)) || jpegUrl(f.thumbnailData)}
                       alt={padFrame(f.frameNumber)}
                       className="h-full w-full object-cover"
                       draggable={false}
@@ -370,15 +412,11 @@ function MiniOverview({
   frames,
   current,
   spans,
-  keys,
-  generated,
   onJump,
 }: {
   frames: TimelineFrame[];
   current: number;
   spans: ProblemSpan[];
-  keys: number[];
-  generated: number[];
   onJump: (n: number) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -395,30 +433,36 @@ function MiniOverview({
     ctx.fillStyle = "#16161a";
     ctx.fillRect(0, 0, w, h);
     const xOf = (tick: number) => (tick / n) * w;
-    const cellOf = (frame: number) => layout.cells.find((x) => x.frameNumber === frame);
+    const byFrame = new Map(layout.cells.map((cell) => [cell.frameNumber, cell]));
     ctx.fillStyle = "rgba(142,160,181,0.35)";
-    for (const g of generated) {
-      const cell = cellOf(g);
-      if (cell) ctx.fillRect(xOf(cell.startTick), 10, Math.max(1, (cell.ticks / n) * w), 6);
+    const step = Math.max(1, Math.ceil(layout.cells.length / w));
+    for (let i = 0; i < layout.cells.length; i += step) {
+      const cell = layout.cells[i]!;
+      const type = frames[cell.drawingIndex]?.frameType;
+      if (type === "GENERATED" || type === "REPAIRED") {
+        ctx.fillRect(xOf(cell.startTick), 10, Math.max(1, (cell.ticks / n) * w), 6);
+      }
     }
     ctx.fillStyle = "rgba(196,165,116,0.7)";
     for (const s of spans) {
-      const a = cellOf(s.start);
-      const b = cellOf(s.end);
+      const a = byFrame.get(s.start);
+      const b = byFrame.get(s.end);
       if (!a) continue;
       const start = a.startTick;
       const end = (b ?? a).startTick + (b ?? a).ticks;
       ctx.fillRect(xOf(start), 4, Math.max(2, xOf(end) - xOf(start)), h - 8);
     }
     ctx.fillStyle = "#d7d2c8";
-    for (const k of keys) {
-      const cell = cellOf(k);
-      if (cell) ctx.fillRect(xOf(cell.startTick), 2, 2, h - 4);
+    for (let i = 0; i < layout.cells.length; i += step) {
+      const cell = layout.cells[i]!;
+      if (frames[cell.drawingIndex]?.frameType === "KEY") {
+        ctx.fillRect(xOf(cell.startTick), 2, 2, h - 4);
+      }
     }
     ctx.fillStyle = "#f4f4f5";
-    const cur = cellOf(current);
+    const cur = byFrame.get(current);
     ctx.fillRect(xOf(cur?.startTick ?? current), 0, 2, h);
-  }, [layout, current, spans, keys, generated, n]);
+  }, [layout, current, spans, frames, n]);
 
   return (
     <button
@@ -428,7 +472,11 @@ function MiniOverview({
         const r = e.currentTarget.getBoundingClientRect();
         const t = (e.clientX - r.left) / r.width;
         const tick = Math.round(t * (n - 1));
-        onJump(drawingAtTick(frames, tick)?.frameNumber ?? 0);
+        const idx = cellIndexAtX(
+          layout.cells.map((c) => ({ left: c.startTick, width: c.ticks })),
+          tick,
+        );
+        onJump(layout.cells[idx]?.frameNumber ?? drawingAtTick(frames, tick)?.frameNumber ?? 0);
       }}
       aria-label="迷你時間軸"
     >

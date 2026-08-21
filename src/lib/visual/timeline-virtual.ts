@@ -43,8 +43,8 @@ export function mergeProblemSpans(spans: ProblemSpan[]): ProblemSpan[] {
   const sorted = [...spans].sort((a, b) => a.start - b.start || a.end - b.end);
   const out: ProblemSpan[] = [{ ...sorted[0] }];
   for (let i = 1; i < sorted.length; i += 1) {
-    const last = out[out.length - 1];
-    const cur = sorted[i];
+    const last = out[out.length - 1]!;
+    const cur = sorted[i]!;
     if (cur.start <= last.end + 1) {
       last.end = Math.max(last.end, cur.end);
       if (severityRank(cur.severity) > severityRank(last.severity)) last.severity = cur.severity;
@@ -97,7 +97,7 @@ export function keyBreakdownFlow(
   const breaks = frames.filter((f) => f.frameType === "BREAKDOWN" || f.frameType === "GENERATED_BREAKDOWN");
   const out: KeyFlow[] = [];
   for (let i = 0; i < keys.length; i += 1) {
-    const key = keys[i];
+    const key = keys[i]!;
     const nextKey = keys[i + 1];
     const breakdown = breaks.find((b) => b.frameNumber > key && (nextKey == null || b.frameNumber < nextKey))?.frameNumber;
     out.push({ key, breakdown, nextKey });
@@ -119,4 +119,88 @@ export function maskTrackMarks(
             ? "warn"
             : "ok",
   }));
+}
+
+export function visibleCellRange(
+  cells: { left: number; width: number }[],
+  scrollLeft: number,
+  viewWidth: number,
+  overscanPx = 240,
+): { start: number; end: number } {
+  if (cells.length === 0) return { start: 0, end: 0 };
+  const lo = scrollLeft - overscanPx;
+  const hi = scrollLeft + viewWidth + overscanPx;
+  let a = 0;
+  let b = cells.length;
+  while (a < b) {
+    const m = (a + b) >> 1;
+    const c = cells[m]!;
+    if (c.left + c.width < lo) a = m + 1;
+    else b = m;
+  }
+  let end = a;
+  while (end < cells.length && cells[end]!.left <= hi) end += 1;
+  return { start: a, end };
+}
+
+export function sliceVisible<T extends { left: number; width: number }>(
+  cells: T[],
+  scrollLeft: number,
+  viewWidth: number,
+  overscanPx?: number,
+): T[] {
+  const { start, end } = visibleCellRange(cells, scrollLeft, viewWidth, overscanPx);
+  return cells.slice(start, end);
+}
+
+export function cellIndexAtX(cells: { left: number; width: number }[], x: number): number {
+  if (cells.length === 0) return 0;
+  const last = cells[cells.length - 1]!;
+  const px = Math.min(last.left + last.width - 1, Math.max(0, x));
+  let a = 0;
+  let b = cells.length - 1;
+  while (a < b) {
+    const m = (a + b) >> 1;
+    const c = cells[m]!;
+    if (px >= c.left + c.width) a = m + 1;
+    else b = m;
+  }
+  return a;
+}
+
+export function visibleFlowSegments(
+  flow: KeyFlow[],
+  viewStartFrame: number,
+  viewEndFrame: number,
+): KeyFlow[] {
+  return flow.filter(
+    (f) => f.nextKey != null && f.key <= viewEndFrame && (f.nextKey ?? f.key) >= viewStartFrame,
+  );
+}
+
+export function visibleSpans<T extends { start: number; end: number }>(
+  spans: T[],
+  viewStartFrame: number,
+  viewEndFrame: number,
+): T[] {
+  return spans.filter((s) => s.end >= viewStartFrame && s.start <= viewEndFrame);
+}
+
+/** Upper bound on timeline DOM nodes for a viewport. Independent of total frames. */
+export function timelineDomEstimate(opts: {
+  containerWidth: number;
+  cellWidth: number;
+  total: number;
+  overscan?: number;
+  flowInView?: number;
+  spansInView?: number;
+}): number {
+  const win = timelineWindow({
+    scrollLeft: 0,
+    containerWidth: opts.containerWidth,
+    cellWidth: opts.cellWidth,
+    total: opts.total,
+    overscan: opts.overscan,
+  });
+  return win.visibleCount + (opts.flowInView ?? 0) + (opts.spansInView ?? 0) + 8;
 }
