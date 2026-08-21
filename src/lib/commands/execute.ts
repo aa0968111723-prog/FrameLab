@@ -356,6 +356,10 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       const { holdFrameCmd } = await import("./timeline-edit");
       return holdFrameCmd(ctx, args);
     }
+    case "create_breakdown": {
+      const { createBreakdownCmd } = await import("./timeline-edit");
+      return createBreakdownCmd(ctx, args);
+    }
     case "replace_frame":
       return replaceFrame(ctx, args);
     case "delete_frame": {

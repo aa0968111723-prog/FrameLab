@@ -55,7 +55,7 @@ See [VISUAL_ANNOTATIONS.md](./VISUAL_ANNOTATIONS.md), [OVERLAY_SYSTEM.md](./OVER
 
 Workspace context (session-isolated, ASK-safe): `get_current_context`, `get_current_frame`, `get_selected_frames`, `get_selected_frame_range` (alias `get_selected_range`), `get_selected_region`, `get_current_character`, `get_current_object`, `analyze_selection`, `analyze_motion_context`. Invalid session → `FRAME_NOT_FOUND`. Missing `sessionId` → `VALIDATION_ERROR`. `analyze_selection` is **lightweight visual analysis** (pixel MAE / histogram / luma centroid / 16×16 block) — never pose. `get_current_context` returns the spec fields including `conversation_id` and `analysis_available`. See [MCP_CONTEXT.md](./MCP_CONTEXT.md).
 
-V0.3 inbetween: `create_keyframe_pair`, `analyze_keyframe_transition`, `create_motion_plan`, `suggest_breakdown_frames`, `create_inbetween_plan` are SUGGEST/ANALYZE. `generate_inbetweens` / `regenerate_inbetween_range` need GENERATE + `confirmed=true`. `accept_generated_frames` needs EDIT + confirm and writes a revision. ASK/ASSIST conversations cannot call generate or accept.
+V0.3 inbetween: `create_keyframe_pair`, `analyze_keyframe_transition`, `create_motion_plan`, `suggest_breakdown_frames`, `create_inbetween_plan` are SUGGEST/ANALYZE. `create_breakdown` is EDIT (blank / copy / mark between A/B, never generative). `generate_inbetweens` / `regenerate_inbetween_range` need GENERATE + `confirmed=true`. `accept_generated_frames` needs EDIT + confirm and writes a revision. ASK/ASSIST conversations cannot call generate or accept.
 
 `generate_inbetweens` writes a **candidate**, not the live timeline. Default provider is **RIFE**. `linear-blend` is 快速預覽 only (not AI inbetweening).
 

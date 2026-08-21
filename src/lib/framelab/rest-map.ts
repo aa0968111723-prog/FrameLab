@@ -244,6 +244,12 @@ export function mapRestPath(
   if (parts[0] === "export" && (parts[1] === "sequence" || parts[1] === "png") && m === "POST") {
     return { tool: "export_frame_sequence", args: {} };
   }
+  if (parts[0] === "breakdowns" && parts[1] === "suggest" && m === "POST") {
+    return { tool: "suggest_breakdown_frames", args: {} };
+  }
+  if (parts[0] === "breakdowns" && m === "POST") {
+    return { tool: "create_breakdown", args: {} };
+  }
   if (parts[0] === "visual" && parts[1] === "context" && m === "GET") {
     return { tool: "get_visual_context", args: { timelineId: query.timelineId, frameNumber: Number(query.frameNumber ?? 0) } };
   }

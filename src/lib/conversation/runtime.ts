@@ -688,7 +688,7 @@ export async function runAskTurn(input: {
         action: "SUGGEST_BREAKDOWN",
         frame_range: range,
         frame: d.plan.breakdowns[0],
-        label: `建立分解影格 F${d.plan.breakdowns[0]}`,
+        label: `建議分解影格 F${d.plan.breakdowns[0]}`,
       });
       suggestions.push({
         type: "suggestion",

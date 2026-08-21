@@ -235,6 +235,17 @@ export class FrameLabClient {
   suggestBreakdowns(args: { timelineId: string; startFrame: number; endFrame: number }) {
     return this.call("suggest_breakdown_frames", args);
   }
+  createBreakdown(args: {
+    timelineId: string;
+    startFrame: number;
+    endFrame: number;
+    frameNumber?: number;
+    mode?: "blank" | "copy" | "mark";
+    copyFrom?: "start" | "end" | number;
+    frameType?: string;
+  }) {
+    return this.call("create_breakdown", args);
+  }
   getGenerationJob(jobId: string) {
     return this.call("get_generation_job", { jobId });
   }

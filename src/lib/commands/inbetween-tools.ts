@@ -14,6 +14,7 @@ import { analyzeMotionSequence } from "@/lib/domain/motion-analysis";
 import { estimatePoseLite, poseContinuity } from "@/lib/domain/pose-lite";
 import { histogram16, histogramDistance, lumaVariance, meanAbsDiff, meanLuma } from "@/lib/domain/pixel-metrics";
 import { midpointBreakdown, scoreTransition } from "@/lib/domain/transition-analysis";
+import { suggestBreakdownPositions } from "@/lib/domain/breakdown";
 import { linearBlendCapabilities, resolveInbetweenStrategy } from "@/lib/domain/inbetween-strategy";
 import { planMinimalRegeneration, assertNotProtected } from "@/lib/domain/regeneration-planner";
 import { sequentialEdges, betweenEdges } from "@/lib/domain/frame-graph";
@@ -181,23 +182,54 @@ export async function analyzeKeyframeTransition(ctx: CommandContext, args: Recor
     generativeAvailable,
     interpolationId: "rife",
   });
+  const suggestions = suggestBreakdownPositions({
+    start,
+    end,
+    complexity: analysis.complexity,
+    occlusion: features.occlusion,
+    contact_count: features.contact_count,
+    pose_displacement: features.pose_displacement,
+  });
   return {
     analysis,
     strategy,
-    suggested_breakdown: analysis.suggest_breakdown ? midpointBreakdown(start, end) : null,
+    suggested_breakdown: suggestions.frames[0] ?? (analysis.suggest_breakdown ? midpointBreakdown(start, end) : null),
+    suggested_breakdowns: suggestions.frames,
+    suggestions: suggestions.suggestions,
+    suggestion_reason: suggestions.reason,
     motion: motion[0] ?? null,
     poses: [pa, pb],
   };
 }
 
 export async function suggestBreakdownFrames(ctx: CommandContext, args: Record<string, unknown>) {
-  const tr = await analyzeKeyframeTransition(ctx, args);
+  const timelineId = String(args.timelineId ?? "");
+  const start = Number(args.startFrame ?? args.frameA);
+  const end = Number(args.endFrame ?? args.frameB);
+  if (!timelineId) fail("VALIDATION_ERROR", "timelineId required");
+  const t = await ownTimeline(ctx, timelineId);
+  const a = await repo.getFrameByNumber(t.id, start);
+  const b = await repo.getFrameByNumber(t.id, end);
+  if (!a || !b) fail("KEYFRAME_NOT_FOUND", "Keyframe not found", 404);
+  if (a.image_data && b.image_data) {
+    const tr = await analyzeKeyframeTransition(ctx, args);
+    return {
+      frames: tr.suggested_breakdowns,
+      suggestions: tr.suggestions,
+      reason: tr.suggestion_reason,
+      auto: false,
+      generative: false,
+      complexity: tr.analysis.complexity,
+    };
+  }
+  const geometric = suggestBreakdownPositions({ start, end });
   return {
-    frames: tr.suggested_breakdown != null ? [tr.suggested_breakdown] : [],
-    reason: tr.analysis.suggest_breakdown
-      ? `Complexity ${tr.analysis.complexity}. Suggest a breakdown at F${tr.suggested_breakdown}.`
-      : "No breakdown required for this pair.",
+    frames: geometric.frames,
+    suggestions: geometric.suggestions,
+    reason: geometric.reason,
     auto: false,
+    generative: false,
+    needs_insert: geometric.needs_insert,
   };
 }
 
@@ -251,10 +283,18 @@ export async function createMotionPlanCmd(ctx: CommandContext, args: Record<stri
   const byObj = new Map<string, string>();
   for (const o of objects) if (o.frame_number === start) byObj.set(o.object_id, o.name);
   const tr = await analyzeKeyframeTransition(ctx, args);
+  const suggested = suggestBreakdownPositions({
+    start,
+    end,
+    complexity: tr.analysis.complexity,
+    occlusion: tr.analysis.features.occlusion,
+    contact_count: tr.analysis.features.contact_count,
+    pose_displacement: tr.analysis.features.pose_displacement,
+  });
   const breakdowns =
-    tr.suggested_breakdown != null && args.includeSuggestedBreakdown !== false
-      ? [tr.suggested_breakdown]
-      : [];
+    args.includeSuggestedBreakdown === false
+      ? []
+      : suggested.frames;
   const pairId = typeof args.pairId === "string" ? args.pairId : null;
   const version = await repo.nextMotionPlanVersion(pairId, t.id);
   const plan = buildMotionPlan({
@@ -331,6 +371,7 @@ export async function createInbetweenPlanCmd(ctx: CommandContext, args: Record<s
       blocked: motion.strategy.kind === "suggest_breakdown",
       reason: motion.strategy.kind === "suggest_breakdown" ? motion.strategy.reason : undefined,
       suggested_breakdown: motion.plan.breakdowns[0] ?? null,
+      suggested_breakdowns: motion.plan.breakdowns,
     },
   };
 }

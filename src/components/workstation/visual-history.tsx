@@ -41,6 +41,8 @@ function actionZh(action: string) {
       return "標成關鍵影格";
     case "mark_breakdown":
       return "標成分解影格";
+    case "create_breakdown":
+      return "分解影格";
     default:
       return action.replaceAll("_", " ");
   }

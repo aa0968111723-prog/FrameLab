@@ -131,6 +131,7 @@ const TOOL_DONE_ZH: Record<string, string> = {
   create_keyframe: "已標成關鍵影格",
   remove_keyframe: "已取消關鍵影格",
   mark_breakdown: "已標成分解影格",
+  create_breakdown: "已加入分解影格",
   analyze_consistency: "一致性掃描完成",
   analyze_frame: "影格分析完成",
   analyze_motion: "運動分析完成",
@@ -512,11 +513,58 @@ function StudioInner({ projectId }: { projectId: string }) {
                   reasons: (d.transition as { reasons?: string[] }).reasons ?? [],
                   suggest_breakdown: Boolean((d.plan as { breakdowns?: number[] } | null)?.breakdowns?.length),
                   suggested_breakdown: (d.plan as { breakdowns?: number[] } | null)?.breakdowns?.[0] ?? null,
+                  suggested_breakdowns: (d.plan as { breakdowns?: number[] } | null)?.breakdowns ?? [],
+                  suggestions: ((d.plan as { breakdowns?: number[] } | null)?.breakdowns ?? []).map((n) => ({
+                    frame_number: n,
+                    reason: "建議分解",
+                  })),
                   strategy: d.strategy ?? { kind: "interpolation", provider: "rife", reason: "" },
                 }
               : s.analysis,
           }));
           setRightTab("inbetween");
+        } catch {
+          setInb((s) => ({ ...s, busy: false }));
+        }
+      } else if (input.tool === "suggest_breakdown_frames" && r.payload) {
+        try {
+          const d = JSON.parse(r.payload) as {
+            frames?: number[];
+            suggestions?: { frame_number: number; reason: string }[];
+            reason?: string;
+            complexity?: string;
+          };
+          setInb((s) => ({
+            ...s,
+            busy: false,
+            analysis: {
+              complexity: d.complexity ?? s.analysis?.complexity ?? "LOW",
+              score: s.analysis?.score ?? 0,
+              reasons: s.analysis?.reasons ?? [],
+              suggest_breakdown: (d.frames?.length ?? 0) > 0,
+              suggested_breakdown: d.frames?.[0] ?? null,
+              suggested_breakdowns: d.frames ?? [],
+              suggestions: d.suggestions ?? [],
+              suggestion_reason: d.reason,
+              strategy: s.analysis?.strategy ?? { kind: "interpolation", provider: "rife", reason: "" },
+            },
+          }));
+          const first = d.frames?.[0];
+          if (typeof first === "number") setEngine((s) => seek(s, first));
+          toast.success(d.reason ?? "已建議分解位置");
+        } catch {
+          setInb((s) => ({ ...s, busy: false }));
+        }
+      } else if (input.tool === "create_breakdown" && r.payload) {
+        try {
+          const d = JSON.parse(r.payload) as { frameNumber?: number; endFrame?: number; inserted?: boolean };
+          setInb((s) => ({
+            ...s,
+            busy: false,
+            end: d.inserted && typeof d.endFrame === "number" ? d.endFrame : s.end,
+          }));
+          if (typeof d.frameNumber === "number") setEngine((s) => seek(s, d.frameNumber!));
+          toast.success(TOOL_DONE_ZH.create_breakdown);
         } catch {
           setInb((s) => ({ ...s, busy: false }));
         }
@@ -1744,13 +1792,19 @@ function StudioInner({ projectId }: { projectId: string }) {
                   });
                 }
                 if (act.action === "SUGGEST_BREAKDOWN" && timelineId) {
-                  const n =
-                    typeof act.frame === "number"
-                      ? act.frame
-                      : act.frame_range
-                        ? Math.round((act.frame_range[0] + act.frame_range[1]) / 2)
-                        : engine.currentFrame;
-                  tool.mutate({ tool: "mark_breakdown", args: { timelineId, frameNumber: n } });
+                  const start = act.frame_range?.[0] ?? inb.start;
+                  const end = act.frame_range?.[1] ?? inb.end;
+                  setRightTab("inbetween");
+                  if (start != null && end != null) {
+                    setInb((s) => ({ ...s, start, end, busy: true }));
+                    tool.mutate({
+                      tool: "suggest_breakdown_frames",
+                      args: { timelineId, startFrame: start, endFrame: end },
+                    });
+                  } else if (typeof act.frame === "number") {
+                    setEngine((s) => seek(s, act.frame as number));
+                    toast.message(`建議分解影格 F${act.frame}`);
+                  }
                 }
               }}
               providerStatus={llm.data?.find((p) => p.id === providerId)?.status === "ready" ? "ready" : "NOT_CONFIGURED"}
@@ -2229,7 +2283,40 @@ function StudioInner({ projectId }: { projectId: string }) {
                       if (!inb.candidate) return;
                       tool.mutate({ tool: "regenerate_inbetween_range", args: { candidateId: inb.candidate.candidateId, confirmed: true } });
                     }}
-                    onMarkBreakdown={(n) => timelineId && tool.mutate({ tool: "mark_breakdown", args: { timelineId, frameNumber: n } })}
+                    onCreateBreakdown={(input) => {
+                      if (!timelineId || inb.start == null || inb.end == null) {
+                        toast.error("請先設定起點與終點關鍵影格");
+                        return;
+                      }
+                      setInb((s) => ({ ...s, busy: true }));
+                      tool.mutate({
+                        tool: "create_breakdown",
+                        args: {
+                          timelineId,
+                          startFrame: inb.start,
+                          endFrame: inb.end,
+                          frameNumber: input.frameNumber,
+                          mode: input.mode,
+                          copyFrom: input.copyFrom,
+                          frameType: input.frameType ?? "BREAKDOWN",
+                        },
+                      });
+                    }}
+                    onSuggestBreakdowns={() => {
+                      if (!timelineId || inb.start == null || inb.end == null) {
+                        toast.error("請先設定起點與終點關鍵影格");
+                        return;
+                      }
+                      setInb((s) => ({ ...s, busy: true }));
+                      tool.mutate({
+                        tool: "suggest_breakdown_frames",
+                        args: { timelineId, startFrame: inb.start, endFrame: inb.end },
+                      });
+                    }}
+                    onSetFrameType={(n, frameType) => {
+                      if (!timelineId) return;
+                      tool.mutate({ tool: "set_frame_type", args: { timelineId, frameNumber: n, frameType } });
+                    }}
                     onViewCandidate={() => {
                       const first = inb.candidate?.frames[0];
                       if (typeof first?.frameNumber === "number") setEngine((s) => seek(s, first.frameNumber));

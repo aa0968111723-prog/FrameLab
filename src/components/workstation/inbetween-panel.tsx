@@ -1,11 +1,20 @@
 /** Inspector Inbetween panel — plan → confirm → candidate → accept. Never auto-writes. */
 
+import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { curveCaption } from "@/lib/visual/motion-curve-visual";
 import { jpegUrl } from "@/lib/visual/jpeg-url";
 import { categoryLabel } from "@/lib/domain/visual-annotation";
+import { BREAKDOWN_SET_TYPES } from "@/lib/domain/breakdown";
+
+export type BreakdownCreateInput = {
+  mode: "blank" | "copy" | "mark";
+  copyFrom?: "start" | "end";
+  frameNumber?: number;
+  frameType?: string;
+};
 
 export type InbetweenConstraints = {
   preserveCharacter: boolean;
@@ -21,6 +30,9 @@ export type InbetweenAnalysis = {
   reasons: string[];
   suggest_breakdown: boolean;
   suggested_breakdown: number | null;
+  suggested_breakdowns?: number[];
+  suggestions?: { frame_number: number; reason: string }[];
+  suggestion_reason?: string;
   strategy: { kind: string; provider: string; reason: string };
 };
 
@@ -36,6 +48,7 @@ export type InbetweenConfirmation = {
   blocked?: boolean;
   reason?: string;
   suggested_breakdown?: number | null;
+  suggested_breakdowns?: number[];
 };
 
 export type MotionPlanView = {
@@ -80,6 +93,14 @@ export type InbetweenPanelState = {
   busy: boolean;
 };
 
+function typeZh(t: string) {
+  if (t === "KEY") return "關鍵 ★";
+  if (t === "BREAKDOWN") return "分解 ◆";
+  if (t === "INBETWEEN") return "中間";
+  if (t === "HOLD") return "停留";
+  return t;
+}
+
 export function InbetweenPanel({
   currentFrame,
   selectedRange,
@@ -99,7 +120,9 @@ export function InbetweenPanel({
   onAccept,
   onReject,
   onRegenerate,
-  onMarkBreakdown,
+  onCreateBreakdown,
+  onSuggestBreakdowns,
+  onSetFrameType,
   onViewCandidate,
   onSeekCandidate,
   onCompareCandidates,
@@ -124,7 +147,9 @@ export function InbetweenPanel({
   onAccept: () => void;
   onReject: () => void;
   onRegenerate: () => void;
-  onMarkBreakdown: (n: number) => void;
+  onCreateBreakdown: (input: BreakdownCreateInput) => void;
+  onSuggestBreakdowns: () => void;
+  onSetFrameType: (n: number, t: string) => void;
   onViewCandidate: () => void;
   onSeekCandidate: (n: number) => void;
   onCompareCandidates: () => void;
@@ -134,6 +159,32 @@ export function InbetweenPanel({
   const gap =
     state.start != null && state.end != null ? Math.max(0, state.end - state.start) : null;
   const generated = gap != null ? Math.max(0, gap - 1) : state.count;
+  const suggested =
+    state.analysis?.suggestions ??
+    (state.analysis?.suggested_breakdowns ?? state.plan?.breakdowns ?? []).map((n) => ({
+      frame_number: n,
+      reason: "建議分解",
+    }));
+  const defaultTarget =
+    suggested[0]?.frame_number ??
+    (state.start != null && state.end != null && state.end - state.start > 1
+      ? Math.round((state.start + state.end) / 2)
+      : currentFrame);
+  const [target, setTarget] = useState(defaultTarget);
+  const [frameType, setFrameType] = useState<(typeof BREAKDOWN_SET_TYPES)[number]>("BREAKDOWN");
+  useEffect(() => {
+    setTarget(defaultTarget);
+  }, [defaultTarget, state.start, state.end]);
+  const pairReady = state.start != null && state.end != null;
+  const create = (mode: BreakdownCreateInput["mode"], copyFrom?: "start" | "end") => {
+    if (!pairReady) return;
+    onCreateBreakdown({
+      mode,
+      copyFrom,
+      frameNumber: Number.isFinite(target) ? target : undefined,
+      frameType,
+    });
+  };
 
   return (
     <div className="space-y-3 rounded-[var(--radius-sm)] border border-border bg-subtle p-3">
@@ -168,6 +219,81 @@ export function InbetweenPanel({
           間隔：{gap} 格 · 將產生：{generated}
         </p>
       )}
+      <div className="space-y-2 rounded-[var(--radius-sm)] border border-warn/40 bg-raised p-2">
+        <p className="text-xs uppercase tracking-wide text-faint">分解影格</p>
+        <p className="text-[11px] text-muted">
+          在關鍵影格 A／B 中間加分解。空白或複製後再畫。不是生成式 Breakdown。
+        </p>
+        <label className="block text-xs text-muted">
+          目標格
+          <Input
+            type="number"
+            className="mt-1"
+            value={Number.isFinite(target) ? target : ""}
+            onChange={(e) => setTarget(Number(e.target.value))}
+          />
+        </label>
+        <div className="flex flex-wrap gap-1">
+          {suggested.map((s) => (
+            <button
+              key={`${s.frame_number}-${s.reason}`}
+              type="button"
+              disabled={state.busy}
+              onClick={() => setTarget(s.frame_number)}
+              className="rounded-[var(--radius-xs)] border border-warn/40 px-1.5 py-0.5 font-mono text-[10px] text-warn hover:bg-warn/10"
+              title={s.reason}
+            >
+              F{s.frame_number} {s.reason}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Button size="sm" variant="secondary" disabled={state.busy || !pairReady} onClick={onSuggestBreakdowns}>
+            建議位置
+          </Button>
+          <Button size="sm" variant="secondary" disabled={state.busy || !pairReady} onClick={() => create("blank")}>
+            空白 Breakdown
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={state.busy || !pairReady}
+            onClick={() => create("copy", "start")}
+          >
+            複製 A 修改
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={state.busy || !pairReady}
+            onClick={() => create("copy", "end")}
+          >
+            複製 B 修改
+          </Button>
+        </div>
+        <label className="block text-xs text-muted">
+          影格類型
+          <select
+            className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm text-fg"
+            value={frameType}
+            onChange={(e) => setFrameType(e.target.value as (typeof BREAKDOWN_SET_TYPES)[number])}
+          >
+            {BREAKDOWN_SET_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {typeZh(t)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={state.busy || !Number.isFinite(target)}
+          onClick={() => onSetFrameType(target, frameType)}
+        >
+          套用類型到 F{Number.isFinite(target) ? target : "—"}
+        </Button>
+      </div>
       <label className="block text-xs text-muted">
         影格數
         <Input
@@ -287,15 +413,23 @@ export function InbetweenPanel({
             複雜度 {complexityZh(state.analysis.complexity)}（{Math.round(state.analysis.score * 100)}%）
           </p>
           <p>{state.analysis.strategy.reason}</p>
-          {state.analysis.suggest_breakdown && state.analysis.suggested_breakdown != null && (
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={state.busy}
-              onClick={() => onMarkBreakdown(state.analysis!.suggested_breakdown!)}
-            >
-              建立分解影格 F{state.analysis.suggested_breakdown}
-            </Button>
+          {state.analysis.suggest_breakdown && (state.analysis.suggested_breakdowns?.length || state.analysis.suggested_breakdown != null) && (
+            <div className="flex flex-wrap gap-1">
+              {(state.analysis.suggested_breakdowns?.length
+                ? state.analysis.suggested_breakdowns
+                : [state.analysis.suggested_breakdown!]
+              ).map((n) => (
+                <Button
+                  key={n}
+                  size="sm"
+                  variant="secondary"
+                  disabled={state.busy}
+                  onClick={() => onCreateBreakdown({ mode: "blank", frameNumber: n, frameType: "BREAKDOWN" })}
+                >
+                  空白 Breakdown F{n}
+                </Button>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -340,9 +474,15 @@ export function InbetweenPanel({
                   size="sm"
                   variant="secondary"
                   disabled={state.busy}
-                  onClick={() => onMarkBreakdown(state.confirmation!.suggested_breakdown!)}
+                  onClick={() =>
+                    onCreateBreakdown({
+                      mode: "blank",
+                      frameNumber: state.confirmation!.suggested_breakdown!,
+                      frameType: "BREAKDOWN",
+                    })
+                  }
                 >
-                  建立分解影格 F{state.confirmation.suggested_breakdown}
+                  空白 Breakdown F{state.confirmation.suggested_breakdown}
                 </Button>
               )}
               <Button size="sm" variant="ghost" disabled={state.busy} onClick={onForceGenerate}>

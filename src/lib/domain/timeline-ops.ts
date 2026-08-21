@@ -5,8 +5,10 @@ export const TIMELINE_OPS = [
   "delete_frame",
   "clear_frame",
   "hold_frame",
+  "create_breakdown",
 ] as const;
 export type TimelineOp = (typeof TIMELINE_OPS)[number];
+
 
 export type FrameSnap = {
   id: string;

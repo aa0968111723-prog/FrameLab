@@ -60,6 +60,7 @@ export const TOOL_SCOPES: Record<string, Scope> = {
   insert_frame: "EDIT",
   clear_frame: "EDIT",
   hold_frame: "EDIT",
+  create_breakdown: "EDIT",
   replace_frame: "EDIT",
   delete_frame: "EDIT",
   set_frame_duration: "EDIT",

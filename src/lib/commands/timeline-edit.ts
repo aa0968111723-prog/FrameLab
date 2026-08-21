@@ -1,9 +1,16 @@
-/** Timeline frame ops: add / insert / duplicate / delete / clear / hold. Each writes a revision. */
+/** Timeline frame ops: add / insert / duplicate / delete / clear / hold / breakdown. Each writes a revision. */
 
 import { fail } from "@/lib/domain/errors";
 import { frameDurationMs } from "@/lib/domain/fps";
 import { nid } from "@/lib/domain/ids";
 import { blankJpegBase64, hashBytes } from "@/lib/domain/image-codec";
+import {
+  isBreakdownMode,
+  isBreakdownSetType,
+  resolveBreakdownTarget,
+  resolveCopySource,
+  type BreakdownMode,
+} from "@/lib/domain/breakdown";
 import {
   isTimelineEdit,
   type FrameSnap,
@@ -15,6 +22,7 @@ import { ownTimeline } from "./ownership.ts";
 import type { CommandContext } from "./execute.ts";
 
 export { isTimelineEdit, type TimelineEdit, type TimelineOp };
+
 
 function snapFrom(row: repo.FrameRow): FrameSnap {
   return {
@@ -99,6 +107,14 @@ async function insertSnap(timelineId: string, snap: FrameSnap) {
     preview_asset: snap.previewAsset,
     thumbnail_asset: snap.thumbnailAsset,
   });
+  if (snap.frameType === "KEY" || snap.frameType === "BREAKDOWN") {
+    await repo.upsertKeyframe({
+      timelineId,
+      frameId: snap.id,
+      kind: snap.frameType,
+      locked: snap.isLocked,
+    });
+  }
 }
 
 async function removeSnap(timelineId: string, snap: FrameSnap) {
@@ -157,6 +173,14 @@ export async function applyTimelineEdit(
   } else if (edit.op === "clear_frame" || edit.op === "hold_frame") {
     const snap = direction === "undo" ? edit.before : edit.after;
     if (snap) await paintSnap(snap);
+  } else if (edit.op === "create_breakdown") {
+    if (edit.created) {
+      if (direction === "undo") await removeSnap(t.id, edit.created);
+      else await insertSnap(t.id, edit.created);
+    } else {
+      const snap = direction === "undo" ? edit.before : edit.after;
+      if (snap) await paintSnap(snap);
+    }
   }
   await recount(t.id);
   return { op: edit.op, direction };
@@ -301,3 +325,130 @@ export async function holdFrameCmd(ctx: CommandContext, args: Record<string, unk
   const revisionId = await record(ctx, "hold_frame", t.project_id, frame.id, edit);
   return { id: frame.id, exposureCount: exposure, revisionId };
 }
+
+async function applyBreakdownPixels(
+  frameId: string,
+  mode: BreakdownMode,
+  frameType: string,
+  source: repo.FrameRow | null,
+) {
+  if (mode === "blank") {
+    const meta = await repo.getFrameMeta(frameId);
+    const jpeg = blankJpegBase64(meta?.width || source?.width || 320, meta?.height || source?.height || 180);
+    await repo.updateFrame(frameId, {
+      image_data: jpeg,
+      thumbnail_data: "",
+      content_hash: hashBytes(jpeg),
+      frame_type: frameType,
+      width: meta?.width || source?.width || 320,
+      height: meta?.height || source?.height || 180,
+    });
+  } else if (mode === "copy") {
+    if (!source?.image_data) fail("FRAME_ASSET_UNAVAILABLE", "Copy source has no image");
+    await repo.updateFrame(frameId, {
+      image_data: source.image_data,
+      thumbnail_data: source.thumbnail_data || "",
+      content_hash: source.content_hash,
+      frame_type: frameType,
+      width: source.width,
+      height: source.height,
+    });
+  } else {
+    await repo.updateFrame(frameId, { frame_type: frameType });
+  }
+  if (frameType === "KEY" || frameType === "BREAKDOWN") {
+    const row = await repo.getFrameMeta(frameId);
+    if (row) {
+      await repo.upsertKeyframe({
+        timelineId: row.timeline_id,
+        frameId: row.id,
+        kind: frameType,
+        locked: row.is_locked,
+      });
+    }
+  } else {
+    await repo.deleteKeyframeForFrame(frameId);
+  }
+}
+
+export async function createBreakdownCmd(ctx: CommandContext, args: Record<string, unknown>) {
+  const t = await ownTimeline(ctx, String(args.timelineId ?? ""));
+  const start = Number(args.startFrame ?? args.frameA);
+  const end = Number(args.endFrame ?? args.frameB);
+  const modeRaw = typeof args.mode === "string" ? args.mode : "blank";
+  if (!isBreakdownMode(modeRaw)) fail("VALIDATION_ERROR", `Invalid breakdown mode ${modeRaw}`);
+  const mode: BreakdownMode = modeRaw;
+  const typeRaw = typeof args.frameType === "string" ? args.frameType : "BREAKDOWN";
+  if (typeRaw === "GENERATED_BREAKDOWN") {
+    fail("VALIDATION_ERROR", "Generative breakdown is not enabled. Use blank or copy.");
+  }
+  if (!isBreakdownSetType(typeRaw)) {
+    fail("VALIDATION_ERROR", `Frame type must be KEY | BREAKDOWN | INBETWEEN | HOLD`);
+  }
+  const { lo, hi, target, insert } = resolveBreakdownTarget({
+    start,
+    end,
+    requested: typeof args.frameNumber === "number" ? args.frameNumber : Number.NaN,
+  });
+  const keyA = await repo.getFrameByNumber(t.id, lo);
+  const keyB = await repo.getFrameByNumber(t.id, hi);
+  if (!keyA || !keyB) fail("KEYFRAME_NOT_FOUND", "Keyframe A/B not found", 404);
+
+  const copyFrom = resolveCopySource(lo, hi, args.copyFrom);
+  const source =
+    mode === "copy"
+      ? copyFrom === hi
+        ? keyB
+        : copyFrom === lo
+          ? keyA
+          : ((await repo.getFrameByNumber(t.id, copyFrom)) ?? keyA)
+      : keyA;
+
+  if (insert) {
+    const createdRow = await putBlank(t, target, keyA);
+    await applyBreakdownPixels(createdRow.id, mode === "mark" ? "blank" : mode, typeRaw, source);
+    await recount(t.id);
+    const created = await repo.getFrameMeta(createdRow.id);
+    if (!created) fail("STORAGE_ERROR", "Breakdown insert failed");
+    const edit: TimelineEdit = { op: "create_breakdown", timelineId: t.id, created: snapFrom(created) };
+    const revisionId = await record(ctx, "create_breakdown", t.project_id, created.id, edit);
+    return {
+      id: created.id,
+      frameNumber: created.frame_number,
+      frameType: created.frame_type,
+      mode: mode === "mark" ? "blank" : mode,
+      inserted: true,
+      startFrame: lo,
+      endFrame: hi + 1,
+      revisionId,
+      auto: false,
+      generative: false,
+    };
+  }
+
+  const existing = await repo.getFrameByNumber(t.id, target);
+  if (!existing) fail("FRAME_NOT_FOUND", `No frame at F${target}`, 404);
+  if (existing.is_locked) fail("VALIDATION_ERROR", "Frame is locked");
+  if (existing.frame_type === "KEY" && args.overwriteKey !== true) {
+    fail("INVALID_KEYFRAME_PAIR", "Cannot overwrite a KEY. Pick an interior frame.");
+  }
+  const before = snapFrom(existing);
+  await applyBreakdownPixels(existing.id, mode, typeRaw, source);
+  const afterRow = await repo.getFrameMeta(existing.id);
+  const after = afterRow ? snapFrom(afterRow) : before;
+  const edit: TimelineEdit = { op: "create_breakdown", timelineId: t.id, before, after };
+  const revisionId = await record(ctx, "create_breakdown", t.project_id, existing.id, edit);
+  return {
+    id: existing.id,
+    frameNumber: existing.frame_number,
+    frameType: after.frameType,
+    mode,
+    inserted: false,
+    startFrame: lo,
+    endFrame: hi,
+    revisionId,
+    auto: false,
+    generative: false,
+  };
+}
+

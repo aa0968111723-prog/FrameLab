@@ -26,7 +26,7 @@ describe("blank frame jpeg", () => {
 });
 
 describe("timeline edit contract", () => {
-  it("recognizes the six ops", () => {
+  it("recognizes the ops including create_breakdown", () => {
     assert.deepEqual([...TIMELINE_OPS], [
       "add_frame",
       "insert_frame",
@@ -34,6 +34,7 @@ describe("timeline edit contract", () => {
       "delete_frame",
       "clear_frame",
       "hold_frame",
+      "create_breakdown",
     ]);
     for (const op of TIMELINE_OPS) {
       assert.equal(isTimelineEdit({ op, timelineId: "tl" }), true);

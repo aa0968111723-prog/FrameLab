@@ -384,6 +384,9 @@ describe("permissions", () => {
     assert.doesNotThrow(() => assertToolAllowed(["GENERATE"], "generate_inbetweens"));
     assert.doesNotThrow(() => assertToolAllowed(["EDIT"], "accept_generated_frames"));
     assert.equal(isAskToolAllowed("generate_inbetweens"), false);
+    assert.equal(isAskToolAllowed("create_breakdown"), false);
+    assert.equal(isAssistToolAllowed("suggest_breakdown_frames"), true);
+    assert.equal(isAssistToolAllowed("create_breakdown"), false);
     assert.equal(isAssistToolAllowed("generate_inbetweens"), false);
     assert.equal(isAssistToolAllowed("create_inbetween_plan"), true);
     assert.equal(isAskToolAllowed("accept_generated_frames"), false);
@@ -406,6 +409,7 @@ describe("mcp / rest surface", () => {
       "analyze_keyframe_transition",
       "create_motion_plan",
       "suggest_breakdown_frames",
+      "create_breakdown",
       "create_inbetween_plan",
       "generate_inbetweens",
       "get_generation_job",
@@ -427,6 +431,8 @@ describe("mcp / rest surface", () => {
     assert.equal(mapRestPath("POST", "/api/v1/inbetweens/generate", {})?.tool, "generate_inbetweens");
     assert.equal(mapRestPath("POST", "/api/v1/keyframe-pairs/p1/analyze", {})?.args.pairId, "p1");
     assert.equal(mapRestPath("POST", "/api/v1/inbetweens/abc/accept", {})?.tool, "accept_generated_frames");
+    assert.equal(mapRestPath("POST", "/api/v1/breakdowns", {})?.tool, "create_breakdown");
+    assert.equal(mapRestPath("POST", "/api/v1/breakdowns/suggest", {})?.tool, "suggest_breakdown_frames");
     assert.equal(mapRestPath("POST", "/api/v1/export/sequence", {})?.tool, "export_frame_sequence");
     assert.equal(
       mapRestPath("GET", "/api/v1/candidates", { timelineId: "tl1" })?.args.timelineId,

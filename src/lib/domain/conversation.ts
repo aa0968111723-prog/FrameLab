@@ -105,6 +105,7 @@ export const FORBIDDEN_ASK_TOOLS = [
   "clear_frame",
   "hold_frame",
   "duplicate_frame",
+  "create_breakdown",
   "extract_video",
   "ingest_frames",
   "render_preview",
