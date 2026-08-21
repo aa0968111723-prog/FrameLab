@@ -25,7 +25,7 @@ function scoreKeyZh(k: string) {
   if (x.includes("contact")) return "接觸";
   if (x.includes("identity")) return "身份";
   if (x.includes("object")) return "物件";
-  return k.replaceAll("_", " ");
+  return "其他";
 }
 
 function frameTypeZh(t: string) {
@@ -33,10 +33,40 @@ function frameTypeZh(t: string) {
   if (t === "BREAKDOWN") return "分解 ◆";
   if (t === "INBETWEEN") return "中間 ●";
   if (t === "HOLD") return "停留";
-  if (t === "GENERATED") return "生成 G";
+  if (t === "GENERATED") return "生成";
   if (t === "REPAIRED") return "已修復";
   if (t === "GENERATED_BREAKDOWN") return "生成分解";
-  return t;
+  return "影格";
+}
+
+function jointZh(name: string) {
+  const map: Record<string, string> = {
+    nose: "鼻",
+    left_eye: "左眼",
+    right_eye: "右眼",
+    left_ear: "左耳",
+    right_ear: "右耳",
+    left_shoulder: "左肩",
+    right_shoulder: "右肩",
+    left_elbow: "左肘",
+    right_elbow: "右肘",
+    left_wrist: "左手腕",
+    right_wrist: "右手腕",
+    left_hip: "左髖",
+    right_hip: "右髖",
+    left_knee: "左膝",
+    right_knee: "右膝",
+    left_ankle: "左踝",
+    right_ankle: "右踝",
+    left_hand: "左手",
+    right_hand: "右手",
+    head: "頭",
+    hip: "髖",
+    foot: "腳",
+  };
+  if (map[name]) return map[name];
+  if (/^[a-z][a-z0-9_]*$/i.test(name) && name.includes("_")) return "關節";
+  return name;
 }
 
 function typeTone(t: string): React.ComponentProps<typeof Badge>["tone"] {
@@ -185,7 +215,7 @@ export function AdvancedInspector({
                     : t === "HOLD"
                       ? "停留"
                       : t === "GENERATED"
-                        ? "生成 G"
+                        ? "生成"
                         : t === "REPAIRED"
                           ? "已修復"
                           : "生成分解"}
@@ -206,7 +236,7 @@ export function AdvancedInspector({
             <ul className="space-y-0.5 text-[11px] text-muted">
               {here.slice(-6).map((c) => (
                 <li key={c.id} className="flex justify-between font-mono">
-                  <span>{c.joint}</span>
+                  <span>{jointZh(c.joint)}</span>
                   <span>
                     {c.x.toFixed(2)} · {c.y.toFixed(2)}
                   </span>
@@ -229,7 +259,7 @@ export function AdvancedInspector({
             <ul className="space-y-0.5 text-[11px] text-muted">
               {here.slice(-6).map((c) => (
                 <li key={c.id} className="flex justify-between font-mono">
-                  <span>{c.name}</span>
+                  <span>{jointZh(c.name)}</span>
                   <span>
                     {c.x.toFixed(2)} · {c.y.toFixed(2)}
                   </span>

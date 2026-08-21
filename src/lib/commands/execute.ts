@@ -219,7 +219,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       return { ...p, timelines };
     }
     case "create_project":
-      return createBlankProject(ctx, { name: str(args.name, "Untitled"), fps: num(args.fps, DEFAULT_PLAYBACK_FPS) });
+      return createBlankProject(ctx, { name: str(args.name, "未命名動畫"), fps: num(args.fps, DEFAULT_PLAYBACK_FPS) });
     case "get_video": {
       const v = await repo.getVideo(str(args.videoId));
       if (!v) fail("FRAME_NOT_FOUND", "Video not found", 404);
@@ -1492,7 +1492,7 @@ export async function createBlankProject(
   await repo.insertProject({
     id,
     user_id: ctx.userId,
-    name: data.name || "Untitled",
+    name: data.name || "未命名動畫",
     description: "",
     fps: data.fps ?? DEFAULT_PLAYBACK_FPS,
     width: 480,
@@ -1504,7 +1504,7 @@ export async function createBlankProject(
     id: timelineId,
     project_id: id,
     video_id: null,
-    name: "Timeline",
+    name: "時間軸",
     fps: data.fps ?? DEFAULT_PLAYBACK_FPS,
     frame_count: 0,
     created_at: now,

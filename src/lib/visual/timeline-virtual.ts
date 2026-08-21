@@ -71,15 +71,15 @@ export function frameTypeMark(type: string): { glyph: string; title: string } {
     case "GENERATED_BREAKDOWN":
       return { glyph: "◆", title: "產生的分解影格" };
     case "GENERATED":
-      return { glyph: "G", title: "產生格" };
+      return { glyph: "生", title: "產生格" };
     case "REPAIRED":
-      return { glyph: "R", title: "修復格" };
+      return { glyph: "修", title: "修復格" };
     case "HOLD":
-      return { glyph: "H", title: "停留格" };
+      return { glyph: "停", title: "停留格" };
     case "INBETWEEN":
       return { glyph: "●", title: "中間影格" };
     default:
-      return { glyph: "·", title: type };
+      return { glyph: "·", title: "影格" };
   }
 }
 

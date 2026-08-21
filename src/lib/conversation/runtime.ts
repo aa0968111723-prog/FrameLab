@@ -303,7 +303,7 @@ function complexityZh(c: string) {
   if (c === "HIGH") return "高";
   if (c === "MEDIUM") return "中";
   if (c === "LOW") return "低";
-  return c;
+  return "未知";
 }
 
 function curveZh(c: string) {
@@ -312,7 +312,7 @@ function curveZh(c: string) {
   if (c === "ease_in_out") return "緩入緩出";
   if (c === "hold") return "停留";
   if (c === "linear") return "線性";
-  return c;
+  return "曲線";
 }
 
 function constraintKindZh(kind: string) {
@@ -323,7 +323,7 @@ function constraintKindZh(kind: string) {
   if (k.includes("contact")) return "接觸";
   if (k.includes("camera")) return "相機";
   if (k.includes("object")) return "物件";
-  return kind.replaceAll("_", " ");
+  return "約束";
 }
 
 function toInbetweenAsk(data: unknown): InbetweenAskPayload | null {
@@ -723,7 +723,7 @@ export async function runAskTurn(input: {
       type: "suggestion",
       action: "APPLY_CURVE",
       frame_range: range,
-      label: `套用 ${parsedIntent.curve ?? "ease_in_out"} 並重新生成（需確認）`,
+      label: `套用 ${curveZh(parsedIntent.curve ?? "ease_in_out")} 並重新生成（需確認）`,
     });
   }
   if (animationCommand) {

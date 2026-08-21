@@ -223,9 +223,9 @@ export function generateBouncingBall(opts?: {
       contentHash: hashBytes(imageData),
       notes:
         frameType === "KEY"
-          ? "Contact or apex — squash / stretch extreme"
+          ? "接觸或最高點 — 壓扁／拉長極值"
           : frameType === "BREAKDOWN"
-            ? "Breakdown — mid-arc volume"
+            ? "分解影格 — 弧線中段體積"
             : "",
     });
   }

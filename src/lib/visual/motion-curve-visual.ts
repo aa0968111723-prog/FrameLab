@@ -49,6 +49,6 @@ export function curveCaption(curve: MotionCurve | string): string {
     case "linear":
       return "線性 · 均勻間距";
     default:
-      return String(curve);
+      return "曲線";
   }
 }

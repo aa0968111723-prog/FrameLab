@@ -115,7 +115,7 @@ describe("timeline virtualization", () => {
     assert.equal(frameTypeMark("KEY").glyph, "★");
     assert.equal(frameTypeMark("BREAKDOWN").glyph, "◆");
     assert.equal(frameTypeMark("INBETWEEN").glyph, "●");
-    assert.equal(frameTypeMark("GENERATED").glyph, "G");
+    assert.equal(frameTypeMark("GENERATED").glyph, "生");
     assert.ok(cellWidthForZoom(2) > cellWidthForZoom(0.5));
   });
 

@@ -20,7 +20,13 @@ import { DEFAULT_PLAYBACK_FPS, clampFps } from "@/lib/domain/fps";
 
 export function ProjectHome() {
   const { user, isPending } = useCurrentUserState();
-  if (isPending) return <div className="min-h-screen bg-bg" />;
+  if (isPending) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-bg text-muted">
+        <p className="text-sm">載入中…</p>
+      </div>
+    );
+  }
   if (!user) return <RedirectToSignIn />;
   return <HomeInner />;
 }
@@ -49,7 +55,7 @@ function HomeInner() {
       }
       void nav({ to: "/studio/$projectId", params: { projectId: id } });
     },
-    onError: (e) => toast.error(e.message || "無法開啟範例"),
+    onError: (e) => toast.error(visibleZh(e.message, "無法開啟範例")),
   });
 
   const create = useMutation({
@@ -153,7 +159,7 @@ function HomeInner() {
       toast.success(`已匯入 ${frameCount} 格`);
       void nav({ to: "/studio/$projectId", params: { projectId } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "匯入失敗");
+      toast.error(err instanceof Error ? visibleZh(err.message, "匯入失敗") : "匯入失敗");
     } finally {
       setBusy(null);
     }
@@ -194,7 +200,7 @@ function HomeInner() {
       toast.success(`已匯入 ${frameCount || "?"} 格`);
       void nav({ to: "/studio/$projectId", params: { projectId: json.projectId } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "影片匯入失敗");
+      toast.error(err instanceof Error ? visibleZh(err.message, "影片匯入失敗") : "影片匯入失敗");
     } finally {
       setBusy(null);
     }
@@ -303,7 +309,7 @@ function HomeInner() {
           </h2>
           <ul className="mt-3 divide-y divide-border rounded-[var(--radius-md)] border border-border bg-surface">
             {projects.isLoading && (
-              <li className="px-4 py-10 text-center text-sm text-muted">讀取專案…</li>
+              <li className="px-4 py-10 text-center text-sm text-muted">載入中…</li>
             )}
             {!projects.isLoading && list.length === 0 && (
               <li className="px-4 py-10 text-center text-sm text-muted">還沒有專案。建立動畫，或開啟範例。</li>
@@ -333,4 +339,9 @@ function HomeInner() {
       </div>
     </div>
   );
+}
+
+function visibleZh(msg: string | undefined, fallback: string) {
+  if (!msg) return fallback;
+  return /[\u4e00-\u9fff]/.test(msg) ? msg : fallback;
 }

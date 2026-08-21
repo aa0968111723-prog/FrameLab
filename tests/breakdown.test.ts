@@ -94,12 +94,12 @@ describe("breakdown command contract", () => {
   it("panel: blank / copy / type / suggest; no AI inbetween label", () => {
     const panel = readFileSync(new URL("../src/components/workstation/inbetween-panel.tsx", import.meta.url), "utf8");
     const studio = readFileSync(new URL("../src/components/workstation/studio-app.tsx", import.meta.url), "utf8");
-    assert.match(panel, /空白 Breakdown/);
+    assert.match(panel, /空白分解/);
     assert.match(panel, /複製 A 修改/);
     assert.match(panel, /複製 B 修改/);
     assert.match(panel, /建議位置/);
     assert.match(panel, /影格類型/);
-    assert.match(panel, /不是生成式 Breakdown/);
+    assert.match(panel, /不是生成式分解/);
     assert.match(studio, /tool: "create_breakdown"/);
     assert.match(studio, /tool: "suggest_breakdown_frames"/);
     assert.match(studio, /tool: "set_frame_type"/);

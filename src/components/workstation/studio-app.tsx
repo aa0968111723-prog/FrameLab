@@ -185,13 +185,22 @@ function toolErrorZh(code: string, error: string) {
   if (e.includes("keyframe")) return "關鍵影格對無效。請先點兩張 ★，或用中間影格面板設定起點／終點。";
   if (e.includes("candidate")) return "找不到候選版本";
   if (e.includes("not found")) return "找不到對象";
-  if (code === "PROVIDER_NOT_AVAILABLE") return error || "生成修復尚未設定。不會用 bbox 混合冒充 AI。";
-  return error ? `${code}: ${error}` : code;
+  if (code === "PROVIDER_NOT_AVAILABLE") {
+    return /[\u4e00-\u9fff]/.test(error) ? error : "生成修復尚未設定。不會用矩形框混合冒充 AI。";
+  }
+  if (/[\u4e00-\u9fff]/.test(error)) return error;
+  return "操作失敗";
 }
 
 export function StudioApp({ projectId }: { projectId: string }) {
   const { user, isPending } = useCurrentUserState();
-  if (isPending) return <div className="min-h-screen bg-bg" />;
+  if (isPending) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-bg text-muted">
+        <p className="text-sm">載入中…</p>
+      </div>
+    );
+  }
   if (!user) return <RedirectToSignIn />;
   return <StudioInner projectId={projectId} />;
 }
@@ -741,7 +750,7 @@ function StudioInner({ projectId }: { projectId: string }) {
             setCompareMode("side");
             toast.success(d.ai ? "區域修復候選已產生" : "快速預覽已產生（非 AI）");
           } else if (!d.available) {
-            toast.error(d.note || "生成修復尚未設定。不會用 bbox 混合冒充 AI。");
+            toast.error(d.note || "生成修復尚未設定。不會用矩形框混合冒充 AI。");
           }
         } catch {
           toast.error("區域修復結果無法讀取，未假裝成功");
@@ -817,7 +826,7 @@ function StudioInner({ projectId }: { projectId: string }) {
       refresh();
     },
     onError: (e) => {
-      toast.error(e.message);
+      toast.error(toolErrorZh("", e.message));
       setInb((s) => ({ ...s, busy: false }));
     },
   });
@@ -1177,7 +1186,7 @@ function StudioInner({ projectId }: { projectId: string }) {
         },
       });
       if (!r.ok) {
-        toast.error(r.error);
+        toast.error(toolErrorZh("", r.error));
         setAiState("idle");
         return;
       }
@@ -1301,7 +1310,7 @@ function StudioInner({ projectId }: { projectId: string }) {
   if (bundle.isLoading) {
     return (
       <div className="grid min-h-screen place-items-center bg-bg text-muted">
-        <Loader2 className="size-6 animate-spin" />
+        <p className="text-sm">載入中…</p>
       </div>
     );
   }
@@ -2503,7 +2512,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <span className="grid h-full place-items-center text-[8px] text-gen">G</span>
+                              <span className="grid h-full place-items-center text-[8px] text-gen">生</span>
                             )}
                           </button>
                         ))}

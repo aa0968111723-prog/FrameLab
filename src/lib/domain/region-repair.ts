@@ -66,11 +66,11 @@ export function isNeighborhoodPreview(method: string | undefined): boolean {
 }
 
 export function regionRepairUnavailableMessage(providerId = "wan"): string {
-  return `生成修復尚未設定（${providerId} 未載入）。bbox 鄰域貼上不是 AI 修復。`;
+  return `生成修復尚未設定（${providerId} 未載入）。矩形鄰域貼上不是 AI 修復。`;
 }
 
 export function neighborhoodPreviewNote(): string {
-  return "快速預覽：鄰域 bbox 貼上。不是 AI 修復。";
+  return "快速預覽：鄰域矩形貼上。不是 AI 修復。";
 }
 
 export type RegionRepairPipeline = {
@@ -172,7 +172,7 @@ export function buildRegionRepairPipeline(input: {
       ? "生成修復候選。尚未寫入時間軸。"
       : neighborhoodPreviewNote()
     : available
-      ? "Provider 已載入，可產生候選。"
+      ? "生成修復已載入，可產生候選。"
       : regionRepairUnavailableMessage(providerId);
   return {
     stages: REGION_REPAIR_STAGES.map((id) => ({

@@ -225,7 +225,7 @@ export function summarizeObservations(
     available_metrics: metrics,
     limitations: [
       "這是輕量視覺分析（像素 MAE、直方圖、亮度質心、16×16 區塊比對）。",
-      "沒有骨架／pose／手部關鍵點 — RTMPose 未載入。",
+      "沒有骨架／姿態／手部關鍵點 — RTMPose 未載入。",
       "沒有 SAM 遮罩。選區若有，是矩形。",
       "不要回報關節角度或身份分數；那些指標不存在。Do not report joint angles or identity scores.",
     ],

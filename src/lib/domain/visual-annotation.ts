@@ -158,7 +158,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export function categoryLabel(category?: string | null): string {
   if (!category) return "問題";
-  return CATEGORY_LABEL[category] ?? category.replaceAll("_", " ").toLowerCase();
+  return CATEGORY_LABEL[category] ?? "問題";
 }
 
 export type ProblemLocator = (p: {

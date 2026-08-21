@@ -39,7 +39,7 @@ export function resolveInbetweenStrategy(input: {
     return {
       kind: "interpolation",
       provider: interp,
-      reason: "生成式中間影格為 MODEL_NOT_AVAILABLE。改用 RIFE 中割。",
+      reason: "生成式中間影格尚未載入。改用 RIFE 中割。",
     };
   }
   if (input.complexity === "MEDIUM") {

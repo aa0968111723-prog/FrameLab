@@ -89,7 +89,7 @@ export function jobTypeZh(type: string) {
     case "GENERATIVE_REPAIR":
       return "區域生成修復";
     default:
-      return type.replaceAll("_", " ");
+      return "工作";
   }
 }
 
@@ -99,5 +99,5 @@ export function jobStateZh(state: string) {
   if (state === "done" || state === "succeeded" || state === "completed") return "完成";
   if (state === "failed") return "失敗";
   if (state === "cancelled") return "已取消";
-  return state;
+  return "狀態";
 }

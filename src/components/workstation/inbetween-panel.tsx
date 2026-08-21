@@ -222,7 +222,7 @@ export function InbetweenPanel({
       <div className="space-y-2 rounded-[var(--radius-sm)] border border-warn/40 bg-raised p-2">
         <p className="text-xs uppercase tracking-wide text-faint">分解影格</p>
         <p className="text-[11px] text-muted">
-          在關鍵影格 A／B 中間加分解。空白或複製後再畫。不是生成式 Breakdown。
+          在關鍵影格 A／B 中間加分解。空白或複製後再畫。不是生成式分解。
         </p>
         <label className="block text-xs text-muted">
           目標格
@@ -252,7 +252,7 @@ export function InbetweenPanel({
             建議位置
           </Button>
           <Button size="sm" variant="secondary" disabled={state.busy || !pairReady} onClick={() => create("blank")}>
-            空白 Breakdown
+            空白分解
           </Button>
           <Button
             size="sm"
@@ -426,7 +426,7 @@ export function InbetweenPanel({
                   disabled={state.busy}
                   onClick={() => onCreateBreakdown({ mode: "blank", frameNumber: n, frameType: "BREAKDOWN" })}
                 >
-                  空白 Breakdown F{n}
+                  空白分解 F{n}
                 </Button>
               ))}
             </div>
@@ -482,7 +482,7 @@ export function InbetweenPanel({
                     })
                   }
                 >
-                  空白 Breakdown F{state.confirmation.suggested_breakdown}
+                  空白分解 F{state.confirmation.suggested_breakdown}
                 </Button>
               )}
               <Button size="sm" variant="ghost" disabled={state.busy} onClick={onForceGenerate}>
@@ -597,7 +597,7 @@ function cameraMoveZh(move?: string) {
   if (m.includes("tilt")) return "俯仰";
   if (m.includes("zoom")) return "縮放";
   if (m.includes("track")) return "跟隨";
-  return move;
+  return "未知";
 }
 
 function complexityZh(c: string) {
@@ -605,14 +605,14 @@ function complexityZh(c: string) {
   if (c === "HIGH") return "高";
   if (c === "MEDIUM") return "中";
   if (c === "LOW") return "低";
-  return c;
+  return "未知";
 }
 
 function providerZh(p: string) {
   if (p.includes("linear-blend") || p.includes("preview")) return "快速預覽";
   if (p.includes("wan")) return "Wan（未載入）";
   if (p.includes("rife")) return p.includes("unavailable") ? "RIFE（未載入）" : "RIFE";
-  return p;
+  return "引擎";
 }
 
 function constraintZh(kind: string) {
@@ -626,7 +626,7 @@ function constraintZh(kind: string) {
   if (k.includes("track")) return "追蹤";
   if (k.includes("object")) return "物件";
   if (k.includes("hold")) return "跟隨";
-  return kind.replaceAll("_", " ");
+  return "約束";
 }
 
 function directionZh(d: string) {
@@ -638,7 +638,7 @@ function directionZh(d: string) {
   if (x.includes("in")) return "靠近";
   if (x.includes("out")) return "遠離";
   if (x.includes("still") || x.includes("none")) return "幾乎不動";
-  return d;
+  return "方向";
 }
 
 function scoreKeyZh(k: string) {
@@ -653,5 +653,5 @@ function scoreKeyZh(k: string) {
   if (x.includes("contact")) return "接觸";
   if (x.includes("identity")) return "身份";
   if (x.includes("object")) return "物件";
-  return k.replaceAll("_", " ");
+  return "其他";
 }

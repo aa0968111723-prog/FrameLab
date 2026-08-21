@@ -122,6 +122,6 @@ function constraintZh(kind: string) {
   if (kind.includes("BODY")) return "身體";
   if (kind.includes("REGION")) return "區域";
   if (kind.includes("KEYFRAME")) return "關鍵影格";
-  return kind.replaceAll("_", " ");
+  return "約束";
 }
 

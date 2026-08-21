@@ -208,7 +208,7 @@ describe("provider routing", () => {
       generativeAvailable: false,
     });
     assert.equal(s.kind, "interpolation");
-    assert.match(s.reason, /MODEL_NOT_AVAILABLE/);
+    assert.match(s.reason, /尚未載入/);
   });
 
   it("wan / fal / comfyui are unavailable; rife is a real worker; linear-blend is 快速預覽", () => {

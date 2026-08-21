@@ -48,7 +48,7 @@ function actionZh(action: string) {
     case "edit_motion_path":
       return "編輯路徑";
     default:
-      return action.replaceAll("_", " ");
+      return "操作";
   }
 }
 

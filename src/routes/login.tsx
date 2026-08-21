@@ -29,12 +29,12 @@ function Login() {
         password,
       });
       if (err) {
-        setError(err.message || "登入失敗");
+        setError(authErrorZh(err.message, "登入失敗"));
         return;
       }
       await afterSession();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "登入失敗");
+      setError(err instanceof Error ? authErrorZh(err.message, "登入失敗") : "登入失敗");
     } finally {
       setBusy(null);
     }
@@ -55,12 +55,12 @@ function Login() {
         name,
       });
       if (err) {
-        setError(err.message || "無法建立帳號");
+        setError(authErrorZh(err.message, "無法建立帳號"));
         return;
       }
       await afterSession();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "無法建立帳號");
+      setError(err instanceof Error ? authErrorZh(err.message, "無法建立帳號") : "無法建立帳號");
     } finally {
       setBusy(null);
     }
@@ -136,7 +136,10 @@ function Login() {
                   onClick={() => {
                     setBusy("oauth");
                     void signIn(p.providerId, { callbackURL: "/studio" }).catch((err) => {
-                      const msg = err instanceof Error ? err.message : "登入被擋住";
+                      const msg = authErrorZh(
+                        err instanceof Error ? err.message : undefined,
+                        "登入被擋住",
+                      );
                       setError(msg);
                       toast.error(msg);
                       setBusy(null);
@@ -154,4 +157,18 @@ function Login() {
       </div>
     </main>
   );
+}
+
+function authErrorZh(msg: string | undefined, fallback: string) {
+  if (!msg) return fallback;
+  if (/[\u4e00-\u9fff]/.test(msg)) return msg;
+  const m = msg.toLowerCase();
+  if (m.includes("invalid email") || m.includes("invalid password") || m.includes("invalid credentials")) {
+    return "電子郵件或密碼不正確";
+  }
+  if (m.includes("already exists") || m.includes("user already")) return "這個電子郵件已經註冊";
+  if (m.includes("too short")) return "密碼至少 8 個字元";
+  if (m.includes("pop-up") || m.includes("popup")) return "瀏覽器擋住彈出視窗，請允許後再登入";
+  if (m.includes("cancel")) return "登入已取消";
+  return fallback;
 }

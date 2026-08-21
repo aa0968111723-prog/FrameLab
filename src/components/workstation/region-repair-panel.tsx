@@ -59,7 +59,7 @@ export function RegionRepairPanel({
       ) : pipeline.candidateId ? (
         <p className="mt-2 text-muted">{pipeline.note}</p>
       ) : (
-        <p className="mt-2 text-[12px] text-fg">生成修復尚未設定。不會用 bbox 混合冒充 AI。</p>
+        <p className="mt-2 text-[12px] text-fg">生成修復尚未設定。不會用矩形框混合冒充 AI。</p>
       )}
       <div className="mt-2 flex flex-wrap gap-1">
         {onPreview && !pipeline.candidateId ? (

@@ -95,7 +95,7 @@ export async function repairRegionCmd(ctx: CommandContext, args: Record<string, 
     : mask
       ? { x: mask.x, y: mask.y, w: mask.w, h: mask.h }
       : null;
-  if (!mask) fail("VALIDATION_ERROR", "需要選區或 SAM 2 遮罩。bbox 混合不是 AI 修復。");
+  if (!mask) fail("VALIDATION_ERROR", "需要選區或 SAM 2 遮罩。矩形混合不是 AI 修復。");
 
   const preview = isNeighborhoodPreview(method);
   const gen = preview ? null : getGenerativeRepair(providerId);

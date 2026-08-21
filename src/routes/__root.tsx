@@ -43,7 +43,7 @@ export const Route = createRootRoute({
 
 function Root() {
   return (
-    <html lang="zh-Hant" className="antialiased" suppressHydrationWarning>
+    <html lang="zh-TW" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

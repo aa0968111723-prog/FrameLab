@@ -53,7 +53,7 @@ export function suggestBreakdownPositions(input: {
       frames: [],
       suggestions: [],
       auto: false,
-      reason: "相鄰關鍵影格沒有中間格。可用空白 Breakdown 插入一格。",
+      reason: "相鄰關鍵影格沒有中間格。可用空白分解影格插入一格。",
       needs_insert: true,
     };
   }

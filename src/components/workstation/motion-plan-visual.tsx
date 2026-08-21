@@ -79,7 +79,7 @@ function cameraMoveZh(move?: string) {
   if (m.includes("tilt")) return "俯仰";
   if (m.includes("zoom")) return "縮放";
   if (m.includes("track")) return "跟隨";
-  return move;
+  return "未知";
 }
 
 function constraintZh(kind: string) {
@@ -91,7 +91,7 @@ function constraintZh(kind: string) {
   if (k.includes("camera")) return "相機";
   if (k.includes("object")) return "物件";
   if (k.includes("hold")) return "跟隨";
-  return kind.replaceAll("_", " ");
+  return "約束";
 }
 
 function directionZh(d: string) {
@@ -103,6 +103,6 @@ function directionZh(d: string) {
   if (x.includes("in")) return "靠近";
   if (x.includes("out")) return "遠離";
   if (x.includes("still") || x.includes("none")) return "幾乎不動";
-  return d;
+  return "方向";
 }
 

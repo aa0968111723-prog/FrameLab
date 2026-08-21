@@ -33,7 +33,7 @@ function waitSeeked(video: HTMLVideoElement): Promise<void> {
     const err = () => {
       video.removeEventListener("seeked", on);
       video.removeEventListener("error", err);
-      reject(new Error("seek failed"));
+      reject(new Error("無法定位影片畫面"));
     };
     video.addEventListener("seeked", on);
     video.addEventListener("error", err);
@@ -112,7 +112,7 @@ export async function extractVideoFrameBatches(
     const { width, height } = scaledSize(video.videoWidth, video.videoHeight, opts.maxWidth ?? 640);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas unavailable");
+    if (!ctx) throw new Error("無法使用畫布");
     const batchSize = Math.max(1, opts.batchSize ?? INGEST_HTTP_BATCH);
     let batch: ExtractedJpeg[] = [];
     for (let i = 0; i < total; i += 1) {
@@ -161,7 +161,7 @@ export async function extractImageSequenceBatches(
   const maxW = opts.maxWidth ?? 640;
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas unavailable");
+  if (!ctx) throw new Error("無法使用畫布");
   const batchSize = Math.max(1, opts.batchSize ?? INGEST_HTTP_BATCH);
   let batch: ExtractedJpeg[] = [];
   for (let i = 0; i < sorted.length; i += 1) {

@@ -64,7 +64,7 @@ function notConfigured(id: string): LLMChatResult {
   return {
     ok: false,
     code: "PROVIDER_NOT_AVAILABLE",
-    error: `${id} is not configured.`,
+    error: `${id} 尚未設定。`,
     provider: id,
   };
 }
@@ -209,7 +209,7 @@ const grok = new GrokProvider();
 const openai = new ReservedLLM("openai", "OpenAI", "unwired");
 const claude = new ReservedLLM("claude", "Claude", "unwired");
 const gemini = new ReservedLLM("gemini", "Gemini", "unwired");
-const local = new ReservedLLM("local", "Local", "unwired");
+const local = new ReservedLLM("local", "本機", "unwired");
 
 const REGISTRY: LLMProvider[] = [grok, openai, claude, gemini, local];
 
