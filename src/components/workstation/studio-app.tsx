@@ -133,6 +133,7 @@ const TOOL_DONE_ZH: Record<string, string> = {
   mark_breakdown: "已標成分解影格",
   create_breakdown: "已加入分解影格",
   edit_pose: "已儲存姿態約束",
+  edit_motion_path: "已儲存路徑約束",
   analyze_consistency: "一致性掃描完成",
   analyze_frame: "影格分析完成",
   analyze_motion: "運動分析完成",
@@ -331,6 +332,10 @@ function StudioInner({ projectId }: { projectId: string }) {
   );
   const poseConstraints = useMemo(
     () => (bundle.data?.ok ? (bundle.data.poseConstraints ?? []) : []),
+    [bundle.data],
+  );
+  const motionConstraints = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.motionConstraints ?? []) : []),
     [bundle.data],
   );
   const tracking = useMemo(
@@ -1392,6 +1397,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                 onClick={() => {
                   setTrailTarget(t);
                   setOverlayStack((s) => setPrimary(s, "track"));
+                  setCanvasTool("pan");
                   if (t === "right_hand") setSelectedJoint("right_wrist");
                   if (t === "left_hand") setSelectedJoint("left_wrist");
                   if (t === "head") setSelectedJoint("nose");
@@ -1466,6 +1472,19 @@ function StudioInner({ projectId }: { projectId: string }) {
                     x: input.x,
                     y: input.y,
                     keypoints: input.keypoints,
+                  },
+                });
+              }}
+              onMotionPathEdit={(input) => {
+                if (!timelineId) return;
+                tool.mutate({
+                  tool: "edit_motion_path",
+                  args: {
+                    timelineId,
+                    frameNumber: input.frameNumber,
+                    name: input.name,
+                    x: input.x,
+                    y: input.y,
                   },
                 });
               }}
@@ -1913,6 +1932,9 @@ function StudioInner({ projectId }: { projectId: string }) {
             </Button>
             {overlayStack.primary === "pose" ? (
               <span className="hidden text-[10px] text-faint sm:inline">拖動關節可改骨架，不會改圖</span>
+            ) : null}
+            {overlayStack.primary === "track" || overlayStack.primary === "motion" ? (
+              <span className="hidden text-[10px] text-faint sm:inline">拖動路徑點可改這一格，不會動關鍵影格</span>
             ) : null}
             {isDrawTool(canvasTool) ? (
               <label className="ml-1 flex items-center gap-1 text-[10px] text-faint">
@@ -2415,6 +2437,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                     previewData: previewFromRevision(r),
                   }))}
                   poseConstraints={poseConstraints}
+                  motionConstraints={motionConstraints}
                   busy={tool.isPending}
                   regionBox={regionBox}
                   setRegionBox={setRegionBox}

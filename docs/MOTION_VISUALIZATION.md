@@ -12,7 +12,7 @@ The selected trail (e.g. right wrist) is drawn across nearby frames as a fading 
 
 ## Motion path
 
-Tracking trail polyline for one target: Head, Left/Right Hand, Hip, Foot, Object, Custom. SEA-RAFT also advects the strongest flow samples as short two-point paths on the motion overlay.
+Tracking trail polyline for one target: Head, Left/Right Hand, Hip, Foot, Object, Custom. SEA-RAFT also advects the strongest flow samples as short two-point paths on the motion overlay. With the Track overlay on, a path handle can be dragged; the drop writes a MotionConstraint for **that frame only** and never rewrites a keyframe.
 
 ## Pose ghost
 

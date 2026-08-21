@@ -67,6 +67,7 @@ export const getProjectBundle = createServerFn({ method: "GET" })
     const objects = await repo.listObjects(project.id);
     const consistency = timeline ? await repo.listConsistency(timeline.id) : [];
     const tracking = await repo.listTrackingPoints(project.id);
+    const motionConstraints = await repo.listMotionConstraints(project.id);
     const assignments = await repo.listProjectAssignments(project.id);
     const jobs = await repo.listJobs(context.userId, project.id);
     const motion = timeline ? await repo.listMotion(timeline.id) : [];
@@ -139,6 +140,18 @@ export const getProjectBundle = createServerFn({ method: "GET" })
         frame_id: c.frame_id,
         frame_number: c.frame_number,
         joint: c.joint,
+        x: c.x,
+        y: c.y,
+        previous_x: c.previous_x,
+        previous_y: c.previous_y,
+        kind: c.kind,
+        revision_id: c.revision_id,
+      })),
+      motionConstraints: motionConstraints.map((c) => ({
+        id: c.id,
+        frame_id: c.frame_id,
+        frame_number: c.frame_number,
+        name: c.name,
         x: c.x,
         y: c.y,
         previous_x: c.previous_x,

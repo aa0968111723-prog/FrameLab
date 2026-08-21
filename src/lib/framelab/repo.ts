@@ -922,6 +922,129 @@ export async function deleteTrackingPointsByName(projectId: string, name: string
   await sql`delete from tracking_points where project_id = ${projectId} and name = ${name}`;
 }
 
+export async function getTrackingPointByNameFrame(projectId: string, name: string, frameNumber: number) {
+  const sql = await getSql();
+  const rows = await sql<{
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    frame_number: number;
+    status: string;
+    score: number;
+    track_id: string | null;
+  }>`
+    select id, name, x, y, frame_number, status, score, track_id
+    from tracking_points
+    where project_id = ${projectId} and name = ${name} and frame_number = ${frameNumber}
+    order by created_at
+    limit 1
+  `;
+  return rows[0] ?? null;
+}
+
+export async function updateTrackingPoint(id: string, x: number, y: number) {
+  const sql = await getSql();
+  await sql`update tracking_points set x = ${Math.round(x)}, y = ${Math.round(y)} where id = ${id}`;
+}
+
+export async function deleteTrackingPoint(id: string) {
+  const sql = await getSql();
+  await sql`delete from tracking_points where id = ${id}`;
+}
+
+export async function upsertTrackingPoint(row: {
+  id: string;
+  projectId: string;
+  name: string;
+  x: number;
+  y: number;
+  frameNumber: number;
+  score?: number;
+  status?: string;
+  trackId?: string;
+}) {
+  const sql = await getSql();
+  await sql`
+    insert into tracking_points (id, project_id, name, x, y, frame_number, score, status, track_id)
+    values (
+      ${row.id}, ${row.projectId}, ${row.name}, ${Math.round(row.x)}, ${Math.round(row.y)},
+      ${row.frameNumber}, ${row.score ?? 1}, ${row.status ?? "visible"}, ${row.trackId ?? row.name}
+    )
+    on conflict (id) do update set x = excluded.x, y = excluded.y
+  `;
+}
+
+export type MotionConstraintRow = {
+  id: string;
+  project_id: string;
+  timeline_id: string;
+  frame_id: string | null;
+  frame_number: number;
+  name: string;
+  x: number;
+  y: number;
+  previous_x: number;
+  previous_y: number;
+  source: string;
+  kind: string;
+  revision_id: string | null;
+};
+
+export async function insertMotionConstraint(row: MotionConstraintRow) {
+  const sql = await getSql();
+  await sql`
+    insert into motion_constraints (
+      id, project_id, timeline_id, frame_id, frame_number, name, x, y,
+      previous_x, previous_y, source, kind, revision_id
+    ) values (
+      ${row.id}, ${row.project_id}, ${row.timeline_id}, ${row.frame_id}, ${row.frame_number},
+      ${row.name}, ${row.x}, ${row.y}, ${row.previous_x}, ${row.previous_y},
+      ${row.source}, ${row.kind}, ${row.revision_id}
+    )
+  `;
+}
+
+export async function listMotionConstraints(projectId: string) {
+  const sql = await getSql();
+  return sql<MotionConstraintRow>`
+    select id, project_id, timeline_id, frame_id, frame_number, name, x, y,
+      previous_x, previous_y, source, kind, revision_id
+    from motion_constraints
+    where project_id = ${projectId}
+    order by created_at
+  `;
+}
+
+export async function listMotionConstraintsForPoint(projectId: string, name: string, frameNumber: number) {
+  const sql = await getSql();
+  return sql<MotionConstraintRow>`
+    select id, project_id, timeline_id, frame_id, frame_number, name, x, y,
+      previous_x, previous_y, source, kind, revision_id
+    from motion_constraints
+    where project_id = ${projectId} and name = ${name} and frame_number = ${frameNumber}
+    order by created_at
+  `;
+}
+
+export async function replaceMotionConstraintsForPoint(
+  projectId: string,
+  name: string,
+  frameNumber: number,
+  rows: MotionConstraintRow[],
+) {
+  const sql = await getSql();
+  await sql`delete from motion_constraints where project_id = ${projectId} and name = ${name} and frame_number = ${frameNumber}`;
+  for (const row of rows) {
+    await insertMotionConstraint(row);
+  }
+}
+
+export async function setMotionConstraintRevision(id: string, revisionId: string) {
+  const sql = await getSql();
+  await sql`update motion_constraints set revision_id = ${revisionId} where id = ${id}`;
+}
+
 export async function deleteTrackEdgesForName(projectId: string, name: string) {
   const sql = await getSql();
   await sql`delete from graph_edges where project_id = ${projectId} and (edge_type = 'TRACKS_TO' or edge_type = 'MOVES_TO') and payload_json like ${"%" + name + "%"}`;

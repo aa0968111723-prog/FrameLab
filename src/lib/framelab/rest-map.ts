@@ -256,6 +256,12 @@ export function mapRestPath(
   if (parts[0] === "poses" && parts[1] === "constraints" && m === "GET") {
     return { tool: "list_pose_constraints", args: { timelineId: query.timelineId, frameNumber: Number(query.frameNumber ?? Number.NaN) } };
   }
+  if (parts[0] === "motion-path" && parts[1] === "edit" && m === "POST") {
+    return { tool: "edit_motion_path", args: {} };
+  }
+  if (parts[0] === "motion-path" && parts[1] === "constraints" && m === "GET") {
+    return { tool: "list_motion_constraints", args: { projectId: query.projectId, name: query.name, frameNumber: Number(query.frameNumber ?? Number.NaN) } };
+  }
   if (parts[0] === "visual" && parts[1] === "context" && m === "GET") {
     return { tool: "get_visual_context", args: { timelineId: query.timelineId, frameNumber: Number(query.frameNumber ?? 0) } };
   }

@@ -368,6 +368,14 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       const { listPoseConstraintsCmd } = await import("./pose-edit-tools");
       return listPoseConstraintsCmd(ctx, args);
     }
+    case "edit_motion_path": {
+      const { editMotionPathCmd } = await import("./motion-path-tools");
+      return editMotionPathCmd(ctx, args);
+    }
+    case "list_motion_constraints": {
+      const { listMotionConstraintsCmd } = await import("./motion-path-tools");
+      return listMotionConstraintsCmd(ctx, args);
+    }
     case "replace_frame":
       return replaceFrame(ctx, args);
     case "delete_frame": {
@@ -1343,6 +1351,12 @@ async function redoFrame(ctx: CommandContext, args: Record<string, unknown>) {
     await repo.updateRevisionStatus(undone.id, "open");
     return { id: undone.id, status: "open" };
   }
+  const { isMotionEdit, applyMotionEditSnap } = await import("./motion-path-tools");
+  if (isMotionEdit(next)) {
+    await applyMotionEditSnap(next);
+    await repo.updateRevisionStatus(undone.id, "open");
+    return { id: undone.id, status: "open" };
+  }
   if (!undone.frame_id || typeof next.imageData !== "string" || !next.imageData) {
     fail("FRAME_NOT_FOUND", "Redo snapshot missing", 404);
   }
@@ -1370,6 +1384,12 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
   const { isPoseEdit, applyPoseEditSnap } = await import("./pose-edit-tools");
   if (isPoseEdit(prev)) {
     await applyPoseEditSnap(prev);
+    await repo.updateRevisionStatus(revisionId, "reverted");
+    return { id: revisionId, status: "reverted" };
+  }
+  const { isMotionEdit, applyMotionEditSnap } = await import("./motion-path-tools");
+  if (isMotionEdit(prev)) {
+    await applyMotionEditSnap(prev);
     await repo.updateRevisionStatus(revisionId, "reverted");
     return { id: revisionId, status: "reverted" };
   }

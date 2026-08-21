@@ -63,6 +63,8 @@ export const TOOL_SCOPES: Record<string, Scope> = {
   create_breakdown: "EDIT",
   edit_pose: "EDIT",
   list_pose_constraints: "READ",
+  edit_motion_path: "EDIT",
+  list_motion_constraints: "READ",
   replace_frame: "EDIT",
   delete_frame: "EDIT",
   set_frame_duration: "EDIT",

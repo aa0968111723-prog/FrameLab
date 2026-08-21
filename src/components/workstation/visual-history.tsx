@@ -45,6 +45,8 @@ function actionZh(action: string) {
       return "分解影格";
     case "edit_pose":
       return "編輯骨架";
+    case "edit_motion_path":
+      return "編輯路徑";
     default:
       return action.replaceAll("_", " ");
   }

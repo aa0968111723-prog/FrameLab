@@ -13,11 +13,12 @@ import {
   drawProblemBubble,
   drawRegionOutline,
   hitAnnotation,
+  hitMotionPathPoint,
   hitPoseJoint,
   hitProblemBubble,
   inferContact,
+  composeTrail,
   motionPathPoints,
-  pickTrailName,
   type PoseJoint,
   type TrackSample,
 } from "@/lib/visual/overlay-renderer";
@@ -106,6 +107,7 @@ export function AnimationCanvas({
   onDrawActionConsumed,
   onPoseEdit,
   onSelectJoint,
+  onMotionPathEdit,
 }: {
   frames: StudioFrame[];
   imageMap: Map<string, string>;
@@ -160,6 +162,12 @@ export function AnimationCanvas({
     frameId: string;
   }) => void;
   onSelectJoint?: (name: string | null) => void;
+  onMotionPathEdit?: (input: {
+    name: string;
+    x: number;
+    y: number;
+    frameNumber: number;
+  }) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -191,6 +199,15 @@ export function AnimationCanvas({
     keypoints: PoseJoint[];
     moved: number;
   } | null>(null);
+  const [liveTrail, setLiveTrail] = useState<{ name: string; frame: number; x: number; y: number } | null>(null);
+  const pathDrag = useRef<{
+    active: boolean;
+    name: string;
+    frame: number;
+    x: number;
+    y: number;
+    moved: number;
+  } | null>(null);
 
   const parsePose = useCallback(
     (n: number): PoseJoint[] => {
@@ -208,10 +225,16 @@ export function AnimationCanvas({
   );
 
   const poseEditable = (layers.has("pose") || overlay.primary === "pose") && !isDrawTool(tool) && tool !== "region";
+  const motionEditable =
+    (layers.has("track") || overlay.primary === "track" || overlay.primary === "motion") &&
+    !isDrawTool(tool) &&
+    tool !== "region";
 
   useEffect(() => {
     setLivePose(null);
     poseDrag.current = null;
+    setLiveTrail(null);
+    pathDrag.current = null;
   }, [engine.currentFrame]);
 
   const emitDrawState = (frameId: string) => {
@@ -601,11 +624,33 @@ export function AnimationCanvas({
       }
     }
 
-    const trailName = pickTrailName(tracking, trailTarget);
+    const trail = composeTrail(tracking, poses, trailTarget);
+    const trailSamples = (() => {
+      if (!liveTrail || liveTrail.name !== trail.name) return trail.samples;
+      const next = trail.samples.map((s) =>
+        s.frame_number === liveTrail.frame ? { ...s, x: liveTrail.x, y: liveTrail.y } : s,
+      );
+      if (!next.some((s) => s.frame_number === liveTrail.frame)) {
+        next.push({
+          name: liveTrail.name,
+          x: liveTrail.x,
+          y: liveTrail.y,
+          frame_number: liveTrail.frame,
+          status: "visible",
+          score: 1,
+        });
+        next.sort((a, b) => a.frame_number - b.frame_number);
+      }
+      return next;
+    })();
+    const trailName = trail.name;
     if (trailName && (layers.has("track") || overlay.primary === "track" || overlay.primary === "motion" || showOnion)) {
-      const pts = motionPathPoints(tracking, vt, trailName);
+      const pts = motionPathPoints(trailSamples, vt, trailName);
       if (layers.has("track") || overlay.primary === "track" || overlay.primary === "motion") {
-        drawMotionPath(ctx, pts, engine.currentFrame);
+        drawMotionPath(ctx, pts, engine.currentFrame, {
+          editable: motionEditable,
+          selectedFrame: pathDrag.current?.frame ?? liveTrail?.frame ?? null,
+        });
       }
       if (showOnion) drawOnionTrail(ctx, pts, engine.currentFrame, Math.max(engine.onionSkin.prev, engine.onionSkin.next, 2));
     }
@@ -673,6 +718,8 @@ export function AnimationCanvas({
     poses,
     livePose,
     poseEditable,
+    liveTrail,
+    motionEditable,
     flowGrid,
     flowPaths,
     annotations,
@@ -759,7 +806,7 @@ export function AnimationCanvas({
         "film-check relative min-h-0 flex-1 touch-none",
         tool === "region" || isDrawTool(tool)
           ? "cursor-crosshair"
-          : poseEditable
+          : poseEditable || motionEditable
             ? "cursor-pointer"
             : "cursor-grab",
       )}
@@ -781,6 +828,27 @@ export function AnimationCanvas({
             onSelectJoint?.(hit);
             setLivePose(joints);
             return;
+          }
+        }
+        if (motionEditable && current && wrap && vt && e.button === 0 && !e.altKey) {
+          const rect = wrap.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const py = e.clientY - rect.top;
+          const trail = composeTrail(tracking, poses, trailTarget);
+          if (trail.name) {
+            const pts = motionPathPoints(trail.samples, vt, trail.name);
+            const hit = pts.length ? hitMotionPathPoint(pts, px, py) : null;
+            if (hit) {
+              e.preventDefault();
+              (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+              const sample = trail.samples.find((s) => s.frame_number === hit.frame);
+              const n = sample
+                ? toNormalized(sample.x, sample.y, current.width, current.height)
+                : toNormalized(hit.x, hit.y, vt.frameWidth, vt.frameHeight);
+              pathDrag.current = { active: true, name: trail.name, frame: hit.frame, x: n.x, y: n.y, moved: 0 };
+              setLiveTrail({ name: trail.name, frame: hit.frame, x: n.x, y: n.y });
+              return;
+            }
           }
         }
         const panInstead = shouldPanPointer({
@@ -851,6 +919,19 @@ export function AnimationCanvas({
           setLivePose(next);
           return;
         }
+        if (pathDrag.current?.active && current) {
+          const wrap = wrapRef.current;
+          const vt = vtRef.current;
+          if (!wrap || !vt) return;
+          const rect = wrap.getBoundingClientRect();
+          const f = viewToFrame(vt, e.clientX - rect.left, e.clientY - rect.top);
+          const n = toNormalized(f.x, f.y, current.width, current.height);
+          pathDrag.current.x = n.x;
+          pathDrag.current.y = n.y;
+          pathDrag.current.moved += 1;
+          setLiveTrail({ name: pathDrag.current.name, frame: pathDrag.current.frame, x: n.x, y: n.y });
+          return;
+        }
         if (draw.current.active && draw.current.pointerId === e.pointerId && current && draw.current.pointers.size === 1) {
           const at = frameAt(e.clientX, e.clientY);
           if (!at) return;
@@ -889,6 +970,19 @@ export function AnimationCanvas({
               keypoints: drag.keypoints,
               frameNumber: current.frameNumber,
               frameId: current.id,
+            });
+          }
+          return;
+        }
+        if (pathDrag.current?.active) {
+          const drag = pathDrag.current;
+          pathDrag.current = null;
+          if (drag.moved > 0) {
+            onMotionPathEdit?.({
+              name: drag.name,
+              x: drag.x,
+              y: drag.y,
+              frameNumber: drag.frame,
             });
           }
           return;
@@ -932,6 +1026,7 @@ export function AnimationCanvas({
         draw.current.pointers.delete(e.pointerId);
         const current = frames.find((f) => f.frameNumber === engine.currentFrame);
         poseDrag.current = null;
+        pathDrag.current = null;
         endStroke(current);
         pan.current.dragging = false;
         pan.current.region = false;

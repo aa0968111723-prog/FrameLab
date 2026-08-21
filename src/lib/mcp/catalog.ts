@@ -88,6 +88,8 @@ export const MCP_TOOLS = [
   tool("create_breakdown", "Create a BREAKDOWN between keyframe A/B. mode=blank | copy | mark. copyFrom=start|end. Never generative. Writes a revision.", { timelineId: str, startFrame: num, endFrame: num, frameA: num, frameB: num, frameNumber: num, mode: str, copyFrom: str, frameType: str }, ["timelineId", "startFrame", "endFrame"]),
   tool("edit_pose", "Drag a skeleton joint. Writes PoseConstraint + revision. Does not modify the frame image.", { timelineId: str, frameNumber: num, frameId: str, joint: str, x: num, y: num, keypoints: { type: "array" } }, ["timelineId", "joint"]),
   tool("list_pose_constraints", "List PoseConstraints for a timeline or frame.", { timelineId: str, frameNumber: num }, ["timelineId"]),
+  tool("edit_motion_path", "Drag one motion-path control point. Writes MotionConstraint + revision. Does not modify pixels or keyframes.", { timelineId: str, frameNumber: num, name: str, x: num, y: num }, ["timelineId", "name", "frameNumber"]),
+  tool("list_motion_constraints", "List MotionConstraints for a project or trail.", { projectId: str, name: str, frameNumber: num }, ["projectId"]),
   tool("replace_frame", "Replace frame image (base64 JPEG). High-risk, audited.", { frameId: str, imageData: str }, ["frameId", "imageData"]),
   tool("delete_frame", "Delete a frame. High-risk, audited, restorable.", { frameId: str }, ["frameId"]),
   tool("set_frame_duration", "Set hold duration in milliseconds", { frameId: str, durationMs: num }, ["frameId", "durationMs"]),

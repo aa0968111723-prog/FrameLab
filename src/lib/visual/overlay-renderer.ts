@@ -197,6 +197,76 @@ export function motionPathPoints(
     });
 }
 
+export function hitMotionPathPoint(
+  points: { x: number; y: number; frame: number }[],
+  px: number,
+  py: number,
+  radius = 14,
+): { frame: number; x: number; y: number } | null {
+  let best: { frame: number; x: number; y: number } | null = null;
+  let bestD = radius;
+  for (const p of points) {
+    const d = Math.hypot(p.x - px, p.y - py);
+    if (d <= bestD) {
+      bestD = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+export function poseTrailSamples(
+  poses: { frame_number: number; joints_json: string }[],
+  target: TrailTarget,
+): TrackSample[] {
+  const names = trailKeypointNames(target);
+  if (!names.length) return [];
+  const out: TrackSample[] = [];
+  for (const row of poses) {
+    let joints: PoseJoint[] = [];
+    try {
+      const parsed = JSON.parse(row.joints_json) as PoseJoint[];
+      if (Array.isArray(parsed)) joints = parsed;
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      const j = joints.find((k) => k.name === name);
+      if (!j) continue;
+      out.push({
+        name,
+        x: j.x,
+        y: j.y,
+        frame_number: row.frame_number,
+        status: "visible",
+        score: j.confidence,
+      });
+    }
+  }
+  return out;
+}
+
+export function composeTrail(
+  tracking: TrackSample[],
+  poses: { frame_number: number; joints_json: string }[],
+  target: TrailTarget,
+): { name: string | null; samples: TrackSample[] } {
+  const fromPose = poseTrailSamples(poses, target);
+  const matched =
+    target === "custom"
+      ? tracking
+      : tracking.filter((t) => trailNameFits(t.name, target));
+  const name = pickTrailName(matched, target) ?? fromPose[0]?.name ?? null;
+  if (!name) return { name: null, samples: [] };
+  const byFrame = new Map<number, TrackSample>();
+  for (const s of fromPose) byFrame.set(s.frame_number, { ...s, name });
+  for (const s of tracking.filter((t) => t.name === name)) byFrame.set(s.frame_number, s);
+  return {
+    name,
+    samples: [...byFrame.values()].sort((a, b) => a.frame_number - b.frame_number),
+  };
+}
+
 const STATUS_COLOR: Record<string, string> = {
   visible: "rgba(142, 160, 181, 0.95)",
   recovered: "rgba(120, 180, 140, 0.95)",
@@ -208,29 +278,39 @@ export function drawMotionPath(
   ctx: CanvasRenderingContext2D,
   points: { x: number; y: number; frame: number; problem: boolean; status?: string }[],
   currentFrame: number,
+  opts: { editable?: boolean; selectedFrame?: number | null } = {},
 ) {
-  if (points.length < 2) return;
+  if (!points.length) return;
   ctx.save();
   ctx.lineWidth = 1.5;
   ctx.lineJoin = "round";
-  for (let i = 1; i < points.length; i += 1) {
-    const a = points[i - 1];
-    const b = points[i];
-    const st = (b.status ?? (b.problem ? "lost" : "visible")).toLowerCase();
-    ctx.strokeStyle = STATUS_COLOR[st] ?? STATUS_COLOR.visible;
-    ctx.setLineDash(st === "occluded" ? [4, 3] : st === "lost" ? [2, 3] : []);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
+  if (points.length >= 2) {
+    for (let i = 1; i < points.length; i += 1) {
+      const a = points[i - 1];
+      const b = points[i];
+      const st = (b.status ?? (b.problem ? "lost" : "visible")).toLowerCase();
+      ctx.strokeStyle = STATUS_COLOR[st] ?? STATUS_COLOR.visible;
+      ctx.setLineDash(st === "occluded" ? [4, 3] : st === "lost" ? [2, 3] : []);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
   }
   ctx.setLineDash([]);
   for (const p of points) {
     const st = (p.status ?? (p.problem ? "lost" : "visible")).toLowerCase();
-    ctx.fillStyle = p.frame === currentFrame ? "#f4f4f5" : STATUS_COLOR[st] ?? STATUS_COLOR.visible;
+    const selected = p.frame === currentFrame || p.frame === opts.selectedFrame;
+    ctx.fillStyle = selected ? "#f4f4f5" : STATUS_COLOR[st] ?? STATUS_COLOR.visible;
+    const r = selected ? (opts.editable ? 5.5 : 3.8) : opts.editable ? 4.2 : 2.4;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.frame === currentFrame ? 3.8 : 2.4, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fill();
+    if (opts.editable) {
+      ctx.strokeStyle = selected ? "rgba(232, 196, 120, 0.95)" : "rgba(244, 244, 245, 0.55)";
+      ctx.lineWidth = selected ? 1.6 : 1;
+      ctx.stroke();
+    }
     if (st === "lost") {
       ctx.fillStyle = DANGER;
       ctx.font = "10px sans-serif";
@@ -341,6 +421,21 @@ export function drawOnionTrail(
   ctx.restore();
 }
 
+const TRAIL_ALIASES: Record<string, string[]> = {
+  head: ["head", "nose", "face"],
+  left_hand: ["left_hand", "left_wrist", "hand_l"],
+  right_hand: ["right_hand", "right_wrist", "hand", "hand_r"],
+  hip: ["hip", "hips"],
+  foot: ["foot", "left_ankle", "right_ankle"],
+  object: ["object", "suitcase", "prop"],
+};
+
+function trailNameFits(name: string, target: TrailTarget): boolean {
+  const want = TRAIL_ALIASES[target] ?? trailKeypointNames(target);
+  const lower = name.toLowerCase();
+  return want.some((w) => lower.includes(w));
+}
+
 export function pickTrailName(
   tracking: TrackSample[],
   target: TrailTarget | undefined,
@@ -351,17 +446,8 @@ export function pickTrailName(
     const names = [...new Set(tracking.map((t) => t.name))];
     return names[0] ?? null;
   }
-  const aliases: Record<string, string[]> = {
-    head: ["head", "nose", "face"],
-    left_hand: ["left_hand", "left_wrist", "hand_l"],
-    right_hand: ["right_hand", "right_wrist", "hand", "hand_r"],
-    hip: ["hip", "hips"],
-    foot: ["foot", "left_ankle", "right_ankle"],
-    object: ["object", "suitcase", "prop"],
-  };
-  const want = aliases[target] ?? [];
   const names = [...new Set(tracking.map((t) => t.name))];
-  return names.find((n) => want.some((w) => n.toLowerCase().includes(w))) ?? names[0] ?? null;
+  return names.find((n) => trailNameFits(n, target)) ?? names[0] ?? null;
 }
 
 export function drawRegionOutline(

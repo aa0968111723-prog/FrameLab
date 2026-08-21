@@ -277,6 +277,12 @@ export class FrameLabClient {
   listPoseConstraints(args: { timelineId: string; frameNumber?: number }) {
     return this.call("list_pose_constraints", args);
   }
+  editMotionPath(args: { timelineId: string; frameNumber: number; name: string; x: number; y: number }) {
+    return this.call("edit_motion_path", args);
+  }
+  listMotionConstraints(args: { projectId: string; name?: string; frameNumber?: number }) {
+    return this.call("list_motion_constraints", args);
+  }
   setFrameExposure(args: { frameId: string; exposure: number }) {
     return this.call("set_frame_exposure", args);
   }
