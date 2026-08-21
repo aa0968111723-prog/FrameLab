@@ -463,3 +463,43 @@ describe("generation resolution policy", () => {
     assert.equal(small.height, 4);
   });
 });
+
+describe("keyframe pair count bounds", () => {
+  const base = {
+    timelineId: "t",
+    startFrame: 100,
+    endFrame: 110,
+    startExists: true,
+    endExists: true,
+    startHasAsset: true,
+    endHasAsset: true,
+  };
+
+  it("accepts a count that exactly fills the interior", () => {
+    const p = validateKeyframePair({ ...base, desiredInbetweenCount: 9 });
+    assert.equal(p.desired_inbetween_count, 9);
+    // The last generated number must stay strictly before the end key.
+    const numbers = generatedFrameNumbers(100, p.desired_inbetween_count);
+    assert.equal(numbers[numbers.length - 1], 109);
+  });
+
+  it("rejects a count that would spill onto and past the end keyframe", () => {
+    // 10 inbetweens between F100 and F110 would be laid out as 101..110,
+    // overwriting the end key itself; 40 would run to F140.
+    for (const count of [10, 11, 40]) {
+      assert.throws(
+        () => validateKeyframePair({ ...base, desiredInbetweenCount: count }),
+        (err) => err instanceof FrameLabError && err.code === "INVALID_FRAME_RANGE",
+        `count ${count} should not fit`,
+      );
+    }
+  });
+
+  it("rejects any inbetween between adjacent keys", () => {
+    assert.throws(
+      () =>
+        validateKeyframePair({ ...base, endFrame: 101, desiredInbetweenCount: 1 }),
+      (err) => err instanceof FrameLabError && err.code === "INVALID_FRAME_RANGE",
+    );
+  });
+});

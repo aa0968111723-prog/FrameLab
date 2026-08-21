@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { ALL_SCOPES, executeTool, type CommandContext } from "@/lib/commands/execute";
-import { parseScopes } from "@/lib/domain/permissions";
+import { parseScopes, TOOL_SCOPES } from "@/lib/domain/permissions";
 import * as repo from "@/lib/framelab/repo";
 import { getSessionUser } from "@/lib/auth/verify.server";
 import { mapRestPath } from "./rest-map.ts";
@@ -52,7 +52,34 @@ export async function handleRest(request: Request): Promise<Response> {
     );
   }
 
-  const ctx = await restContext(request);
+  // /api/v1 accepts the session cookie, so a state-changing tool reachable over
+  // GET is a cross-site write primitive: an <img> tag or a sibling page's
+  // top-level navigation carries the cookie and needs no CSRF token. The path
+  // router already only maps mutations to POST -- it was the ?tool= escape
+  // hatch that let any tool run on any method. All 42 mapped GET routes resolve
+  // to READ-scope tools, so requiring that of every GET breaks no endpoint.
+  const method = request.method.toUpperCase();
+  if ((method === "GET" || method === "HEAD") && TOOL_SCOPES[tool] !== "READ") {
+    return Response.json(
+      {
+        ok: false,
+        code: "PERMISSION_DENIED",
+        error: `${tool} changes state and cannot be invoked with ${method}; use POST`,
+      },
+      { status: 405, headers: { allow: "POST" } },
+    );
+  }
+
+  let ctx: CommandContext | null;
+  try {
+    ctx = await restContext(request);
+  } catch (err) {
+    // Scripted sibling-origin request carrying this app's cookie.
+    if (err && typeof err === "object" && "status" in err && err.status === 403) {
+      return Response.json({ ok: false, code: "PERMISSION_DENIED", error: "Forbidden" }, { status: 403 });
+    }
+    throw err;
+  }
   if (!ctx) {
     return Response.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
   }
@@ -87,6 +114,13 @@ export async function restContext(request: Request): Promise<CommandContext | nu
       projectScope: client.project_scope,
     };
   }
+  // Bearer (MCP) clients are server-to-server and legitimately cross-origin, but
+  // cookie auth here must clear the same bar as the server functions: apps on
+  // *.grok.me are same-site to each other and mutually untrusted, and a
+  // SameSite=Lax cookie rides a sibling's scripted request. authMiddleware
+  // enforces this for server functions; REST used to skip it entirely.
+  const { assertSameSiteRequest } = await import("@/lib/auth/isolation.server");
+  assertSameSiteRequest();
   const user = await getSessionUser();
   if (!user) return null;
   return {

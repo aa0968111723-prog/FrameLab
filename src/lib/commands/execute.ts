@@ -1057,6 +1057,15 @@ async function interpolateFrames(ctx: CommandContext, args: Record<string, unkno
     const existing = await repo.getFrameByNumber(t.id, n);
     if (!existing || existing.is_locked || existing.frame_type === "KEY") continue;
     const imageData = encodeJpegBase64(generated[i], 80);
+    await recordRevision(
+      ctx,
+      "interpolate_frames",
+      t.project_id,
+      existing.id,
+      snapshotFrame(existing),
+      { contentHash: hashBytes(imageData) },
+      { timelineId: t.id, startFrame: a.frame_number, endFrame: b.frame_number },
+    );
     await repo.updateFrame(existing.id, {
       image_data: imageData,
       thumbnail_data: makeThumbnail(generated[i]),
@@ -1127,6 +1136,15 @@ async function repairFrameRange(ctx: CommandContext, args: Record<string, unknow
         const frame = await repo.getFrameByNumber(t.id, interior[i]);
         if (!frame || frame.is_locked || frame.frame_type === "KEY") continue;
         const imageData = encodeJpegBase64(generated[i] ?? generated[generated.length - 1], 80);
+        await recordRevision(
+          ctx,
+          "repair_frame_range",
+          t.project_id,
+          frame.id,
+          snapshotFrame(frame),
+          { contentHash: hashBytes(imageData) },
+          { timelineId: t.id, startFrame: interior[0], endFrame: interior[interior.length - 1] },
+        );
         await repo.updateFrame(frame.id, {
           image_data: imageData,
           thumbnail_data: makeThumbnail(generated[i] ?? generated[0]),
@@ -1462,8 +1480,15 @@ export async function ingestFrames(
     projectId?: string;
   },
 ) {
+  // A caller-supplied projectId used to be trusted outright, and the very next
+  // thing this function does is delete every existing frame of that project --
+  // so any authenticated user could wipe and overwrite another tenant's
+  // timeline. Prove ownership (and token scope) before touching it.
   const created = data.projectId
-    ? { id: data.projectId, timelineId: (await repo.listTimelines(data.projectId))[0]?.id }
+    ? {
+        id: (await ownProject(ctx, data.projectId)).id,
+        timelineId: (await repo.listTimelines(data.projectId))[0]?.id,
+      }
     : await createBlankProject(ctx, { name: data.name || "Imported", fps: data.fps });
   if (!created.timelineId) fail("FRAME_NOT_FOUND", "Timeline missing", 404);
   const existing = await repo.listFramesMeta(created.timelineId);

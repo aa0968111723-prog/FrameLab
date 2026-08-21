@@ -45,9 +45,22 @@ export function validateKeyframePair(input: KeyframePairInput): KeyframePair {
     fail("INVALID_KEYFRAME_PAIR", "Both ends must be KEY frames.");
   }
   const gap = end - start;
-  const desired = input.desiredInbetweenCount ?? Math.max(0, gap - 1);
+  // Frames that physically exist strictly between the two keys.
+  const interior = Math.max(0, gap - 1);
+  const desired = input.desiredInbetweenCount ?? interior;
   if (desired < 0) fail("INVALID_KEYFRAME_PAIR", "Inbetween count cannot be negative.");
   if (desired > 120) fail("INVALID_FRAME_RANGE", "count cap is 120");
+  // generatedFrameNumbers() lays the results out as start+1 .. start+desired, so
+  // a count larger than the interior runs onto the end key and past it, silently
+  // overwriting frames that belong to the next span. Callers that genuinely want
+  // to make room must shift the timeline first (planInbetweenSlots), not spill.
+  if (desired > interior) {
+    fail(
+      "INVALID_FRAME_RANGE",
+      `count ${desired} does not fit between F${start} and F${end}: ` +
+        `only ${interior} interior frame${interior === 1 ? "" : "s"} available.`,
+    );
+  }
   return {
     start_frame_number: start,
     end_frame_number: end,
