@@ -302,7 +302,7 @@ function toInbetweenAsk(data: unknown): InbetweenAskPayload | null {
   return {
     confirmation: d.confirmation
       ? {
-          title: d.confirmation.title ?? "Generate Inbetweens",
+          title: d.confirmation.title ?? "產生中間影格",
           start: d.confirmation.start ?? d.pair?.start_frame_number ?? 0,
           end: d.confirmation.end ?? d.pair?.end_frame_number ?? 0,
           frames: d.confirmation.frames ?? d.pair?.desired_inbetween_count ?? 0,
@@ -525,7 +525,7 @@ export async function runAskTurn(input: {
   };
 
   let assistantText = "";
-  let toolStatus: string | null = "Reading frame context...";
+  let toolStatus: string | null = "正在讀取影格上下文…";
 
   if (!provider.configured()) {
     toolStatus = null;
@@ -535,7 +535,7 @@ export async function runAskTurn(input: {
       frameCount: input.frameCount,
     });
   } else {
-    toolStatus = "Analyzing selected frames...";
+    toolStatus = "正在看選取的影格…";
     const images = await collectVision(input.ctx, resolved);
     const history = await repo.listMessages(conversationId);
     const messages: LLMMessage[] = [
@@ -557,12 +557,12 @@ export async function runAskTurn(input: {
       maxTokens: 700,
     });
     if (!round.ok) {
-      assistantText = `${round.error}\n\nFalling back to lightweight analysis:\n${analysisText}`;
+      assistantText = `${round.error}\n\n改用輕量分析：\n${analysisText}`;
     } else {
       let loops = 0;
       while (round.ok && round.toolCalls.length && loops < 2) {
         loops += 1;
-        toolStatus = `Calling ${round.toolCalls[0].name}...`;
+        toolStatus = `正在呼叫 ${round.toolCalls[0].name}…`;
         messages.push({
           role: "assistant",
           content: round.text || "",
@@ -570,10 +570,10 @@ export async function runAskTurn(input: {
         for (const tc of round.toolCalls) {
           toolStatus =
             tc.name === "compare_frames"
-              ? "Comparing neighboring frames..."
+              ? "正在比對鄰近影格…"
               : tc.name === "analyze_motion_context" || tc.name === "analyze_selection"
-                ? "Analyzing selected frames..."
-                : `Calling ${tc.name}...`;
+                ? "正在看選取的影格…"
+                : `正在呼叫 ${tc.name}…`;
           const toolArgs = { sessionId: input.sessionId, ...tc.arguments };
           const result = await callAskTool(
             input.ctx,

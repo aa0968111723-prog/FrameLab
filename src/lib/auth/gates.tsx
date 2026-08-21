@@ -52,7 +52,7 @@ export function RedirectToSignIn({ to = SIGN_IN_PATH }: { to?: string }) {
 export function UserButton() {
   const user = useCurrentUser();
   if (!user) return null;
-  const label = user.displayName ?? user.primaryEmail ?? "Account";
+  const label = user.displayName ?? user.primaryEmail ?? "帳號";
   return (
     <div className="flex items-center gap-2">
       {user.profileImageUrl ? (

@@ -23,7 +23,7 @@ export function resolveInbetweenStrategy(input: {
     return {
       kind: "suggest_breakdown",
       provider: interp,
-      reason: "Pose / occlusion is large. Suggest a breakdown frame before filling 9 inbetweens.",
+      reason: "姿態／遮擋變化很大。建議先加分解影格，再補中間影格。",
       fallback: input.interpolationAvailable ? interp : undefined,
     };
   }
@@ -32,27 +32,27 @@ export function resolveInbetweenStrategy(input: {
       return {
         kind: "generative",
         provider: gen,
-        reason: "Large pose change — prefer a generative inbetween provider.",
+        reason: "姿態變化大 — 較適合生成式中間影格供應商。",
         fallback: input.interpolationAvailable ? interp : undefined,
       };
     }
     return {
       kind: "interpolation",
       provider: interp,
-      reason: "Generative inbetween is MODEL_NOT_AVAILABLE. Falling back to linear-blend interpolation.",
+      reason: "生成式中間影格為 MODEL_NOT_AVAILABLE。改用線性混合插值。",
     };
   }
   if (input.complexity === "MEDIUM") {
     return {
       kind: "interpolation",
       provider: interp,
-      reason: "Medium motion — interpolation with motion-curve guidance.",
+      reason: "中等運動 — 以運動曲線引導插值。",
     };
   }
   return {
     kind: "interpolation",
     provider: interp,
-    reason: "Small motion — traditional interpolation.",
+    reason: "小幅運動 — 傳統插值。",
   };
 }
 

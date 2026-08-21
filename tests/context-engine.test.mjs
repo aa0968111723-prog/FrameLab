@@ -253,11 +253,11 @@ describe("conversation prompt + ASK tools (live module)", () => {
       analysisText: "MAE spike F135→F136",
       frameCount: 24,
     });
-    assert.match(text, /Currently looking at Frame 136/);
-    assert.match(text, /selected region/);
-    assert.match(text, /What looks off/);
-    assert.match(text, /Based on/);
-    assert.match(text, /Suggested next actions \(not executed\)/);
+    assert.match(text, /目前在看 影格 136/);
+    assert.match(text, /已選區域/);
+    assert.match(text, /看起來不對勁的地方/);
+    assert.match(text, /依據/);
+    assert.match(text, /建議下一步（尚未執行）/);
     assert.match(text, /NOT_CONFIGURED/);
     assert.match(text, /ANALYZE_MOTION/);
   });

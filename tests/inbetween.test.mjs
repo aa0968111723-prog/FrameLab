@@ -237,7 +237,7 @@ describe("provider routing", () => {
     assert.ok(warnings.some((w) => w.constraint === "PRESERVE_FACE"));
     assert.ok(warnings.some((w) => w.constraint === "MAINTAIN_CONTACT"));
     assert.ok(!warnings.some((w) => w.constraint === "LOCK_KEYFRAME"));
-    assert.match(warnings[0].message, /cannot be enforced/);
+    assert.match(warnings[0].message, /無法強制|僅評估/);
   });
 
   it("does not copy pixel mean_motion as camera_motion", () => {

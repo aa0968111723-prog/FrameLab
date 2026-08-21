@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { ProviderInfo } from "@/lib/ai/llm-provider";
 import type { SuggestedAction } from "@/lib/domain/conversation";
 import type { SerializedContext } from "@/lib/domain/context-engine";
+import { categoryLabel } from "@/lib/domain/visual-annotation";
 import { cn } from "@/lib/utils";
 
 export type ChatLine = {
@@ -85,14 +86,14 @@ export function ConversationPanel({
     )}>
       <header className="flex items-center gap-2 border-b border-border px-3 py-2">
         <p className="text-xs uppercase tracking-wide text-faint">AI</p>
-        <Badge tone="muted">{mode}</Badge>
+        <Badge tone="muted">{mode === "ASK" ? "詢問" : "協助"}</Badge>
         {onMode && (
           <button
             type="button"
             className="text-[10px] text-muted hover:text-fg"
             onClick={() => onMode(mode === "ASK" ? "ASSIST" : "ASK")}
           >
-            {mode === "ASK" ? "ASSIST" : "ASK"}
+            {mode === "ASK" ? "切到協助" : "切到詢問"}
           </button>
         )}
         <span className="ml-auto flex gap-1">
@@ -114,11 +115,11 @@ export function ConversationPanel({
           {providers.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
-              {p.configured ? "" : " · NOT_CONFIGURED"}
+              {p.configured ? "" : " · 尚未設定"}
             </option>
           ))}
         </select>
-        <span className="text-[11px] text-faint">{providerStatus}</span>
+        <span className="text-[11px] text-faint">{providerStatus === "NOT_CONFIGURED" ? "尚未設定" : "就緒"}</span>
         <button
           type="button"
           onClick={onToggleLock}
@@ -168,7 +169,7 @@ export function ConversationPanel({
                   <div key={`${r.start}-${r.end}`} className="flex items-center justify-between gap-2">
                     <p className="text-muted">
                       F{r.start}–F{r.end}
-                      {r.category ? ` · ${r.category.replace(/_/g, " ")}` : ""}
+                      {r.category ? ` · ${categoryLabel(r.category)}` : ""}
                     </p>
                     <button
                       type="button"

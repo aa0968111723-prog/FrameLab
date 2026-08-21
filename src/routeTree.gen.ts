@@ -17,6 +17,7 @@ import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as ApiModelsRouteImport } from './routes/api/models'
 import { Route as ApiV1RouteImport } from './routes/api/v1'
 import { Route as ApiVideosRouteImport } from './routes/api/videos'
+import { Route as StudioIndexRouteImport } from './routes/studio/index'
 import { Route as StudioProjectIdRouteImport } from './routes/studio/$projectId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiSystemDevicesRouteImport } from './routes/api/system.devices'
@@ -62,6 +63,11 @@ const ApiVideosRoute = ApiVideosRouteImport.update({
   path: '/api/videos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudioIndexRoute = StudioIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => StudioRoute,
+} as any)
 const StudioProjectIdRoute = StudioProjectIdRouteImport.update({
   id: '/$projectId',
   path: '/$projectId',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/api/v1': typeof ApiV1RouteWithChildren
   '/api/videos': typeof ApiVideosRoute
   '/studio/$projectId': typeof StudioProjectIdRoute
+  '/studio/': typeof StudioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/system/devices': typeof ApiSystemDevicesRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -100,13 +107,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/studio': typeof StudioRouteWithChildren
   '/api/health': typeof ApiHealthRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/models': typeof ApiModelsRoute
   '/api/v1': typeof ApiV1RouteWithChildren
   '/api/videos': typeof ApiVideosRoute
   '/studio/$projectId': typeof StudioProjectIdRoute
+  '/studio': typeof StudioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/system/devices': typeof ApiSystemDevicesRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -122,6 +129,7 @@ export interface FileRoutesById {
   '/api/v1': typeof ApiV1RouteWithChildren
   '/api/videos': typeof ApiVideosRoute
   '/studio/$projectId': typeof StudioProjectIdRoute
+  '/studio/': typeof StudioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/system/devices': typeof ApiSystemDevicesRoute
   '/api/v1/$': typeof ApiV1SplatRoute
@@ -138,6 +146,7 @@ export interface FileRouteTypes {
     | '/api/v1'
     | '/api/videos'
     | '/studio/$projectId'
+    | '/studio/'
     | '/api/auth/$'
     | '/api/system/devices'
     | '/api/v1/$'
@@ -145,13 +154,13 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
-    | '/studio'
     | '/api/health'
     | '/api/mcp'
     | '/api/models'
     | '/api/v1'
     | '/api/videos'
     | '/studio/$projectId'
+    | '/studio'
     | '/api/auth/$'
     | '/api/system/devices'
     | '/api/v1/$'
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/api/v1'
     | '/api/videos'
     | '/studio/$projectId'
+    | '/studio/'
     | '/api/auth/$'
     | '/api/system/devices'
     | '/api/v1/$'
@@ -242,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVideosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/studio/': {
+      id: '/studio/'
+      path: '/'
+      fullPath: '/studio/'
+      preLoaderRoute: typeof StudioIndexRouteImport
+      parentRoute: typeof StudioRoute
+    }
     '/studio/$projectId': {
       id: '/studio/$projectId'
       path: '/$projectId'
@@ -275,10 +292,12 @@ declare module '@tanstack/react-router' {
 
 interface StudioRouteChildren {
   StudioProjectIdRoute: typeof StudioProjectIdRoute
+  StudioIndexRoute: typeof StudioIndexRoute
 }
 
 const StudioRouteChildren: StudioRouteChildren = {
   StudioProjectIdRoute: StudioProjectIdRoute,
+  StudioIndexRoute: StudioIndexRoute,
 }
 
 const StudioRouteWithChildren =

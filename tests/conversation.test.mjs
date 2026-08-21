@@ -71,7 +71,7 @@ describe("conversation snapshots + stale + provider", () => {
     assert.match(llm, /not_configured/);
     assert.match(llm, /XAI_API_KEY/);
     assert.match(runtime, /buildFallbackAskReply/);
-    assert.match(conv, /AI provider is not configured/);
+    assert.match(conv, /尚未設定 AI 供應商/);
     assert.match(conv, /NOT_CONFIGURED/);
   });
 

@@ -183,7 +183,7 @@ export function annotationsFromProblems(
     const start = p.start ?? p.frame_number ?? 0;
     const end = p.end ?? p.frame_number ?? start;
     const peak = p.peak_frame ?? start;
-    const label = `${categoryLabel(p.category)} · ${p.reason ?? "issue"}`;
+    const label = `${categoryLabel(p.category)} · ${p.reason ?? "問題"}`;
     const severity = (p.severity as VisualSeverity) || "warning";
     out.push(
       rangeAnnotation(`rng-${i}-${start}-${end}`, start, end, label, {

@@ -144,7 +144,7 @@ function HomeInner() {
       setBusy("儲存時間軸…");
       const result = await ingestSequenceFn({
         data: {
-          name: video?.name ?? "Image sequence",
+          name: video?.name ?? "影像序列",
           fps: video ? 12 : 12,
           frames: frames.map((f) => ({
             imageData: f.imageData,
@@ -250,7 +250,7 @@ function HomeInner() {
                 disabled={Boolean(busy)}
               >
                 <Film className="size-4" />
-                FFmpeg
+                FFmpeg 匯入
               </Button>
               <input
                 ref={fileRef}
@@ -354,7 +354,7 @@ function HomeInner() {
             <ul className="mt-2 space-y-1 text-xs text-muted">
               {missing.map((m) => (
                 <li key={m.id}>
-                  {m.modelName} — {m.status}
+                  {m.modelName} — {modelStatusZh(m.status)}
                 </li>
               ))}
             </ul>
@@ -362,13 +362,13 @@ function HomeInner() {
 
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium">MCP token</h2>
+              <h2 className="text-sm font-medium">MCP 權杖</h2>
               <Button size="sm" variant="secondary" onClick={() => mint.mutate()}>
                 簽發
               </Button>
             </div>
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              POST /api/mcp 帶 Bearer token。token 會雜湊儲存；密鑰只顯示一次。
+              POST /api/mcp 帶 Bearer 權杖。權杖會雜湊儲存；密鑰只顯示一次。
             </p>
             {tokenPlain && (
               <pre className="mt-3 overflow-x-auto rounded-[var(--radius-sm)] bg-bg p-2 text-[11px] text-key">
@@ -386,11 +386,17 @@ function HomeInner() {
 
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4 text-xs leading-relaxed text-muted">
             <Film className="mb-2 size-4 text-fg" />
-            Video import uses the browser decoder (first 72 frames at 12 fps).
-            Empty projects wait for an import — there is no fake footage.
+            影片匯入用瀏覽器解碼器（最多 72 格、12 fps）。空白專案會等你匯入 — 不會用假畫面充數。
           </div>
         </aside>
       </div>
     </div>
   );
+}
+
+function modelStatusZh(status: string) {
+  if (status === "unavailable" || status === "MODEL_NOT_AVAILABLE") return "尚未提供";
+  if (status === "ready") return "就緒";
+  if (status === "not_configured") return "尚未設定";
+  return status;
 }

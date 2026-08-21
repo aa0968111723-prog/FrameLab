@@ -114,6 +114,37 @@ const TRAIL_ZH: Record<TrailTarget, string> = {
   custom: "自訂",
 };
 
+const TOOL_DONE_ZH: Record<string, string> = {
+  create_keyframe: "已標成關鍵影格",
+  remove_keyframe: "已取消關鍵影格",
+  mark_breakdown: "已標成分解影格",
+  analyze_consistency: "一致性掃描完成",
+  analyze_frame: "影格分析完成",
+  analyze_motion: "運動分析完成",
+  analyze_tracking: "追蹤分析完成",
+  analyze_pose: "姿態分析完成",
+  repair_frame: "影格已修復",
+  repair_frame_range: "範圍已修復",
+  regenerate_region: "區域已混合",
+  duplicate_frame: "影格已複製",
+  delete_frame: "影格已刪除",
+  undo: "已復原",
+  redo: "已重做",
+  create_character: "角色已新增",
+  assign_character: "已指定角色",
+  create_object: "物件已新增",
+  assign_object: "已指定物件",
+  detect_keyframes: "已偵測關鍵影格",
+  create_tracking_point: "追蹤點已建立",
+  accept_generated_frames: "已寫入時間軸",
+  reject_generated_frames: "已捨棄候選",
+  set_frame_type: "影格類型已更新",
+  set_frame_duration: "時長已更新",
+  set_frame_exposure: "曝光已更新",
+  execute_repair_plan: "修復已執行",
+  create_repair_plan: "修復計畫已建立",
+};
+
 function jpegUrl(b64?: string) {
   if (!b64) return "";
   return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
@@ -159,7 +190,7 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [compareFrame, setCompareFrame] = useState<number | null>(null);
   const [canvasTool, setCanvasTool] = useState<CanvasTool>("pan");
   const [trailTarget, setTrailTarget] = useState<TrailTarget>("right_hand");
-  const [selectedJoint, setSelectedJoint] = useState<string | null>("right_wrist");
+  const [selectedJoint, setSelectedJoint] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<VisualAnnotation[]>([]);
   const [highlightRange, setHighlightRange] = useState<[number, number] | null>(null);
   const [repairViz, setRepairViz] = useState<[number, number] | null>(null);
@@ -537,7 +568,7 @@ function StudioInner({ projectId }: { projectId: string }) {
           /* ignore */
         }
       } else {
-        toast.success(input.tool.replaceAll("_", " "));
+        toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
       }
       refresh();
     },
@@ -879,7 +910,7 @@ function StudioInner({ projectId }: { projectId: string }) {
           start: c.start ?? s.start,
           end: c.end ?? s.end,
           confirmation: {
-            title: "套用 Motion Curve",
+            title: "套用運動曲線",
             start: c.start ?? s.start ?? engine.currentFrame,
             end: c.end ?? s.end ?? engine.currentFrame,
             frames: s.count,
@@ -957,8 +988,31 @@ function StudioInner({ projectId }: { projectId: string }) {
       </div>
     );
   }
+  if (bundle.isError) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-bg px-6 text-center">
+        <div className="max-w-sm space-y-3">
+          <p className="text-lg font-medium text-fg">工作區讀不到</p>
+          <p className="text-sm text-muted">重新整理，或回到專案列表再開一次。</p>
+          <Link to="/studio" className="inline-flex h-10 items-center rounded-[var(--radius-sm)] bg-accent px-4 text-sm font-medium text-accent-fg">
+            回到專案列表
+          </Link>
+        </div>
+      </div>
+    );
+  }
   if (!bundle.data?.ok) {
-    return <div className="grid min-h-screen place-items-center bg-bg text-muted">找不到專案。</div>;
+    return (
+      <div className="grid min-h-screen place-items-center bg-bg px-6 text-center">
+        <div className="max-w-sm space-y-3">
+          <p className="text-lg font-medium text-fg">找不到這個專案</p>
+          <p className="text-sm text-muted">可能已經刪除，或這不是你的專案。回到列表再開一份，或從經典彈跳球開始。</p>
+          <Link to="/studio" className="inline-flex h-10 items-center rounded-[var(--radius-sm)] bg-accent px-4 text-sm font-medium text-accent-fg">
+            回到專案列表
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const project = bundle.data.project;
@@ -1250,6 +1304,14 @@ function StudioInner({ projectId }: { projectId: string }) {
                 });
               }}
             />
+            {frames.length === 0 && (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center bg-bg/80 px-6 text-center">
+                <div>
+                  <p className="text-sm text-fg">還沒有影格</p>
+                  <p className="mt-1 text-[12px] text-muted">回到專案列表匯入序列，或開啟經典彈跳球。</p>
+                </div>
+              </div>
+            )}
             <RegionActions
               visible={regionLive && chrome.regionActions}
               frame={engine.currentFrame}
@@ -1314,7 +1376,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                       setProblemMenu(false);
                     }}
                   >
-                    Return to fit
+                    回到符合畫面
                   </Button>
                 </div>
               </div>
@@ -1496,7 +1558,7 @@ function StudioInner({ projectId }: { projectId: string }) {
               </button>
             ))}
             <div className="ml-auto flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => setZoom(s, s.zoom / 1.2))} aria-label="Zoom out">
+              <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => setZoom(s, s.zoom / 1.2))} aria-label="縮小">
                 <ZoomOut className="size-4" />
               </Button>
               <Button
@@ -1508,11 +1570,11 @@ function StudioInner({ projectId }: { projectId: string }) {
                   setEngine((s) => setZoom(s, 1));
                   setFitTick((n) => n + 1);
                 }}
-                aria-label="Fit"
+                aria-label="符合畫面"
               >
                 <ScanSearch className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => setZoom(s, s.zoom * 1.2))} aria-label="Zoom in">
+              <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => setZoom(s, s.zoom * 1.2))} aria-label="放大">
                 <ZoomIn className="size-4" />
               </Button>
               <Button

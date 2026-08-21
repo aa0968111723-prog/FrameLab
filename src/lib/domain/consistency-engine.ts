@@ -144,7 +144,7 @@ export function fuseConsistency(input: {
       score,
       severity: c.severity,
       evidence: { distance: c.distance, median: c.median, pair: c.pair.join("·") },
-      explanation: `Possible contact break between ${c.pair[0]} and ${c.pair[1]} at F${c.frame} (heuristic distance, not a physics model).`,
+      explanation: `F${c.frame} 可能接觸中斷：${c.pair[0]} 與 ${c.pair[1]}（距離啟發式，不是物理模擬）。`,
       frame: c.frame,
       related_frames: [Math.max(0, c.frame - 1), c.frame],
     });
@@ -156,7 +156,7 @@ export function fuseConsistency(input: {
       score: f.score,
       severity: severityOf(f.score),
       evidence: { flicker: f.score },
-      explanation: `Luma flicker around F${f.frame}.`,
+      explanation: `F${f.frame} 附近亮度閃爍。`,
       frame: f.frame,
       related_frames: [f.frame],
     });
@@ -224,22 +224,22 @@ function rank(s: AssistSeverity) {
 export function explainMotion(p: MotionPairSummary): string {
   const ratio = p.velocity_ratio;
   if (ratio != null && ratio >= 2) {
-    return `F${p.frame_a}→F${p.frame_b} motion speed increased about ${ratio.toFixed(1)}× (${p.provider} block-match, not SEA-RAFT).`;
+    return `F${p.frame_a}→F${p.frame_b} 速度約提高 ${ratio.toFixed(1)} 倍（${p.provider} 區塊比對，不是 SEA-RAFT）。`;
   }
   if ((p.direction_change_deg ?? 0) >= 55) {
-    return `F${p.frame_a}→F${p.frame_b} motion direction changed ${p.direction_change_deg?.toFixed(0)}°.`;
+    return `F${p.frame_a}→F${p.frame_b} 運動方向改變 ${p.direction_change_deg?.toFixed(0)}°。`;
   }
-  return `F${p.frame_a}→F${p.frame_b} mean motion ${p.mean_motion.toFixed(2)}.`;
+  return `F${p.frame_a}→F${p.frame_b} 平均位移 ${p.mean_motion.toFixed(2)}。`;
 }
 
 export function explainPose(e: PoseContinuityEvent): string {
   if (e.kind === "MISSING_KEYPOINT") {
-    return `${e.joint} keypoint is missing or low-confidence at F${e.frame_b} (pose-lite, not RTMPose).`;
+    return `${e.joint} 在 F${e.frame_b} 缺失或信心過低（姿態精簡，不是 RTMPose）。`;
   }
   if (e.kind === "POSE_DIRECTION_CHANGE") {
-    return `${e.joint} moved in a different direction F${e.frame_a}→F${e.frame_b} (pose-lite silhouette, not RTMPose).`;
+    return `${e.joint} 在 F${e.frame_a}→F${e.frame_b} 方向改變（姿態精簡輪廓，不是 RTMPose）。`;
   }
-  return `${e.joint} velocity spiked F${e.frame_a}→F${e.frame_b} (v=${e.velocity.toFixed(1)}). Silhouette pose-lite, not RTMPose.`;
+  return `${e.joint} 在 F${e.frame_a}→F${e.frame_b} 速度突增（v=${e.velocity.toFixed(1)}）。姿態精簡，不是 RTMPose。`;
 }
 
 /** Gaps in character/object assignments inside an analyzed range. */
@@ -267,8 +267,8 @@ export function entityStability(
         evidence: { entity: entity.name, missing_frame: n, span: `${min}-${max}` },
         explanation:
           type === "CHARACTER_STABILITY"
-            ? `Character "${entity.name}" is missing at F${n} between F${min} and F${max}.`
-            : `Object "${entity.name}" is missing at F${n} between F${min} and F${max}.`,
+            ? `角色「${entity.name}」在 F${min}–F${max} 之間的 F${n} 消失。`
+            : `物件「${entity.name}」在 F${min}–F${max} 之間的 F${n} 消失。`,
         frame: n,
         related_frames: [min, n, max],
       });

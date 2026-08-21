@@ -1,6 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ProjectHome } from "@/components/workstation/project-home";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/studio")({
-  component: ProjectHome,
+  component: StudioLayout,
 });
+
+function StudioLayout() {
+  return <Outlet />;
+}

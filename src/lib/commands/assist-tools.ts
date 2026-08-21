@@ -192,16 +192,16 @@ export async function analyzeMotionAssist(ctx: CommandContext, args: Record<stri
       const cached = cacheGet<ReturnType<typeof analyzeMotionSequence>>(cacheKey);
       let pairs = cached;
       if (!pairs) {
-        await progress(10, { current: 0, total: slice.length, label: "Analyzing Motion" });
+        await progress(10, { current: 0, total: slice.length, label: "分析運動" });
         const decoded = slice.map((f) => ({
           number: f.frame_number,
           rgba: decodeJpegBase64(f.image_data),
         }));
-        await progress(40, { current: Math.floor(slice.length / 2), total: slice.length, label: "Analyzing Motion" });
+        await progress(40, { current: Math.floor(slice.length / 2), total: slice.length, label: "分析運動" });
         pairs = analyzeMotionSequence(decoded, { region, regionFor, provider: flow.id });
         cacheSet(cacheKey, pairs);
       }
-      await progress(80, { current: slice.length, total: slice.length, label: "Analyzing Motion" });
+      await progress(80, { current: slice.length, total: slice.length, label: "分析運動" });
       await persistMotionPairs(t.id, t.project_id, pairs, flow.id);
       await progress(95);
       return pairs;
@@ -276,7 +276,7 @@ export async function analyzePoseAssist(ctx: CommandContext, args: Record<string
         await progress(Math.round(((i + 1) / Math.max(1, slice.length)) * 85), {
           current: i + 1,
           total: slice.length,
-          label: "Analyzing Pose",
+          label: "分析姿態",
         });
       }
       await repo.replacePosesForFrames(poseRows);
@@ -308,12 +308,12 @@ export async function suggestRepair(ctx: CommandContext, args: Record<string, un
       type: "CONSISTENCY_ANALYSIS",
       payload: { timelineId: t.id, startFrame: args.startFrame, endFrame: args.endFrame },
       work: async (_id, progress) => {
-        await progress(8, { label: "Evaluating Consistency" });
+        await progress(8, { label: "評估一致性" });
         const result = await suggestRepair(ctx, { ...args, skipJob: true });
         await progress(95, {
           current: result.problem_ranges[0] ? result.problem_ranges[0].end - result.problem_ranges[0].start + 1 : 0,
           total: result.problems.length,
-          label: "Evaluating Consistency",
+          label: "評估一致性",
         });
         return result;
       },
@@ -773,7 +773,7 @@ export async function executeRepairPlanCmd(ctx: CommandContext, args: Record<str
         await progress(Math.round(((i + 1) / Math.max(1, snapshots.length)) * 80), {
           current: i + 1,
           total: snapshots.length,
-          label: "Repair interpolation",
+          label: "修復插值",
         });
       }
       await repo.updateRepairPlan(planId, { status: "executed", revisionId });

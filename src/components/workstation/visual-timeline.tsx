@@ -117,13 +117,13 @@ export function VisualTimeline({
       />
       <div className="flex items-center justify-between px-3 py-0.5 text-[11px] text-faint">
         <span className="truncate">
-          Timeline
-          {engine.loopRange ? ` · loop F${engine.loopRange[0]}–F${engine.loopRange[1]}` : ""}
+          時間軸
+          {engine.loopRange ? ` · 循環 F${engine.loopRange[0]}–F${engine.loopRange[1]}` : ""}
           {highlightRange ? ` · F${highlightRange[0]}–F${highlightRange[1]}` : ""}
-          {repairRange ? ` · repair F${repairRange[0]}–F${repairRange[1]}` : ""}
+          {repairRange ? ` · 修復 F${repairRange[0]}–F${repairRange[1]}` : ""}
         </span>
         <label className="flex items-center gap-2">
-          Zoom
+          縮放
           <input
             type="range"
             min={0.5}
@@ -131,7 +131,7 @@ export function VisualTimeline({
             step={0.1}
             value={timelineZoom}
             onChange={(e) => onZoomTimeline(Number(e.target.value))}
-            aria-label="Timeline zoom"
+            aria-label="時間軸縮放"
           />
         </label>
       </div>

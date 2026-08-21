@@ -109,7 +109,7 @@ function Home() {
           },
           {
             title: "代理怎麼接",
-            body: "在工作室簽發 MCP token。POST /api/mcp 帶 Bearer。與介面同一套指令 — analyze_consistency、generate_inbetweens、repair_frame_range — 有權限範圍與稽核紀錄。",
+            body: "在工作室簽發 MCP 權杖。POST /api/mcp 帶 Bearer。與介面同一套指令 — analyze_consistency、generate_inbetweens、repair_frame_range — 有權限範圍與稽核紀錄。",
           },
         ].map((card) => (
           <article

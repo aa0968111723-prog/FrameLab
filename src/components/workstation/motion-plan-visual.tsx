@@ -1,4 +1,5 @@
 import type { MotionPlanView } from "./inbetween-panel";
+import { curveCaption } from "@/lib/visual/motion-curve-visual";
 
 export function MotionPlanVisual({ plan }: { plan: MotionPlanView | null }) {
   if (!plan) return null;
@@ -12,23 +13,23 @@ export function MotionPlanVisual({ plan }: { plan: MotionPlanView | null }) {
           <li key={c.character_id} className="flex justify-between gap-2">
             <span className="text-fg">{String(c.pose_transition?.name ?? c.character_id)}</span>
             <span>
-              {c.motion.direction} · {c.motion.distance_normalized.toFixed(2)}
+              {directionZh(c.motion.direction)} · {c.motion.distance_normalized.toFixed(2)}
             </span>
           </li>
         ))}
         {objs.map((o) => (
           <li key={o.object_id} className="flex justify-between gap-2">
-            <span className="text-fg">{o.constraint}</span>
-            <span>{o.constraint}</span>
+            <span className="text-fg">物件</span>
+            <span>{constraintZh(o.constraint)}</span>
           </li>
         ))}
         <li className="flex justify-between">
           <span>相機</span>
-          <span>{plan.camera?.movement ?? "未知"}</span>
+          <span>{cameraMoveZh(plan.camera?.movement)}</span>
         </li>
         <li className="flex justify-between">
           <span>曲線</span>
-          <span>{plan.curve}</span>
+          <span>{curveCaption(plan.curve)}</span>
         </li>
       </ul>
     </div>
@@ -69,3 +70,39 @@ export function ConstraintChips({
     </div>
   );
 }
+
+function cameraMoveZh(move?: string) {
+  if (!move) return "未知";
+  const m = move.toLowerCase();
+  if (m.includes("static") || m.includes("still")) return "靜止";
+  if (m.includes("pan")) return "平移";
+  if (m.includes("tilt")) return "俯仰";
+  if (m.includes("zoom")) return "縮放";
+  if (m.includes("track")) return "跟隨";
+  return move;
+}
+
+function constraintZh(kind: string) {
+  const k = kind.toLowerCase();
+  if (k.includes("character")) return "角色";
+  if (k.includes("face")) return "臉";
+  if (k.includes("background")) return "背景";
+  if (k.includes("contact")) return "接觸";
+  if (k.includes("camera")) return "相機";
+  if (k.includes("object")) return "物件";
+  if (k.includes("hold")) return "跟隨";
+  return kind.replaceAll("_", " ");
+}
+
+function directionZh(d: string) {
+  const x = d.toLowerCase();
+  if (x.includes("up")) return "上";
+  if (x.includes("down")) return "下";
+  if (x.includes("left")) return "左";
+  if (x.includes("right")) return "右";
+  if (x.includes("in")) return "靠近";
+  if (x.includes("out")) return "遠離";
+  if (x.includes("still") || x.includes("none")) return "幾乎不動";
+  return d;
+}
+

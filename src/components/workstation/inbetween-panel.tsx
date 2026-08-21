@@ -3,6 +3,8 @@
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { curveCaption } from "@/lib/visual/motion-curve-visual";
+import { categoryLabel } from "@/lib/domain/visual-annotation";
 
 export type InbetweenConstraints = {
   preserveCharacter: boolean;
@@ -235,15 +237,15 @@ export function InbetweenPanel({
         <div className="space-y-1 rounded-[var(--radius-sm)] border border-border p-2 text-[11px]">
           <p className="text-xs uppercase tracking-wide text-faint">動作計畫 v{state.plan.version}</p>
           <p className="text-muted">
-            曲線 {state.plan.curve}
+            曲線 {curveCaption(state.plan.curve)}
             {state.plan.timing ? ` · ${state.plan.timing.frames} 格 @ ${state.plan.timing.fps} fps` : ""}
           </p>
-          <p className="text-muted">相機：{state.plan.camera?.movement ?? "未知"}</p>
+          <p className="text-muted">相機：{cameraMoveZh(state.plan.camera?.movement)}</p>
           {(state.plan.characters ?? []).length > 0 ? (
             <ul className="text-fg">
               {(state.plan.characters ?? []).map((c) => (
                 <li key={c.character_id}>
-                  角色 {String(c.pose_transition?.name ?? c.character_id.slice(0, 8))} · {c.motion.direction} · 距離{" "}
+                  角色 {String(c.pose_transition?.name ?? c.character_id.slice(0, 8))} · {directionZh(c.motion.direction)} · 距離{" "}
                   {c.motion.distance_normalized.toFixed(2)}
                   {typeof c.pose_transition.pose_displacement === "number"
                     ? ` · 姿態 Δ ${Number(c.pose_transition.pose_displacement).toFixed(2)}`
@@ -257,21 +259,21 @@ export function InbetweenPanel({
           {(state.plan.objects ?? []).length > 0 && (
             <ul>
               {(state.plan.objects ?? []).map((o) => (
-                <li key={o.object_id}>Object {o.constraint}</li>
+                <li key={o.object_id}>物件 · {constraintZh(o.constraint)}</li>
               ))}
             </ul>
           )}
           {(state.plan.constraints ?? []).length > 0 && (
             <p className="text-muted">
-              約束：{(state.plan.constraints ?? []).map((c) => c.kind.replaceAll("_", " ")).join(" · ")}
+              約束：{(state.plan.constraints ?? []).map((c) => constraintZh(c.kind)).join(" · ")}
             </p>
           )}
           {(state.plan.breakdowns ?? []).length > 0 && (
-            <p className="text-muted">Breakdowns: {(state.plan.breakdowns ?? []).map((n) => `F${n}`).join(", ")}</p>
+            <p className="text-muted">分解影格：{(state.plan.breakdowns ?? []).map((n) => `F${n}`).join(", ")}</p>
           )}
           {(state.plan.spacing ?? []).length > 0 && (
             <p className="font-mono text-faint">
-              Spacing {state.plan.spacing!.slice(0, 9).map((s) => s.toFixed(2)).join(" ")}
+              間距 {state.plan.spacing!.slice(0, 9).map((s) => s.toFixed(2)).join(" ")}
             </p>
           )}
         </div>
@@ -279,7 +281,7 @@ export function InbetweenPanel({
       {state.analysis && (
         <div className="space-y-1 text-[11px] text-muted">
           <p>
-            複雜度 {state.analysis.complexity}（{Math.round(state.analysis.score * 100)}%）
+            複雜度 {complexityZh(state.analysis.complexity)}（{Math.round(state.analysis.score * 100)}%）
           </p>
           <p>{state.analysis.strategy.reason}</p>
           {state.analysis.suggest_breakdown && state.analysis.suggested_breakdown != null && (
@@ -289,7 +291,7 @@ export function InbetweenPanel({
               disabled={state.busy}
               onClick={() => onMarkBreakdown(state.analysis!.suggested_breakdown!)}
             >
-              建立 Breakdown F{state.analysis.suggested_breakdown}
+              建立分解影格 F{state.analysis.suggested_breakdown}
             </Button>
           )}
         </div>
@@ -312,13 +314,13 @@ export function InbetweenPanel({
           </p>
           <ul className="text-[11px] text-muted">
             <li>影格數：{state.confirmation.frames}</li>
-            <li>運動：{state.confirmation.curve}</li>
-            <li>供應商：{state.confirmation.provider}</li>
+            <li>運動：{curveCaption(state.confirmation.curve)}</li>
+            <li>供應商：{providerZh(state.confirmation.provider)}</li>
           </ul>
           {state.confirmation.constraints.length > 0 && (
             <ul className="text-[11px] text-fg">
               {state.confirmation.constraints.map((c) => (
-                <li key={c}>✓ {c}</li>
+                <li key={c}>✓ {constraintZh(c)}</li>
               ))}
             </ul>
           )}
@@ -337,7 +339,7 @@ export function InbetweenPanel({
                   disabled={state.busy}
                   onClick={() => onMarkBreakdown(state.confirmation!.suggested_breakdown!)}
                 >
-                  建立 Breakdown F{state.confirmation.suggested_breakdown}
+                  建立分解影格 F{state.confirmation.suggested_breakdown}
                 </Button>
               )}
               <Button size="sm" variant="ghost" disabled={state.busy} onClick={onForceGenerate}>
@@ -360,7 +362,7 @@ export function InbetweenPanel({
       {state.candidate && (
         <div className="space-y-2 rounded-[var(--radius-sm)] border border-gen/40 p-2">
           <p className="text-xs font-medium">
-            {state.candidate.count} 格已產生 · {state.candidate.provider} · {state.candidate.quality === "production" ? "成品" : "預覽"}
+            {state.candidate.count} 格已產生 · {providerZh(state.candidate.provider)} · {state.candidate.quality === "production" ? "成品" : "預覽"}
           </p>
           <p className="text-[11px] text-faint">僅為候選版本 — 尚未寫入時間軸。</p>
           {state.candidate.frames.length > 0 && (
@@ -385,7 +387,7 @@ export function InbetweenPanel({
             <ul className="space-y-0.5 text-[11px]">
               {Object.entries(state.candidate.evaluation.scores).map(([k, v]) => (
                 <li key={k} className="flex justify-between">
-                  <span className="text-faint">{k.replaceAll("_", " ")}</span>
+                  <span className="text-faint">{scoreKeyZh(k)}</span>
                   <span className={v < 0.8 ? "text-warn" : "text-fg"}>{Math.round(v * 100)}%{v < 0.8 ? " ⚠" : ""}</span>
                 </li>
               ))}
@@ -397,7 +399,7 @@ export function InbetweenPanel({
               <ul>
                 {(state.candidate.evaluation?.problems ?? []).slice(0, 6).map((p) => (
                   <li key={`${p.frame_number}-${p.category}`}>
-                    F{p.frame_number} {p.category}
+                    F{p.frame_number} {categoryLabel(p.category)}
                   </li>
                 ))}
               </ul>
@@ -442,4 +444,65 @@ export function InbetweenPanel({
       </div>
     </div>
   );
+}
+
+function cameraMoveZh(move?: string) {
+  if (!move) return "未知";
+  const m = move.toLowerCase();
+  if (m.includes("static") || m.includes("still")) return "靜止";
+  if (m.includes("pan")) return "平移";
+  if (m.includes("tilt")) return "俯仰";
+  if (m.includes("zoom")) return "縮放";
+  if (m.includes("track")) return "跟隨";
+  return move;
+}
+
+function complexityZh(c: string) {
+  if (c === "VERY_HIGH") return "非常高";
+  if (c === "HIGH") return "高";
+  if (c === "MEDIUM") return "中";
+  if (c === "LOW") return "低";
+  return c;
+}
+
+function providerZh(p: string) {
+  if (p.includes("linear-blend")) return p.includes("unavailable") ? "線性混合（不可用）" : "線性混合";
+  if (p.includes("wan")) return "Wan（未載入）";
+  if (p.includes("rife")) return "RIFE（未載入）";
+  return p;
+}
+
+function constraintZh(kind: string) {
+  const k = kind.toLowerCase();
+  if (k.includes("character")) return "角色";
+  if (k.includes("face")) return "臉";
+  if (k.includes("background")) return "背景";
+  if (k.includes("contact")) return "接觸";
+  if (k.includes("camera")) return "相機";
+  if (k.includes("object")) return "物件";
+  if (k.includes("hold")) return "跟隨";
+  return kind.replaceAll("_", " ");
+}
+
+function directionZh(d: string) {
+  const x = d.toLowerCase();
+  if (x.includes("up")) return "上";
+  if (x.includes("down")) return "下";
+  if (x.includes("left")) return "左";
+  if (x.includes("right")) return "右";
+  if (x.includes("in")) return "靠近";
+  if (x.includes("out")) return "遠離";
+  if (x.includes("still") || x.includes("none")) return "幾乎不動";
+  return d;
+}
+
+function scoreKeyZh(k: string) {
+  if (k.includes("character")) return "角色";
+  if (k.includes("face")) return "臉";
+  if (k.includes("background")) return "背景";
+  if (k.includes("flicker") || k.includes("temporal")) return "閃爍";
+  if (k.includes("motion")) return "運動";
+  if (k.includes("contact")) return "接觸";
+  if (k.includes("identity")) return "身份";
+  return k.replaceAll("_", " ");
 }

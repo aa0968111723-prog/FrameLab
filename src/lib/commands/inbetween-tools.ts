@@ -469,11 +469,11 @@ export async function generateInbetweensCmd(ctx: CommandContext, args: Record<st
           result_json: JSON.stringify({ stage: { label, current: extra?.current, total: extra?.total }, ...extra }),
         });
       };
-      await stage(8, "Analyzing keyframes...");
+      await stage(8, "正在分析關鍵影格…");
       let generated = generationCacheGet<ReturnType<typeof decodeJpegBase64>[]>(cacheKey);
       const cacheHit = Boolean(generated);
       if (!generated) {
-        await stage(22, "Creating motion plan...");
+        await stage(22, "正在建立動作計畫…");
         const runGenerate = async (srcA: typeof ra, srcB: typeof rb, n: number) =>
           inb.generate({
             start: srcA,
@@ -517,7 +517,7 @@ export async function generateInbetweensCmd(ctx: CommandContext, args: Record<st
       for (let i = 0; i < generated.length; i += 1) {
         const g = generated[i]!;
         const n = numbers[i]!;
-        await stage(30 + Math.round(((i + 1) / Math.max(1, generated.length)) * 40), `Generating ${i + 1} / ${count} frames...`, {
+        await stage(30 + Math.round(((i + 1) / Math.max(1, generated.length)) * 40), `正在產生影格… ${i + 1} / ${count}`, {
           current: i + 1,
           total: count,
         });
@@ -546,10 +546,10 @@ export async function generateInbetweensCmd(ctx: CommandContext, args: Record<st
         await progress(70 + Math.round(((i + 1) / Math.max(1, generated.length)) * 15), {
           current: i + 1,
           total: count,
-          label: `Generating ${i + 1} / ${count} frames...`,
+          label: `正在產生影格… ${i + 1} / ${count}`,
         });
       }
-      await stage(82, "Evaluating generated frames...");
+      await stage(82, "正在評估產生的影格…");
       const evalStarted = Date.now();
       const evaluation = await evaluateGenerated(ctx, t.id, start, end, decoded);
       const evalMs = Date.now() - evalStarted;
@@ -590,7 +590,7 @@ export async function generateInbetweensCmd(ctx: CommandContext, args: Record<st
           reason: p.reason,
         })),
       );
-      await stage(94, "Checking consistency...");
+      await stage(94, "正在檢查一致性…");
       await progress(96);
       const durationMs = Date.now() - genStarted;
       logEvent("generation.completed", {

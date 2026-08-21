@@ -150,29 +150,29 @@ export function buildAssistResponse(input: {
   const ranges = input.ranges;
   const top = ranges[0];
   const summary = top
-    ? `${input.contextLabel}: problem mainly F${top.start}–F${top.end} (peak F${top.peak_frame}). ${top.reason}`
-    : `${input.contextLabel}: no motion/pose/tracking spike above warning.`;
+    ? `${input.contextLabel}：問題主要在 F${top.start}–F${top.end}（峰值 F${top.peak_frame}）。${top.reason}`
+    : `${input.contextLabel}：運動／姿態／追蹤沒有超過警告門檻。`;
   const actions: AssistSuggestedAction[] = [];
   if (top) {
     actions.push({
       type: "suggestion",
       action: "VIEW_PROBLEM_FRAMES",
       frame_range: [top.start, top.end],
-      label: `View F${top.start}–F${top.end}`,
+      label: `查看 F${top.start}–F${top.end}`,
       auto: false,
     });
     actions.push({
       type: "suggestion",
       action: "COMPARE_FRAMES",
       frame_range: [top.peak_frame, Math.min(top.end, top.peak_frame + 1)],
-      label: `Compare F${top.peak_frame}`,
+      label: `比對 F${top.peak_frame}`,
       auto: false,
     });
     actions.push({
       type: "suggestion",
       action: "CREATE_REPAIR_PLAN",
       frame_range: [top.start, top.end],
-      label: "Create repair plan",
+      label: "建立修復計畫",
       auto: false,
     });
     if (input.plan) {
@@ -180,7 +180,7 @@ export function buildAssistResponse(input: {
         type: "suggestion",
         action: "EXECUTE_REPAIR",
         frame_range: input.plan.repair_range,
-        label: `Repair F${input.plan.repair_range[0]}–F${input.plan.repair_range[1]} (confirm)`,
+        label: `修復 F${input.plan.repair_range[0]}–F${input.plan.repair_range[1]}（需確認）`,
         auto: false,
       });
     }
@@ -188,19 +188,19 @@ export function buildAssistResponse(input: {
     actions.push({
       type: "suggestion",
       action: "RUN_MOTION_ANALYSIS",
-      label: "Run motion analysis",
+      label: "執行運動分析",
       auto: false,
     });
     actions.push({
       type: "suggestion",
       action: "RUN_POSE_ANALYSIS",
-      label: "Run pose-lite",
+      label: "執行姿態精簡",
       auto: false,
     });
     actions.push({
       type: "suggestion",
       action: "RUN_TRACKING",
-      label: "Run tracking",
+      label: "執行追蹤",
       auto: false,
     });
   }

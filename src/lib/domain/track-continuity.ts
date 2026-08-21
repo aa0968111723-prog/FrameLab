@@ -63,10 +63,10 @@ export function detectTrackBreaks(samples: TrackSample[]): TrackBreak[] {
           severity: jump > 80 || to === "LOST" ? "error" : "warning",
           note:
             to === "LOST"
-              ? `Track "${name}" lost at F${b.frame}.`
+              ? `軌道「${name}」在 F${b.frame} 丟失。`
               : recovered
-                ? `Track "${name}" recovered at F${b.frame} after a gap.`
-                : `Track "${name}" jumped ${jump.toFixed(1)}px between F${a.frame} and F${b.frame}.`,
+                ? `軌道「${name}」在 F${b.frame} 於空缺後找回。`
+                : `軌道「${name}」在 F${a.frame} 與 F${b.frame} 之間跳了 ${jump.toFixed(1)}px。`,
         });
       }
     }

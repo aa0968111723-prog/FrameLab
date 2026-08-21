@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { padFrame, type FrameType } from "@/lib/domain/types";
+import { jobStateZh, jobTypeZh } from "@/lib/domain/job-progress";
 import type { createTimelineState } from "@/lib/domain/timeline-engine";
 import { VisualHistory, type HistoryRow } from "./visual-history";
 
@@ -122,7 +123,21 @@ export function AdvancedInspector({
           onChange={(e) => onType(e.target.value as FrameType)}
         >
           {["KEY", "BREAKDOWN", "INBETWEEN", "HOLD", "GENERATED", "REPAIRED", "GENERATED_BREAKDOWN"].map((t) => (
-            <option key={t}>{t}</option>
+            <option key={t} value={t}>
+              {t === "KEY"
+                ? "關鍵 ★"
+                : t === "BREAKDOWN"
+                  ? "分解 ◆"
+                  : t === "INBETWEEN"
+                    ? "中間"
+                    : t === "HOLD"
+                      ? "停留"
+                      : t === "GENERATED"
+                        ? "生成 G"
+                        : t === "REPAIRED"
+                          ? "已修復"
+                          : "生成分解"}
+            </option>
           ))}
         </select>
       </label>
@@ -138,9 +153,9 @@ export function AdvancedInspector({
             defaultValue="1"
             onChange={(e) => onExposure(Number(e.target.value))}
           >
-            <option value="1">On ones (1)</option>
-            <option value="2">On twos (2)</option>
-            <option value="3">On threes (3)</option>
+            <option value="1">一格一拍</option>
+            <option value="2">兩格一拍</option>
+            <option value="3">三格一拍</option>
           </select>
         </label>
       )}
@@ -180,7 +195,7 @@ export function AdvancedInspector({
       )}
       <div className="grid grid-cols-2 gap-2">
         <Button size="sm" variant="secondary" disabled={busy} onClick={onAnalyze}>
-          Grok
+          Grok 視覺
         </Button>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onPose}>
           姿態精簡
@@ -220,11 +235,12 @@ export function AdvancedInspector({
         ))}
       </div>
       <select className="h-8 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-xs" value={regionKind} onChange={(e) => setRegionKind(e.target.value)}>
-        {["custom", "hand", "face", "object"].map((k) => (
-          <option key={k}>{k}</option>
-        ))}
+        <option value="custom">自訂</option>
+        <option value="hand">手</option>
+        <option value="face">臉</option>
+        <option value="object">物件</option>
       </select>
-      <p className="text-[10px] text-faint">SAM2 具名遮罩：MODEL_NOT_AVAILABLE。矩形選區是真的。</p>
+      <p className="text-[10px] text-faint">SAM 2 具名遮罩尚未提供。矩形選區是真的。</p>
       <div>
         <p className="text-xs text-muted">角色</p>
         {characters.map((c) => (
@@ -254,7 +270,7 @@ export function AdvancedInspector({
             {o.name}
           </button>
         ))}
-        <Button size="sm" variant="ghost" className="mt-1" onClick={() => onCreateObject("Suitcase")}>
+        <Button size="sm" variant="ghost" className="mt-1" onClick={() => onCreateObject("行李箱")}>
           新增行李箱
         </Button>
       </div>
@@ -263,13 +279,13 @@ export function AdvancedInspector({
         {tracking
           .filter((t) => t.frame_number === current.frameNumber)
           .map((t) => `${t.name}${t.score != null ? ` ${"●".repeat(Math.round((t.score ?? 0) * 4))}${"○".repeat(4 - Math.round((t.score ?? 0) * 4))}` : ""}`)
-          .join(", ") || "none"}
+          .join(", ") || "無"}
       </p>
       <VisualHistory rows={revisions} onPreview={onPreview} onRestore={onRestore} onUndo={onUndo} onRedo={onRedo} />
       <ul className="max-h-16 overflow-auto text-[10px] text-faint">
         {jobs.slice(0, 6).map((j) => (
           <li key={j.id}>
-            {j.type} · {j.state} · {j.progress}%
+            {jobTypeZh(j.type)} · {jobStateZh(j.state)} · {j.progress}%
           </li>
         ))}
       </ul>

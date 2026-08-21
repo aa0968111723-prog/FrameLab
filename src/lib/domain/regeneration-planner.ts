@@ -66,7 +66,7 @@ export function planMinimalRegeneration(
     boundary_start: left,
     boundary_end: right,
     protected_frames: protectedFrames,
-    reason: `Only F${problem[0]}–F${problem[1]} failed. Boundaries F${left} / F${right}. KEY/LOCKED never rewritten.`,
+    reason: `只有 F${problem[0]}–F${problem[1]} 出問題。邊界 F${left} / F${right}。關鍵影格與鎖定影格不會被改寫。`,
   };
 }
 

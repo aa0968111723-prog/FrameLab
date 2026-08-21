@@ -625,7 +625,7 @@ async function analyzeRange(ctx: CommandContext, args: Record<string, unknown>) 
         frameId: f.id,
         rgba: decodeJpegBase64(f.image_data),
       }));
-      await progress(20, { current: 0, total: slice.length, label: "Evaluating Consistency" });
+      await progress(20, { current: 0, total: slice.length, label: "評估一致性" });
       const pixel = scoreWindow(decoded);
       const { suggestRepair } = await import("./assist-tools");
       const assist = await suggestRepair(ctx, {
@@ -638,7 +638,7 @@ async function analyzeRange(ctx: CommandContext, args: Record<string, unknown>) 
         region: args.region,
         characterId: args.characterId,
       });
-      await progress(80, { current: slice.length, total: slice.length, label: "Evaluating Consistency" });
+      await progress(80, { current: slice.length, total: slice.length, label: "評估一致性" });
       const tracking = await repo.listTrackingPoints(t.project_id);
       const contacts = detectContactBreaks(tracking);
       for (const c of contacts) {
@@ -708,7 +708,7 @@ async function analyzeMotion(ctx: CommandContext, args: Record<string, unknown>)
         await progress(Math.round((i / Math.max(1, frames.length - 1)) * 90), {
           current: i,
           total: frames.length - 1,
-          label: "Analyzing Motion",
+          label: "分析運動",
         });
       }
       await repo.replaceMotionData(
@@ -831,7 +831,7 @@ async function analyzeTracking(ctx: CommandContext, args: Record<string, unknown
         await progress(Math.round((i / Math.max(1, byName.size)) * 90), {
           current: i,
           total: byName.size,
-          label: "Analyzing Tracking",
+          label: "分析追蹤",
         });
       }
       return { provider: tracker.id, tracks };
@@ -1155,7 +1155,7 @@ async function repairFrameRange(ctx: CommandContext, args: Record<string, unknow
         await progress(Math.round(((i + 1) / Math.max(1, interior.length)) * 90), {
           current: i + 1,
           total: interior.length,
-          label: "Repair interpolation",
+          label: "修復插值",
         });
       }
       return { repaired, provider: interpolator.id };

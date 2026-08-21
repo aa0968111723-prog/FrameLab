@@ -82,7 +82,7 @@ export function HeroStage() {
       width={520}
       height={300}
       className="h-auto w-full rounded-[var(--radius-md)] border border-border bg-subtle"
-      aria-label="Onion-skinned bouncing ball"
+      aria-label="洋蔥皮彈跳球"
     />
   );
 }

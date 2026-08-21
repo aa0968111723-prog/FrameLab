@@ -35,7 +35,7 @@ export function jobStageLabel(
   }
   const frames =
     stage?.current != null && stage?.total != null
-      ? `${stage.current} / ${stage.total} frames`
+      ? `${stage.current} / ${stage.total} 格`
       : null;
   const running = state === "running" || state === "queued";
   if (running && type === "OPTICAL_FLOW") {
@@ -54,5 +54,33 @@ export function jobStageLabel(
     return frames ? `修復插值 ${frames}` : `修復插值 ${progress}%`;
   }
   if (stage?.label && running) return stage.label;
-  return `${type} · ${state} · ${progress}%`;
+  return `${jobTypeZh(type)} · ${jobStateZh(state)} · ${progress}%`;
+}
+
+export function jobTypeZh(type: string) {
+  switch (type) {
+    case "GENERATE_INBETWEENS":
+      return "產生中間影格";
+    case "OPTICAL_FLOW":
+      return "運動分析";
+    case "POSE_ANALYSIS":
+      return "姿態分析";
+    case "POINT_TRACKING":
+      return "點追蹤";
+    case "CONSISTENCY_ANALYSIS":
+      return "一致性";
+    case "REPAIR_INTERPOLATION":
+      return "修復插值";
+    default:
+      return type.replaceAll("_", " ");
+  }
+}
+
+export function jobStateZh(state: string) {
+  if (state === "running") return "進行中";
+  if (state === "queued") return "排隊中";
+  if (state === "done" || state === "succeeded" || state === "completed") return "完成";
+  if (state === "failed") return "失敗";
+  if (state === "cancelled") return "已取消";
+  return state;
 }

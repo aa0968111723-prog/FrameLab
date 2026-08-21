@@ -343,27 +343,27 @@ function labelFor(action: SuggestedActionType, range?: [number, number]): string
   const span = range ? ` F${range[0]}–F${range[1]}` : "";
   switch (action) {
     case "ANALYZE_POSE":
-      return `Analyze pose${span}`;
+      return `分析姿態${span}`;
     case "ANALYZE_MOTION":
-      return `Analyze motion${span}`;
+      return `分析運動${span}`;
     case "ANALYZE_TRACKING":
-      return `Analyze tracking${span}`;
+      return `分析追蹤${span}`;
     case "COMPARE_FRAMES":
-      return `Compare frames${span}`;
+      return `比對影格${span}`;
     case "MARK_PROBLEM":
-      return `Mark problem${span}`;
+      return `標記問題${span}`;
     case "VIEW_PROBLEM_FRAMES":
-      return `View problem frames${span}`;
+      return `查看問題影格${span}`;
     case "RUN_MOTION_ANALYSIS":
-      return `Run motion analysis${span}`;
+      return `執行運動分析${span}`;
     case "RUN_POSE_ANALYSIS":
-      return `Run pose-lite${span}`;
+      return `執行姿態精簡${span}`;
     case "RUN_TRACKING":
-      return `Run tracking${span}`;
+      return `執行追蹤${span}`;
     case "CREATE_REPAIR_PLAN":
-      return `Create repair plan${span}`;
+      return `建立修復計畫${span}`;
     case "EXECUTE_REPAIR":
-      return `Execute repair${span} (confirm)`;
+      return `執行修復${span}（需確認）`;
     default:
       return action;
   }
@@ -385,7 +385,7 @@ export function conversationTitleFromContext(
     : f != null
       ? ` F${f}`
       : "";
-  const clip = userMessage.trim().slice(0, 42) || "workspace question";
+  const clip = userMessage.trim().slice(0, 42) || "工作區提問";
   return `${clip}${range}${region}`.trim();
 }
 
@@ -402,15 +402,15 @@ export function buildFallbackAskReply(input: {
   const range = snap.selected_range;
   const neighbors = resolved.neighbors.filter((n) => n !== frame);
   const sees: string[] = [];
-  if (frame != null) sees.push(`Frame ${frame}`);
+  if (frame != null) sees.push(`影格 ${frame}`);
   if (region) {
     sees.push(
-      `selected region (normalized x=${region.x.toFixed(2)} y=${region.y.toFixed(2)} w=${region.width.toFixed(2)} h=${region.height.toFixed(2)})`,
+      `已選區域（正規化 x=${region.x.toFixed(2)} y=${region.y.toFixed(2)} w=${region.width.toFixed(2)} h=${region.height.toFixed(2)}）`,
     );
   }
-  if (snap.selected_character) sees.push(`character ${snap.selected_character}`);
-  if (range && range[0] !== range[1]) sees.push(`range F${range[0]}–F${range[1]}`);
-  if (neighbors.length) sees.push(`neighbors ${neighbors.map((n) => `F${n}`).join(", ")}`);
+  if (snap.selected_character) sees.push(`角色 ${snap.selected_character}`);
+  if (range && range[0] !== range[1]) sees.push(`範圍 F${range[0]}–F${range[1]}`);
+  if (neighbors.length) sees.push(`鄰近 ${neighbors.map((n) => `F${n}`).join("、")}`);
 
   const motionRange: [number, number] | null =
     range && range[0] !== range[1]
@@ -432,21 +432,21 @@ export function buildFallbackAskReply(input: {
   }
 
   return [
-    `Currently looking at ${sees.join(", ") || "the workspace"}.`,
+    `目前在看 ${sees.join("、") || "工作區"}。`,
     "",
-    "What looks off:",
+    "看起來不對勁的地方：",
     input.analysisText ||
-      "Lightweight visual analysis has not produced a motion spike yet. Pose is unavailable.",
+      "輕量視覺分析還沒抓到運動突變。姿態也還沒有資料。",
     "",
-    "Based on:",
-    "- FrameLab context snapshot (not an empty chat)",
-    `- Onion skin ${snap.onion_skin.enabled ? `prev ${snap.onion_skin.previousFrames} / next ${snap.onion_skin.nextFrames}` : "off"}`,
-    "- Lightweight visual analysis (pixel MAE / histogram / centroid — not pose)",
+    "依據：",
+    "- FrameLab 上下文快照（不是空對話）",
+    `- 洋蔥皮 ${snap.onion_skin.enabled ? `前 ${snap.onion_skin.previousFrames} / 後 ${snap.onion_skin.nextFrames}` : "關"}`,
+    "- 輕量視覺分析（像素 MAE／直方圖／質心 — 不是骨架）",
     "",
-    "Suggested next actions (not executed):",
+    "建議下一步（尚未執行）：",
     ...suggestions,
     "",
-    "AI provider is not configured.",
-    "NOT_CONFIGURED — no fake chat reply.",
+    "尚未設定 AI 供應商。",
+    "NOT_CONFIGURED — 不會假裝有回覆。",
   ].join("\n");
 }

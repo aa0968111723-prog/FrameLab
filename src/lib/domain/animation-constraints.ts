@@ -65,12 +65,12 @@ const ENFORCEABLE: Record<ConstraintKind, (c: InbetweenCapabilities) => boolean>
 };
 
 const WARNING_COPY: Partial<Record<ConstraintKind, string>> = {
-  PRESERVE_BACKGROUND: "This provider cannot guarantee background preservation.",
-  PRESERVE_FACE: "Face Lock · evaluation only. Constraint will be evaluated after generation but cannot be enforced during generation.",
-  PRESERVE_HAIR: "Hair Lock · evaluation only.",
-  PRESERVE_CLOTHING: "Clothing Lock · evaluation only.",
-  PRESERVE_BODY: "Body proportion lock · evaluation only.",
-  MAINTAIN_CONTACT: "Constraint will be evaluated after generation but cannot be enforced during generation.",
+  PRESERVE_BACKGROUND: "這個供應商無法保證背景不變。",
+  PRESERVE_FACE: "鎖定臉 · 僅評估。產生時無法強制，完成後才會檢查。",
+  PRESERVE_HAIR: "鎖定頭髮 · 僅評估。",
+  PRESERVE_CLOTHING: "鎖定服裝 · 僅評估。",
+  PRESERVE_BODY: "鎖定身體比例 · 僅評估。",
+  MAINTAIN_CONTACT: "接觸約束僅評估，產生時無法強制。",
 };
 
 export function constraintWarnings(
@@ -84,7 +84,7 @@ export function constraintWarnings(
       constraint: c.kind,
       message:
         WARNING_COPY[c.kind] ??
-        `${c.kind} will be evaluated after generation but cannot be enforced during generation by this provider.`,
+        `${constraintZh(c.kind)} 僅評估，這個供應商產生時無法強制。`,
     });
   }
   return out;
@@ -109,3 +109,19 @@ export function contactFromPair(
     strength: 1,
   };
 }
+
+function constraintZh(kind: string) {
+  if (kind.includes("CHARACTER")) return "角色";
+  if (kind.includes("FACE")) return "臉";
+  if (kind.includes("BACKGROUND")) return "背景";
+  if (kind.includes("CONTACT")) return "接觸";
+  if (kind.includes("CAMERA")) return "相機";
+  if (kind.includes("OBJECT")) return "物件";
+  if (kind.includes("CLOTHING")) return "服裝";
+  if (kind.includes("HAIR")) return "頭髮";
+  if (kind.includes("BODY")) return "身體";
+  if (kind.includes("REGION")) return "區域";
+  if (kind.includes("KEYFRAME")) return "關鍵影格";
+  return kind.replaceAll("_", " ");
+}
+

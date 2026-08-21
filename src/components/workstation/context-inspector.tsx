@@ -25,10 +25,19 @@ export function ContextInspector({ snapshot }: { snapshot: SerializedContext }) 
           洋蔥皮 {snapshot.onion_skin.enabled ? "開" : "關"}{" "}
           {snapshot.onion_skin.previousFrames}/{snapshot.onion_skin.nextFrames}
         </li>
-        <li>焦點 {snapshot.focus}</li>
+        <li>焦點 {focusZh(snapshot.focus)}</li>
         <li>對話 {snapshot.conversation_id ?? "—"}</li>
         <li>v{snapshot.context_version}</li>
       </ul>
     </div>
   );
 }
+
+function focusZh(focus: string) {
+  if (focus === "current_frame") return "目前影格";
+  if (focus === "range") return "範圍";
+  if (focus === "region") return "選區";
+  if (focus === "character") return "角色";
+  return focus;
+}
+
