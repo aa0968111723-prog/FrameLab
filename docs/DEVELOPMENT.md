@@ -17,4 +17,4 @@ MCP token: studio home → Issue. Call `POST /api/mcp` with `tools/list` then `t
 
 FFmpeg ingest: `POST /api/videos` multipart field `file`. Browser import stays available without a server round-trip.
 
-CPU-only docker: `docker compose -f docker-compose.dev.yml up`. GPU compose is a stub for later CUDA workers.
+CPU-only docker: `docker compose -f docker-compose.dev.yml up`. GPU worker: `docker compose -f docker-compose.gpu.yml up --build` (Python 3.12 + PyTorch; reports `unavailable` when there is no CUDA).

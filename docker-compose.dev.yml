@@ -1,5 +1,5 @@
 # v0.1: web process is the modular monolith (UI + REST + MCP + pixel workers).
-# Separate api / mcp-server / gpu-worker containers come when CUDA adapters load.
+# GPU worker lives in docker-compose.gpu.yml (Python 3.12 + PyTorch, honest CUDA probe).
 services:
   postgres:
     image: postgres:16

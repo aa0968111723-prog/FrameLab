@@ -8,6 +8,8 @@ The product spec described a Python FastAPI + Next.js + Redis + GPU worker split
 2. The workstation has to run where the preview/deploy lives (Node, Postgres or PGLite, no apt, no guaranteed CUDA).
 3. Half a Python API that cannot start would violate the “no fake success” rule.
 
+GPU inference is a **Python 3.12 + PyTorch** worker (`workers/gpu-worker/server.py`) with `/health`, `/models`, `/jobs`, `/device`. It reports CUDA / GPU / VRAM from `torch.cuda`. No GPU → `unavailable`. It never fakes a device or a completed job. The TypeScript monolith remains the command runtime.
+
 GPU Python workers run RTMPose, LocoTrack, SEA-RAFT, RIFE, and SAM 2 behind the existing provider interfaces (`src/lib/ai/providers.ts`) without changing commands or MCP tool names. Wan remains reserved.
 
 V0.2 Assist path:

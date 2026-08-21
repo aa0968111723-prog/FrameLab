@@ -3,6 +3,7 @@ import { locotrackHealth } from "@/lib/ai/locotrack-worker";
 import { seaRaftHealth } from "@/lib/ai/sea-raft-worker";
 import { rifeHealth } from "@/lib/ai/rife-worker";
 import { sam2Health } from "@/lib/ai/sam2-worker";
+import { probeGpuDevice } from "@/lib/ai/gpu-worker";
 
 export type ProviderStatus =
   | "ready"
@@ -288,23 +289,28 @@ export function listModels(): ModelInfo[] {
 }
 
 export function getDeviceInfo() {
+  const gpu = probeGpuDevice();
   const pose = rtmposeHealth();
   const sam = sam2Health();
-  const workers = [pose, sam].filter((w) => w.ok);
+  const cuda = gpu.cuda === true;
   return {
     cpu: true,
-    cuda: pose.cuda === true || sam.cuda === true,
+    cuda,
     mps: false,
-    gpu: pose.cuda || sam.cuda ? "cuda" : null,
-    vram_gb: 0,
-    runtime: workers.length ? "python+node" : "node",
+    gpu: cuda ? gpu.gpu : null,
+    gpu_name: cuda ? gpu.gpu_name : null,
+    vram_gb: cuda ? gpu.vram_gb : 0,
+    vram_used_gb: cuda ? gpu.vram_used_gb : 0,
+    status: cuda ? "ready" : "unavailable",
+    runtime: gpu.torch ? "python+pytorch" : "node",
+    python: gpu.python,
+    torch: gpu.torch,
+    torch_version: gpu.torch_version,
     rtmpose: pose,
     sam2: sam,
-    note: sam.ok
-      ? `SAM 2 worker ready on ${sam.device}. Click mask + forward/backward propagate.`
-      : pose.ok
-        ? `RTMPose worker ready on ${pose.device}. SAM 2 worker not loaded.`
-        : "SAM 2 / RTMPose workers not loaded. Pixel metrics, NCC, block-match, linear blend, and xAI vision run on CPU/API.",
+    note: cuda
+      ? `CUDA GPU ready: ${gpu.gpu_name ?? gpu.gpu}. VRAM ${gpu.vram_gb} GB.`
+      : gpu.note || "No CUDA GPU. GPU models stay unavailable.",
   };
 }
 

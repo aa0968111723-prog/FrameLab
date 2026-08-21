@@ -1,7 +1,23 @@
-# GPU overlay. No worker image in v0.1 — this file exists so CPU
-# developers can keep docker-compose.dev.yml and GPU work can attach later.
+# Python 3.12 + PyTorch GPU worker.
+# Device probe uses torch.cuda.is_available(). No GPU → status=unavailable.
+# This service always starts and reports honestly. It is not a stub image.
 services:
   gpu-worker:
-    profiles: ["gpu"]
-    image: busybox
-    command: ["echo", "GPU worker not built — MODEL_NOT_AVAILABLE"]
+    build:
+      context: ./workers/gpu-worker
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      FRAMELAB_GPU_WORKER_PORT: "8090"
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+    restart: unless-stopped
+    # When nvidia-container-toolkit is present, pass the GPU through:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]

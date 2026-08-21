@@ -27,7 +27,7 @@ Modular TypeScript monolith (TanStack Start + Postgres/PGLite):
 - **MCP** — `POST /api/mcp` (JSON-RPC, Streamable HTTP)
 - All three call **application commands** (`src/lib/commands/execute.ts`)
 
-Python FastAPI + GPU workers are deliberately not the runtime in v0.1. Adapter interfaces exist; unloaded models return `MODEL_NOT_AVAILABLE` / `PROVIDER_NOT_AVAILABLE` instead of fake scores. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+GPU inference runs in a **Python 3.12 + PyTorch** worker (`workers/gpu-worker`, `GET /health|/device|/models|/jobs`). The Node app stays the command runtime. Unloaded models return `MODEL_NOT_AVAILABLE` / `PROVIDER_NOT_AVAILABLE` instead of fake scores. No CUDA → the worker reports `status: "unavailable"`. See [docs/GPU.md](docs/GPU.md).
 
 ## Quick start
 
