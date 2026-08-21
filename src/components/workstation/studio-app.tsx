@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import {
   ChevronLeft,
   ChevronRight,
+  Eraser,
   Eye,
   EyeOff,
   FlipHorizontal,
@@ -11,11 +12,14 @@ import {
   MessageSquare,
   PanelRight,
   Pause,
+  Pencil,
   Play,
+  Redo2,
   Repeat,
   ScanSearch,
   SkipBack,
   SkipForward,
+  Undo2,
   Wand2,
   ZoomIn,
   ZoomOut,
@@ -62,6 +66,7 @@ import { createEmptyContext, serializeContext, type SerializedContext } from "@/
 import { curveCaption, curvePathD, spacingDots } from "@/lib/visual/motion-curve-visual";
 import { locateProblemBox } from "@/lib/visual/problem-locate";
 import { jpegUrl } from "@/lib/visual/jpeg-url";
+import { clampBrushSize, DEFAULT_BRUSH_SIZE, isDrawTool } from "@/lib/visual/draw-canvas";
 import { buildPresence } from "@/lib/visual/character-track";
 import { maskTrackMarks } from "@/lib/visual/timeline-virtual";
 import { suggestedFocusZoom, zoom100Percent } from "@/lib/visual/viewport";
@@ -103,6 +108,8 @@ const MODE_LABEL: Record<WorkspaceMode, string> = {
 
 const TOOL_LABEL: Record<CanvasTool, string> = {
   pan: "平移",
+  brush: "畫筆",
+  eraser: "橡皮擦",
   region: "選區",
   point: "錨點",
   character: "角色",
@@ -202,6 +209,9 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [holdCompare, setHoldCompare] = useState(false);
   const [compareFrame, setCompareFrame] = useState<number | null>(null);
   const [canvasTool, setCanvasTool] = useState<CanvasTool>("pan");
+  const [brushSize, setBrushSize] = useState(DEFAULT_BRUSH_SIZE);
+  const [drawAction, setDrawAction] = useState<{ n: number; type: "undo" | "redo" } | null>(null);
+  const [drawState, setDrawState] = useState({ canUndo: false, canRedo: false });
   const [trailTarget, setTrailTarget] = useState<TrailTarget>("right_hand");
   const [selectedJoint, setSelectedJoint] = useState<string | null>(null);
   const [annotations, setAnnotations] = useState<VisualAnnotation[]>([]);
@@ -586,6 +596,9 @@ function StudioInner({ projectId }: { projectId: string }) {
         } catch {
           /* ignore */
         }
+      } else if (input.tool === "replace_frame") {
+        refresh();
+        return;
       } else {
         toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
       }
@@ -708,10 +721,28 @@ function StudioInner({ projectId }: { projectId: string }) {
           tool.mutate({ tool: "mark_breakdown", args: { timelineId, frameNumber: current.frameNumber } });
         }
       } else if (e.key === "p" || e.key === "P") setPixelView((v) => !v);
-      else if (e.key === "u" || e.key === "U") {
-        if (current) tool.mutate({ tool: "undo", args: { projectId, frameId: current.id } });
+      else if (e.code === "KeyZ" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+        e.preventDefault();
+        if (isDrawTool(canvasTool) && drawState.canRedo) {
+          setDrawAction((a) => ({ n: (a?.n ?? 0) + 1, type: "redo" }));
+        } else if (current) {
+          tool.mutate({ tool: "redo", args: { projectId, frameId: current.id } });
+        }
+      } else if (e.code === "KeyZ" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (isDrawTool(canvasTool) && drawState.canUndo) {
+          setDrawAction((a) => ({ n: (a?.n ?? 0) + 1, type: "undo" }));
+        } else if (current) {
+          tool.mutate({ tool: "undo", args: { projectId, frameId: current.id } });
+        }
+      } else if (e.key === "u" || e.key === "U") {
+        if (isDrawTool(canvasTool) && drawState.canUndo) {
+          setDrawAction((a) => ({ n: (a?.n ?? 0) + 1, type: "undo" }));
+        } else if (current) tool.mutate({ tool: "undo", args: { projectId, frameId: current.id } });
       } else if (e.key === "y" || e.key === "Y") {
-        if (current) tool.mutate({ tool: "redo", args: { projectId, frameId: current.id } });
+        if (isDrawTool(canvasTool) && drawState.canRedo) {
+          setDrawAction((a) => ({ n: (a?.n ?? 0) + 1, type: "redo" }));
+        } else if (current) tool.mutate({ tool: "redo", args: { projectId, frameId: current.id } });
       } else if (e.key === "i" || e.key === "I") setSheet((v) => !v);
       else if (e.key === "f" || e.key === "F") setFocusMode((v) => !v);
       else if (e.key === "h" || e.key === "H") {
@@ -752,7 +783,7 @@ function StudioInner({ projectId }: { projectId: string }) {
     };
   // projectId is captured by the keyboard undo/redo handlers; leaving it out
   // meant a project switch without a remount kept undoing in the old project.
-  }, [current, timelineId, step, tool, engine.currentFrame, projectId]);
+  }, [current, timelineId, step, tool, engine.currentFrame, projectId, canvasTool, drawState.canUndo, drawState.canRedo]);
 
   const revisions = useQuery({
     queryKey: ["rev", projectId, current?.id],
@@ -1279,7 +1310,7 @@ function StudioInner({ projectId }: { projectId: string }) {
               </button>
             ))}
             <p className="mt-3 px-1 text-[10px] uppercase tracking-wide text-faint">工具</p>
-            {(["pan", "region", "point", "character"] as CanvasTool[]).map((t) => (
+            {(["pan", "brush", "eraser", "region", "point", "character"] as CanvasTool[]).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -1334,9 +1365,33 @@ function StudioInner({ projectId }: { projectId: string }) {
               }}
               onProblemBubble={() => setProblemMenu(true)}
               fitTick={fitTick}
+              brushSize={brushSize}
+              drawAction={drawAction}
+              onPaintCommit={(frameId, imageData) => {
+                qc.setQueriesData(
+                  { queryKey: ["images", projectId] },
+                  (
+                    old:
+                      | { ok?: boolean; images?: { id: string; imageData: string }[] }
+                      | undefined,
+                  ) => {
+                    if (!old?.images) return old;
+                    return {
+                      ...old,
+                      images: old.images.map((im) =>
+                        im.id === frameId ? { ...im, imageData: `data:image/jpeg;base64,${imageData}` } : im,
+                      ),
+                    };
+                  },
+                );
+                tool.mutate({ tool: "replace_frame", args: { frameId, imageData } });
+              }}
+              onDrawState={setDrawState}
+              onLockedDraw={() => toast.error("此影格已鎖定")}
+              onDrawActionConsumed={() => setDrawAction(null)}
               onPlacePoint={(x, y) => {
                 if (!current) return;
-                if (canvasTool === "region") return;
+                if (canvasTool === "region" || isDrawTool(canvasTool)) return;
                 if (canvasTool === "character") {
                   if (selectedCharacterId) {
                     tool.mutate({ tool: "assign_character", args: { frameId: current.id, characterId: selectedCharacterId } });
@@ -1631,6 +1686,28 @@ function StudioInner({ projectId }: { projectId: string }) {
             ))}
             <button
               type="button"
+              onClick={() => setCanvasTool("brush")}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-[var(--radius-xs)] px-2 py-1 text-[11px]",
+                canvasTool === "brush" ? "bg-raised text-fg" : "text-muted hover:text-fg",
+              )}
+            >
+              <Pencil className="size-3" />
+              畫筆
+            </button>
+            <button
+              type="button"
+              onClick={() => setCanvasTool("eraser")}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-[var(--radius-xs)] px-2 py-1 text-[11px]",
+                canvasTool === "eraser" ? "bg-raised text-fg" : "text-muted hover:text-fg",
+              )}
+            >
+              <Eraser className="size-3" />
+              橡皮擦
+            </button>
+            <button
+              type="button"
               onClick={() => setCanvasTool((t) => (t === "region" ? "pan" : "region"))}
               className={cn(
                 "rounded-[var(--radius-xs)] px-2 py-1 text-[11px] md:hidden",
@@ -1639,6 +1716,40 @@ function StudioInner({ projectId }: { projectId: string }) {
             >
               選區
             </button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              disabled={!drawState.canUndo}
+              onClick={() => setDrawAction((a) => ({ n: (a?.n ?? 0) + 1, type: "undo" }))}
+              aria-label="復原"
+            >
+              <Undo2 className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              disabled={!drawState.canRedo}
+              onClick={() => setDrawAction((a) => ({ n: (a?.n ?? 0) + 1, type: "redo" }))}
+              aria-label="重做"
+            >
+              <Redo2 className="size-3.5" />
+            </Button>
+            {isDrawTool(canvasTool) ? (
+              <label className="ml-1 flex items-center gap-1 text-[10px] text-faint">
+                尺寸
+                <input
+                  type="range"
+                  min={1}
+                  max={48}
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(clampBrushSize(Number(e.target.value)))}
+                  className="w-20 accent-fg"
+                  aria-label="筆刷尺寸"
+                />
+              </label>
+            ) : null}
             <div className="ml-auto flex items-center gap-1">
               <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => setZoom(s, s.zoom / 1.2))} aria-label="縮小">
                 <ZoomOut className="size-4" />
@@ -2134,7 +2245,8 @@ function StudioInner({ projectId }: { projectId: string }) {
               <li>K 關鍵影格 · B 分解影格 · O 洋蔥皮 · L 循環 · P 像素</li>
               <li>A 開啟 AI · C 一致性掃描 · I 開啟檢視面板</li>
               <li>點兩張 ★ 設為起點／終點 · Shift 點時間軸拉範圍</li>
-              <li>U 復原 · Y 重做 · F 對焦 · ` 閃爍比對 · 按住 H</li>
+              <li>U 復原 · Y 重做 · Ctrl+Z 筆畫復原 · F 對焦 · ` 閃爍比對 · 按住 H</li>
+              <li>畫筆／橡皮擦改目前影格 · 滾輪縮放 · 中鍵或 Alt 拖曳平移</li>
               <li>1–5 工作模式 · Shift 點疊加層可堆疊</li>
               <li>選區工具 — 在畫布上拖出問題區域</li>
               <li>Esc — 清除選區／回到符合畫面</li>

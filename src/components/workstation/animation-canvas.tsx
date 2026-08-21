@@ -29,8 +29,17 @@ import { regionBoxFromDrag, isUsableRegionBox } from "@/lib/visual/region-box";
 import { cn } from "@/lib/utils";
 
 import { jpegUrl } from "@/lib/visual/jpeg-url";
+import {
+  BRUSH_COLOR,
+  ERASER_COLOR,
+  MAX_DRAW_UNDOS,
+  isDrawTool,
+  jpegFromDataUrl,
+  shouldPanPointer,
+  strokeWidth,
+} from "@/lib/visual/draw-canvas";
 
-export type CanvasTool = "pan" | "region" | "point" | "character";
+export type CanvasTool = "pan" | "region" | "point" | "character" | "brush" | "eraser";
 
 export type StudioFrame = {
   id: string;
@@ -38,6 +47,7 @@ export type StudioFrame = {
   width: number;
   height: number;
   thumbnailData?: string;
+  isLocked?: boolean;
 };
 
 export type MaskProp = { frame: number; mask: { x: number; y: number; w: number; h: number }; lost?: boolean };
@@ -75,6 +85,12 @@ export function AnimationCanvas({
   onViewport,
   onPanChange,
   fitTick,
+  brushSize = 8,
+  drawAction = null,
+  onPaintCommit,
+  onDrawState,
+  onLockedDraw,
+  onDrawActionConsumed,
 }: {
   frames: StudioFrame[];
   imageMap: Map<string, string>;
@@ -112,6 +128,12 @@ export function AnimationCanvas({
   onViewport?: (vt: ViewportTransform) => void;
   onPanChange?: (p: { x: number; y: number }) => void;
   fitTick: number;
+  brushSize?: number;
+  drawAction?: { n: number; type: "undo" | "redo" } | null;
+  onPaintCommit?: (frameId: string, imageData: string) => void;
+  onDrawState?: (s: { canUndo: boolean; canRedo: boolean }) => void;
+  onLockedDraw?: () => void;
+  onDrawActionConsumed?: () => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -123,6 +145,112 @@ export function AnimationCanvas({
   const bubbleRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const cache = useRef(new Map<string, HTMLImageElement>());
   const layers = activeOverlays(overlay);
+  const paintMap = useRef(
+    new Map<string, { canvas: HTMLCanvasElement; undo: string[]; redo: string[] }>(),
+  );
+  const draw = useRef({
+    active: false,
+    pointerId: -1,
+    lastX: 0,
+    lastY: 0,
+    moved: 0,
+    pointers: new Map<number, { x: number; y: number }>(),
+  });
+  const [paintTick, setPaintTick] = useState(0);
+  const bumpPaint = () => setPaintTick((n) => n + 1);
+
+  const emitDrawState = (frameId: string) => {
+    const s = paintMap.current.get(frameId);
+    onDrawState?.({ canUndo: Boolean(s && s.undo.length), canRedo: Boolean(s && s.redo.length) });
+  };
+
+  const commitPaint = (frameId: string) => {
+    const s = paintMap.current.get(frameId);
+    if (!s || !onPaintCommit) return;
+    onPaintCommit(frameId, jpegFromDataUrl(s.canvas.toDataURL("image/jpeg", 0.88)));
+    emitDrawState(frameId);
+  };
+
+  const paintOnto = (sessionCanvas: HTMLCanvasElement, src: string) =>
+    new Promise<void>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = sessionCanvas.getContext("2d");
+        if (ctx) {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, sessionCanvas.width, sessionCanvas.height);
+          ctx.drawImage(img, 0, 0, sessionCanvas.width, sessionCanvas.height);
+        }
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = jpegUrl(src);
+    });
+
+  const bootSession = async (frame: StudioFrame) => {
+    const existing = paintMap.current.get(frame.id);
+    if (existing) return existing;
+    const img = new Image();
+    const full = `/api/frame-assets?frameId=${encodeURIComponent(frame.id)}&tier=full`;
+    img.src = full;
+    try {
+      await img.decode();
+    } catch {
+      const data = imageMap.get(frame.id);
+      if (!data) return null;
+      img.src = jpegUrl(data);
+      try {
+        await img.decode();
+      } catch {
+        return null;
+      }
+    }
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, frame.width);
+    c.height = Math.max(1, frame.height);
+    const cctx = c.getContext("2d");
+    if (!cctx) return null;
+    cctx.drawImage(img, 0, 0, c.width, c.height);
+    const s = { canvas: c, undo: [] as string[], redo: [] as string[] };
+    paintMap.current.set(frame.id, s);
+    return s;
+  };
+
+  const strokeTo = (frame: StudioFrame, x: number, y: number, pressure: number) => {
+    const s = paintMap.current.get(frame.id);
+    const ctx = s?.canvas.getContext("2d");
+    if (!s || !ctx) return;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = tool === "eraser" ? ERASER_COLOR : BRUSH_COLOR;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.lineWidth = strokeWidth(brushSize, pressure);
+    ctx.beginPath();
+    ctx.moveTo(draw.current.lastX, draw.current.lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    draw.current.lastX = x;
+    draw.current.lastY = y;
+    draw.current.moved += 1;
+    bumpPaint();
+  };
+
+  const applyHistory = async (frame: StudioFrame, type: "undo" | "redo") => {
+    const s = paintMap.current.get(frame.id) ?? (await bootSession(frame));
+    if (!s) return;
+    const stack = type === "undo" ? s.undo : s.redo;
+    const other = type === "undo" ? s.redo : s.undo;
+    const prev = stack.pop();
+    if (!prev) {
+      emitDrawState(frame.id);
+      return;
+    }
+    other.push(s.canvas.toDataURL("image/jpeg", 0.88));
+    if (other.length > MAX_DRAW_UNDOS) other.shift();
+    await paintOnto(s.canvas, prev);
+    bumpPaint();
+    commitPaint(frame.id);
+  };
 
   const load = useCallback((id: string, b64: string) => {
     const existing = cache.current.get(id);
@@ -325,7 +453,9 @@ export function AnimationCanvas({
       return;
     }
     ctx.imageSmoothingEnabled = !pixelView && engine.zoom < 2;
-    ctx.drawImage(img, dx, dy, current.width * scale, current.height * scale);
+    const live = paintMap.current.get(display.id);
+    if (live) ctx.drawImage(live.canvas, dx, dy, current.width * scale, current.height * scale);
+    else ctx.drawImage(img, dx, dy, current.width * scale, current.height * scale);
 
     if (showCompare && compareMode === "overlay" && compareFrame != null) {
       drawFrame(compareFrame, 0.45);
@@ -473,6 +603,7 @@ export function AnimationCanvas({
     layers,
     pulse,
     maskTrack,
+    paintTick,
   ]);
 
   useEffect(() => {
@@ -487,14 +618,88 @@ export function AnimationCanvas({
     return () => el.removeEventListener("wheel", onWheel);
   }, [engine.zoom, onZoom]);
 
+  useEffect(() => {
+    const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+    if (current) emitDrawState(current.id);
+    else onDrawState?.({ canUndo: false, canRedo: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine.currentFrame]);
+
+  useEffect(() => {
+    if (!drawAction) return;
+    const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+    if (current) void applyHistory(current, drawAction.type);
+    onDrawActionConsumed?.();
+    // applyHistory closes over boot/commit; run only when the parent ticks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawAction?.n]);
+
+  const frameAt = (clientX: number, clientY: number) => {
+    const wrap = wrapRef.current;
+    const vt = vtRef.current;
+    if (!wrap || !vt) return null;
+    const rect = wrap.getBoundingClientRect();
+    return viewToFrame(vt, clientX - rect.left, clientY - rect.top);
+  };
+
+  const endStroke = (frame?: StudioFrame) => {
+    if (!draw.current.active) return;
+    const moved = draw.current.moved;
+    draw.current.active = false;
+    draw.current.pointerId = -1;
+    if (!frame) return;
+    const s = paintMap.current.get(frame.id);
+    if (!s) return;
+    if (moved < 1) {
+      s.undo.pop();
+      emitDrawState(frame.id);
+      return;
+    }
+    commitPaint(frame.id);
+  };
+
   return (
     <div
       ref={wrapRef}
       className={cn(
-        "film-check relative min-h-0 flex-1",
-        tool === "region" ? "cursor-crosshair" : "cursor-grab",
+        "film-check relative min-h-0 flex-1 touch-none",
+        tool === "region" || isDrawTool(tool) ? "cursor-crosshair" : "cursor-grab",
       )}
       onPointerDown={(e) => {
+        const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+        draw.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const panInstead = shouldPanPointer({
+          tool,
+          button: e.button,
+          altKey: e.altKey,
+          pointerCount: draw.current.pointers.size,
+        });
+        (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+        if (!panInstead && isDrawTool(tool) && current) {
+          e.preventDefault();
+          if (current.isLocked) {
+            onLockedDraw?.();
+            return;
+          }
+          const at = frameAt(e.clientX, e.clientY);
+          if (!at) return;
+          const pointerId = e.pointerId;
+          const pressure = e.pressure;
+          void bootSession(current).then((s) => {
+            if (!s || !draw.current.pointers.has(pointerId)) return;
+            s.undo.push(s.canvas.toDataURL("image/jpeg", 0.88));
+            if (s.undo.length > MAX_DRAW_UNDOS) s.undo.shift();
+            s.redo = [];
+            draw.current.active = true;
+            draw.current.pointerId = pointerId;
+            draw.current.lastX = at.x;
+            draw.current.lastY = at.y;
+            draw.current.moved = 0;
+            strokeTo(current, at.x, at.y, pressure);
+          });
+          return;
+        }
+        if (draw.current.active && current) endStroke(current);
         const vt = vtRef.current;
         pan.current = {
           ...pan.current,
@@ -502,12 +707,11 @@ export function AnimationCanvas({
           px: e.clientX,
           py: e.clientY,
           moved: 0,
-          region: tool === "region",
+          region: tool === "region" && e.button === 0 && !e.altKey,
           rx: e.clientX,
           ry: e.clientY,
         };
-        (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-        if (tool === "region" && vt) {
+        if (pan.current.region && vt) {
           const wrap = wrapRef.current;
           if (!wrap) return;
           const rect = wrap.getBoundingClientRect();
@@ -517,6 +721,15 @@ export function AnimationCanvas({
         }
       }}
       onPointerMove={(e) => {
+        const pt = draw.current.pointers.get(e.pointerId);
+        if (pt) draw.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+        if (draw.current.active && draw.current.pointerId === e.pointerId && current && draw.current.pointers.size === 1) {
+          const at = frameAt(e.clientX, e.clientY);
+          if (!at) return;
+          strokeTo(current, at.x, at.y, e.pressure);
+          return;
+        }
         if (!pan.current.dragging) return;
         const dx = e.clientX - pan.current.px;
         const dy = e.clientY - pan.current.py;
@@ -526,7 +739,6 @@ export function AnimationCanvas({
         if (pan.current.region) {
           const wrap = wrapRef.current;
           const vt = vtRef.current;
-          const current = frames.find((f) => f.frameNumber === engine.currentFrame);
           if (!wrap || !vt || !current) return;
           const rect = wrap.getBoundingClientRect();
           const f = viewToFrame(vt, e.clientX - rect.left, e.clientY - rect.top);
@@ -536,6 +748,12 @@ export function AnimationCanvas({
         setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
       }}
       onPointerUp={(e) => {
+        draw.current.pointers.delete(e.pointerId);
+        const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+        if (draw.current.active && (draw.current.pointerId === e.pointerId || draw.current.pointerId === -1)) {
+          endStroke(current);
+          return;
+        }
         const moved = pan.current.moved;
         const wasRegion = pan.current.region;
         pan.current.dragging = false;
@@ -547,9 +765,9 @@ export function AnimationCanvas({
         }
         setDragBox(null);
         if (moved > 6) return;
+        if (isDrawTool(tool)) return;
         const wrap = wrapRef.current;
         const vt = vtRef.current;
-        const current = frames.find((f) => f.frameNumber === engine.currentFrame);
         if (!wrap || !current || !vt) return;
         const rect = wrap.getBoundingClientRect();
         const px = e.clientX - rect.left;
@@ -567,8 +785,16 @@ export function AnimationCanvas({
         if (f.x < 0 || f.y < 0 || f.x > current.width || f.y > current.height) return;
         onPlacePoint(f.x, f.y);
       }}
-      onPointerLeave={() => {
+      onPointerCancel={(e) => {
+        draw.current.pointers.delete(e.pointerId);
+        const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+        endStroke(current);
         pan.current.dragging = false;
+        pan.current.region = false;
+        setDragBox(null);
+      }}
+      onPointerLeave={() => {
+        if (!draw.current.active) pan.current.dragging = false;
       }}
     >
       <canvas ref={canvasRef} className="h-full w-full" />

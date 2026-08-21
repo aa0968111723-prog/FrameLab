@@ -21,8 +21,8 @@ function actionZh(action: string) {
       return "修復影格";
     case "repair_frame_range":
       return "範圍修復";
-    case "regenerate_region":
-      return "區域混合";
+    case "replace_frame":
+      return "手繪影格";
     case "generate_inbetweens":
       return "產生中間影格";
     case "create_keyframe":
