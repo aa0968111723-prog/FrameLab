@@ -1,0 +1,216 @@
+FrameLab 專案定位 — 最高優先級
+
+你現在要開發的唯一目標 Repository 是：
+
+GitHub Repository：
+"https://github.com/aa0968111723-prog/FrameLab"
+
+Repository Full Name：
+"aa0968111723-prog/FrameLab"
+
+Project Name：
+"FrameLab"
+
+FrameLab 是一個完全獨立的：
+
+Visual-first AI Frame-by-Frame Animation Workstation
+
+專門處理：
+
+逐幀動畫分析、Keyframe、Breakdown、Inbetween、Onion Skin、Motion、Pose、Tracking、一致性、局部修復、AI 對話與 MCP 外部 AI 控制。
+
+---
+
+Repository 邊界
+
+所有本次工作都必須發生在：
+
+aa0968111723-prog/FrameLab
+
+禁止修改：
+
+aa0968111723-prog/ai_os
+
+以及其他任何 Repository，除非未來有新的明確指示。
+
+FrameLab 必須保持：
+
+- 獨立 Repository
+- 獨立 Frontend
+- 獨立 Backend
+- 獨立 Database Schema
+- 獨立 AI Provider Layer
+- 獨立 GPU Worker
+- 獨立 MCP Server
+- 獨立 REST API
+- 獨立 SDK
+- 獨立測試
+- 獨立部署
+
+未來 AIOS 或其他系統只能透過：
+
+MCP
+REST API
+SDK
+
+與 FrameLab 整合。
+
+禁止把 FrameLab 重新塞進 AIOS Monorepo。
+
+---
+
+開始工作前必須確認 Repository
+
+先執行：
+
+git remote -v
+git status
+git branch
+git log --oneline -30
+
+確認：
+
+origin = https://github.com/aa0968111723-prog/FrameLab
+
+如果目前不在：
+
+aa0968111723-prog/FrameLab
+
+立即停止修改程式碼。
+
+不要誤改其他專案。
+
+---
+
+Clone
+
+如果本機還沒有 Repository：
+
+git clone https://github.com/aa0968111723-prog/FrameLab.git
+cd FrameLab
+
+---
+
+Branch
+
+不要直接在 "main" 大規模修改。
+
+如果目前在 main，建立：
+
+git switch -c feat/framelab-production-hardening
+
+如果已經有本輪對應的 Feature Branch，沿用，不要重複建立。
+
+---
+
+本輪任務
+
+接下來繼續執行完整：
+
+FrameLab 全面缺陷清查 + 補齊 + 整合 + 穩定化
+
+也就是：
+
+Repository Audit
+↓
+逐幀核心流程 Audit
+↓
+Visual Workspace Audit
+↓
+Timeline / Canvas Audit
+↓
+Frame Graph Audit
+↓
+Context / Conversation Audit
+↓
+MCP Audit
+↓
+Motion / Pose / Tracking Audit
+↓
+Consistency Audit
+↓
+Keyframe / Inbetween Audit
+↓
+Region Repair Audit
+↓
+Revision / Restore Audit
+↓
+Database / Storage Audit
+↓
+Security Audit
+↓
+Performance Audit
+↓
+E2E Audit
+↓
+真正補齊缺陷
+
+請把後續所有原本的「FrameLab 全面缺陷清查、補齊與穩定化」規格視為本任務的完整執行要求。
+
+---
+
+最重要限制
+
+不要只寫 Audit 報告。
+
+Audit 完之後必須：
+
+實際修。
+
+不要只建立：
+
+TODO
+FIXME
+placeholder
+mock
+future implementation
+
+來表示完成。
+
+每發現一個問題：
+
+Identify
+↓
+Reproduce
+↓
+Find Root Cause
+↓
+Fix
+↓
+Test
+↓
+Regression Test
+↓
+Document
+
+---
+
+最終確認
+
+本輪所有結果都必須屬於：
+
+https://github.com/aa0968111723-prog/FrameLab
+
+最終回報第一行必須明確寫：
+
+Repository audited:
+https://github.com/aa0968111723-prog/FrameLab
+
+並回報：
+
+- Branch
+- Commit
+- Tests
+- Build
+- Docker
+- MCP
+- E2E
+- Remaining P0
+- Remaining P1
+- Known Issues
+
+如果 Repository URL 不一致：
+
+不要繼續執行。
+
+現在開始。
