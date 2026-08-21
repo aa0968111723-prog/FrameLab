@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile, link, copyFile } from "node:fs/promises";
 import path from "node:path";
 import { fail } from "../domain/errors.ts";
 import {
@@ -8,6 +8,7 @@ import {
   parseFfmpegVideoMeta,
   type VideoProbeMeta,
 } from "../domain/fps.ts";
+import { exposureTicks } from "../domain/exposure.ts";
 import { assertInsideData, dataRoot, safeFilename } from "../storage/local.ts";
 
 const ALLOWED_EXT = new Set([".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi"]);
@@ -161,18 +162,32 @@ export async function removeDir(dir: string): Promise<void> {
 export async function concatJpegSequence(input: {
   projectId: string;
   fps: number;
-  frames: { frameNumber: number; imageData: string }[];
-}): Promise<{ outputPath: string; frameCount: number; provider: string }> {
+  frames: { frameNumber: number; imageData: string; exposureCount?: number }[];
+}): Promise<{ outputPath: string; frameCount: number; drawingCount: number; provider: string }> {
   const { ensureProjectLayout, projectRoot, assertInsideData } = await import(
     "../storage/local"
   );
   await ensureProjectLayout(input.projectId);
   const seqDir = assertInsideData(path.join(projectRoot(input.projectId), "renders", "seq"));
+  await rm(seqDir, { recursive: true, force: true });
   await mkdir(seqDir, { recursive: true });
   const sorted = [...input.frames].sort((a, b) => a.frameNumber - b.frameNumber);
-  for (let i = 0; i < sorted.length; i += 1) {
-    const file = path.join(seqDir, `frame_${String(i + 1).padStart(6, "0")}.jpg`);
-    await writeFile(assertInsideData(file), Buffer.from(sorted[i].imageData, "base64"));
+  let tick = 0;
+  for (const drawing of sorted) {
+    const ticks = exposureTicks(drawing.exposureCount);
+    const buf = Buffer.from(drawing.imageData, "base64");
+    const first = path.join(seqDir, `frame_${String(tick + 1).padStart(6, "0")}.jpg`);
+    await writeFile(assertInsideData(first), buf);
+    tick += 1;
+    for (let i = 1; i < ticks; i += 1) {
+      const dest = path.join(seqDir, `frame_${String(tick + 1).padStart(6, "0")}.jpg`);
+      try {
+        await link(first, assertInsideData(dest));
+      } catch {
+        await copyFile(first, assertInsideData(dest));
+      }
+      tick += 1;
+    }
   }
   const out = assertInsideData(
     path.join(projectRoot(input.projectId), "renders", "preview.mp4"),
@@ -217,7 +232,7 @@ export async function concatJpegSequence(input: {
       );
     }
   }
-  return { outputPath: out, frameCount: sorted.length, provider: "ffmpeg" };
+  return { outputPath: out, frameCount: tick, drawingCount: sorted.length, provider: "ffmpeg" };
 }
 
 export { MAX_BYTES, ALLOWED_EXT, FRAME_FILE_PATTERN, dataRoot, safeFilename };

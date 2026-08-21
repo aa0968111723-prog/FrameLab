@@ -1384,7 +1384,11 @@ async function renderPreview(ctx: CommandContext, args: Record<string, unknown>)
       return concatJpegSequence({
         projectId: t.project_id,
         fps: t.fps,
-        frames: slice.map((f) => ({ frameNumber: f.frame_number, imageData: f.image_data })),
+        frames: slice.map((f) => ({
+          frameNumber: f.frame_number,
+          imageData: f.image_data,
+          exposureCount: f.exposure_count ?? 1,
+        })),
       });
     },
     summarize: (r) => ({ outputPath: r.outputPath, frameCount: r.frameCount }),

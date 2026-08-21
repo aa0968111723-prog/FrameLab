@@ -58,11 +58,14 @@ export function resolvePlaybackFps(
   return clampFps(n, extractFps);
 }
 
+/** One playback tick at this fps. Exposure multiplies this; never duplicate drawings. */
+export function tickDurationMs(playbackFps: number): number {
+  return Math.max(1, Math.round(1000 / clampFps(playbackFps)));
+}
+
 /** Hold length of one drawing on the playback clock. Independent of extract fps. */
 export function frameDurationMs(playbackFps: number, exposureCount = 1): number {
-  const fps = clampFps(playbackFps);
-  const exp = clampExposure(exposureCount);
-  return Math.max(1, Math.round((1000 / fps) * exp));
+  return tickDurationMs(playbackFps) * clampExposure(exposureCount);
 }
 
 /** Native-extract fallback when the container did not advertise a rate. */

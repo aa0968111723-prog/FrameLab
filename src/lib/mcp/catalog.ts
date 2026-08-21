@@ -163,7 +163,7 @@ export const MCP_TOOLS = [
   tool("export_frame_sequence", "Write PNG sequence frame_0001.png … into renders/", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),
   tool("generate_breakdown_frame", "GENERATE: linear-blend midpoint marked GENERATED_BREAKDOWN. Requires confirmed=true. Never pretends to be a human drawing.", { timelineId: str, startFrame: num, endFrame: num, frameNumber: num, confirmed: bool }, ["timelineId", "startFrame", "endFrame"]),
   tool("get_generated_frame", "Read a generated frame slot from a candidate or timeline frame id.", { id: str, candidateId: str, frameNumber: num, frameId: str }),
-  tool("set_frame_exposure", "Set exposure_count (ones/twos/threes/fours). Duration follows playback fps × exposure, not extract fps.", { frameId: str, exposure: num, exposure_count: num }, ["frameId"]),
+  tool("set_frame_exposure", "Set exposure ticks (1=一拍一, 2=一拍二, 3=一拍三). One drawing holds N playback frames. Does not duplicate the image.", { frameId: str, exposure: num, exposure_count: num }, ["frameId"]),
   tool("set_playback_fps", "Set project playback fps (1–60). Independent of drawing exposure_count. Rewrites frame duration_ms.", { projectId: str, fps: num }, ["projectId", "fps"]),
   tool("get_visual_context", "Current visual annotations / overlays for a frame. Returns VisualAnnotation, never DOM commands.", { timelineId: str, frameNumber: num, sessionId: str }),
   tool("annotate_frame", "Create a VisualAnnotation (POINT/REGION/PATH/LABEL/RANGE) with 0–1 coordinates.", { frameNumber: num, type: str, coordinates: { type: "array", items: num }, label: str, severity: str, x: num, y: num, w: num, h: num, sessionId: str, projectId: str }),

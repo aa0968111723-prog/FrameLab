@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { padFrame, type FrameType } from "@/lib/domain/types";
 import { frameDurationMs } from "@/lib/domain/fps";
+import { EXPOSURE_PRESETS, exposureLabel } from "@/lib/domain/exposure";
 import { jobStateZh, jobTypeZh } from "@/lib/domain/job-progress";
 import type { createTimelineState } from "@/lib/domain/timeline-engine";
 import { VisualHistory, type HistoryRow } from "./visual-history";
@@ -188,21 +189,22 @@ export function AdvancedInspector({
         播放時長
         <p className="mt-1 text-sm tabular-nums text-fg">{holdMs} ms</p>
         <p className="mt-0.5 text-[10px] text-faint">
-          {playbackFps} fps × {exposure === 1 ? "一格一拍" : exposure === 2 ? "兩格一拍" : exposure === 3 ? "三格一拍" : "四格一拍"}
+          {playbackFps} fps × {exposureLabel(exposure)}
         </p>
       </label>
       {onExposure && (
         <label className="block text-xs text-muted">
-          曝光（繪製停留，與播放 FPS 分開）
+          曝光（一張畫佔幾格播放時間，不是複製圖片）
           <select
             className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm"
             value={String(exposure)}
             onChange={(e) => onExposure(Number(e.target.value))}
           >
-            <option value="1">一格一拍</option>
-            <option value="2">兩格一拍</option>
-            <option value="3">三格一拍</option>
-            <option value="4">四格一拍</option>
+            {[...EXPOSURE_PRESETS, ...(exposure > 3 ? [exposure] : [])].map((n) => (
+              <option key={n} value={n}>
+                {exposureLabel(n)}
+              </option>
+            ))}
           </select>
         </label>
       )}

@@ -79,19 +79,17 @@ describe("fps domain", () => {
 
   it("separates playback fps from drawing exposure", () => {
     assert.equal(frameDurationMs(24, 1), 42);
-    assert.equal(frameDurationMs(24, 2), 83);
+    assert.equal(frameDurationMs(24, 2), 84);
     assert.equal(frameDurationMs(12, 1), 83);
-    assert.equal(frameDurationMs(24, 2), frameDurationMs(12, 1));
     assert.equal(frameDurationMs(30, 1), 33);
-    assert.equal(frameDurationMs(30, 3), 100);
+    assert.equal(frameDurationMs(30, 3), 99);
     assert.equal(clampExposure(0), 1);
     assert.equal(clampExposure(9), 4);
     const onesAt24 = frameDurationMs(24, 1);
     const twosAt24 = frameDurationMs(24, 2);
-    const onesAt12 = frameDurationMs(12, 1);
     assert.notEqual(onesAt24, twosAt24);
-    assert.equal(twosAt24, onesAt12);
-    assert.equal(frameDurationMs(30, 2), 67);
+    assert.equal(twosAt24, onesAt24 * 2);
+    assert.equal(frameDurationMs(30, 2), 66);
   });
 
   it("infers fps from native frame count × duration", () => {

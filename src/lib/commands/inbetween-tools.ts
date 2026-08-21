@@ -5,6 +5,7 @@ import { constraintWarnings, type AnimationConstraint } from "@/lib/domain/anima
 import { parseAnimationIntent } from "@/lib/domain/animation-intent";
 import { fail, FrameLabError } from "@/lib/domain/errors";
 import { frameDurationMs } from "@/lib/domain/fps";
+import { exposureTicks } from "@/lib/domain/exposure";
 import { decodeJpegBase64, encodeJpegBase64, encodePng, hashBytes, makeThumbnail } from "@/lib/domain/image-codec";
 import { generatedFrameNumbers, validateKeyframePair } from "@/lib/domain/keyframe-pair";
 import { buildMotionPlan, hashMotionPlan, type MotionPlan } from "@/lib/domain/motion-plan";
@@ -1066,11 +1067,16 @@ export async function exportFrameSequenceCmd(ctx: CommandContext, args: Record<s
     (f) => f.frame_number >= start && f.frame_number <= end,
   );
   const files: string[] = [];
+  let tick = 0;
   for (const f of frames) {
-    const name = `frame_${String(f.frame_number).padStart(4, "0")}.png`;
+    const ticks = exposureTicks(f.exposure_count);
     const png = encodePng(decodeJpegBase64(f.image_data));
-    await putBytes(t.project_id, "renders", name, png).catch(() => undefined);
-    files.push(name);
+    for (let i = 0; i < ticks; i += 1) {
+      const name = `frame_${String(tick + 1).padStart(4, "0")}.png`;
+      await putBytes(t.project_id, "renders", name, png).catch(() => undefined);
+      files.push(name);
+      tick += 1;
+    }
   }
   return {
     files,
@@ -1078,7 +1084,9 @@ export async function exportFrameSequenceCmd(ctx: CommandContext, args: Record<s
     end,
     fps: t.fps,
     format: "png",
-    note: "PNG sequence. Playback fps is timeline metadata, not frame count.",
+    drawingCount: frames.length,
+    frameCount: tick,
+    note: "PNG sequence expanded by exposure ticks. One drawing, N playback frames. Not duplicate artwork.",
   };
 }
 

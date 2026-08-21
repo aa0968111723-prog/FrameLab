@@ -57,6 +57,7 @@ import {
 } from "@/lib/domain/timeline-engine";
 import { padFrame } from "@/lib/domain/types";
 import { frameDurationMs, PRESET_FPS, clampFps } from "@/lib/domain/fps";
+import { exposureTicks, tickDurationMs } from "@/lib/domain/exposure";
 import { jobStageLabel, parseJobStage } from "@/lib/domain/job-progress";
 import { annotationsFromProblems, categoryLabel, type VisualAnnotation } from "@/lib/domain/visual-annotation";
 import { propagateMask } from "@/lib/domain/region-repair";
@@ -2373,6 +2374,7 @@ async function exportWebm(
     a.click();
   };
   rec.start();
+  const tickMs = tickDurationMs(fps);
   for (const f of frames) {
     const src = imageMap.get(f.id);
     if (!src) continue;
@@ -2382,14 +2384,17 @@ async function exportWebm(
       img.onload = res;
       img.onerror = res;
     });
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    await new Promise((r) => setTimeout(r, frameDurationMs(fps, f.exposureCount ?? 1)));
+    const ticks = exposureTicks(f.exposureCount);
+    for (let i = 0; i < ticks; i += 1) {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      await new Promise((r) => setTimeout(r, tickMs));
+    }
   }
   rec.stop();
 }
 
 async function exportPngSequence(
-  frames: { id: string; frameNumber: number; width: number; height: number }[],
+  frames: { id: string; frameNumber: number; width: number; height: number; exposureCount?: number }[],
   imageMap: Map<string, string>,
   candidate?: { frameNumber: number; thumbnailData?: string; imageData?: string }[],
 ) {
@@ -2401,7 +2406,7 @@ async function exportPngSequence(
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const cand = new Map((candidate ?? []).map((f) => [f.frameNumber, f.imageData || f.thumbnailData || ""]));
-  let n = 0;
+  let tick = 0;
   for (const f of frames) {
     const src = cand.get(f.frameNumber) || imageMap.get(f.id);
     if (!src) continue;
@@ -2417,15 +2422,18 @@ async function exportPngSequence(
     ctx.drawImage(img, 0, 0);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) continue;
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `frame_${String(f.frameNumber).padStart(4, "0")}.png`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    n += 1;
-    await new Promise((r) => setTimeout(r, 80));
+    const ticks = exposureTicks(f.exposureCount);
+    for (let i = 0; i < ticks; i += 1) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `frame_${String(tick + 1).padStart(4, "0")}.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      tick += 1;
+      await new Promise((r) => setTimeout(r, 40));
+    }
   }
-  toast.message(`已匯出 ${n} 張 PNG`);
+  toast.message(`已匯出 ${tick} 張 PNG（${frames.length} 張畫稿，依拍數展開）`);
 }
 
 function previewFromRevision(row: { previous_json?: string; new_json?: string }): string | null {

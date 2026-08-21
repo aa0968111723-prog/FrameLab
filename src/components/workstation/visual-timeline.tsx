@@ -6,13 +6,13 @@ import { padFrame } from "@/lib/domain/types";
 import type { TimelineEngineState } from "@/lib/domain/types";
 import {
   cellWidthForZoom,
-  frameAtX,
   frameTypeMark,
   mergeProblemSpans,
   timelineWindow,
   keyBreakdownFlow,
   type ProblemSpan,
 } from "@/lib/visual/timeline-virtual";
+import { drawingAtTick, drawingAtX, exposureLabel, layoutExposureStrip } from "@/lib/domain/exposure";
 import { cn } from "@/lib/utils";
 
 import { jpegUrl } from "@/lib/visual/jpeg-url";
@@ -23,6 +23,7 @@ export type TimelineFrame = {
   frameType: string;
   thumbnailData: string;
   isLocked?: boolean;
+  exposureCount?: number;
 };
 
 export type MaskMark = { frame: number; status: "ok" | "warn" | "lost" };
@@ -74,11 +75,13 @@ export function VisualTimeline({
   const [hover, setHover] = useState<{ n: number; x: number; src: string } | null>(null);
   const dragging = useRef(false);
   const cell = cellWidthForZoom(timelineZoom);
+  const layout = useMemo(() => layoutExposureStrip(frames, cell), [frames, cell]);
+  const byNum = useMemo(() => new Map(layout.cells.map((c) => [c.frameNumber, c])), [layout]);
   const win = timelineWindow({
     scrollLeft,
     containerWidth: width,
     cellWidth: cell,
-    total: frames.length,
+    total: Math.max(1, layout.totalTicks),
   });
 
   useEffect(() => {
@@ -93,23 +96,35 @@ export function VisualTimeline({
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const x = engine.currentFrame * cell - width / 2 + cell / 2;
+    const cur = byNum.get(engine.currentFrame);
+    const x = (cur?.left ?? engine.currentFrame * cell) + (cur?.width ?? cell) / 2 - width / 2;
     if (!dragging.current && Math.abs(el.scrollLeft - x) > cell * 4) el.scrollTo({ left: Math.max(0, x) });
-  }, [engine.currentFrame, cell, width]);
+  }, [engine.currentFrame, cell, width, byNum]);
 
   const spans = useMemo(
     () => mergeProblemSpans(problemRanges as ProblemSpan[]),
     [problemRanges],
   );
-  const slice = frames.slice(win.start, win.end);
+  const slice = useMemo(() => {
+    const pad = cell * 8;
+    return layout.cells.filter((c) => c.left + c.width >= scrollLeft - pad && c.left <= scrollLeft + width + pad);
+  }, [layout.cells, scrollLeft, width, cell]);
   const flow = useMemo(() => keyBreakdownFlow(frames), [frames]);
   const maskBy = useMemo(() => new Map((maskTrack ?? []).map((m) => [m.frame, m.status])), [maskTrack]);
+
+  function pxRange(start: number, end: number) {
+    const a = byNum.get(Math.min(start, end));
+    const b = byNum.get(Math.max(start, end));
+    const left = a?.left ?? start * cell;
+    const right = b ? b.left + b.width : left + cell;
+    return { left, width: Math.max(cell, right - left) };
+  }
 
   function frameFromClientX(clientX: number) {
     const el = scroller.current;
     if (!el) return 0;
     const x = el.scrollLeft + (clientX - el.getBoundingClientRect().left);
-    return frameAtX(x, cell, frames.length);
+    return drawingAtX(frames, x, cell);
   }
 
   return (
@@ -187,21 +202,23 @@ export function VisualTimeline({
           dragging.current = false;
         }}
       >
-        <div className="relative" style={{ width: win.totalWidth, height: 78 }}>
+        <div className="relative" style={{ width: layout.totalWidth || win.totalWidth, height: 78 }}>
           {flow.map((f) =>
             f.nextKey == null ? null : (
               <div
                 key={`flow-${f.key}-${f.nextKey}`}
                 className="pointer-events-none absolute top-1 h-0.5 bg-key/40"
                 style={{
-                  left: f.key * cell + cell / 2,
-                  width: Math.max(8, (f.nextKey - f.key) * cell),
+                  left: (byNum.get(f.key)?.left ?? f.key * cell) + (byNum.get(f.key)?.width ?? cell) / 2,
+                  width: Math.max(8, (byNum.get(f.nextKey)?.left ?? f.nextKey * cell) - (byNum.get(f.key)?.left ?? f.key * cell)),
                 }}
                 title={`★ F${f.key}${f.breakdown != null ? ` ◆ F${f.breakdown}` : ""} ★ F${f.nextKey}`}
               />
             ),
           )}
-          {spans.map((s) => (
+          {spans.map((s) => {
+            const r = pxRange(s.start, s.end);
+            return (
             <button
               key={`span-${s.start}-${s.end}`}
               type="button"
@@ -209,31 +226,28 @@ export function VisualTimeline({
               onClick={() => onSeek(s.start, false)}
               className="absolute top-0 h-full rounded-[var(--radius-xs)] bg-warn/15 ring-1 ring-warn/40"
               style={{
-                left: s.start * cell,
-                width: Math.max(cell, (s.end - s.start + 1) * cell),
+                left: r.left,
+                width: r.width,
               }}
             />
-          ))}
+            );
+          })}
           {repairRange && (
             <div
               className="pointer-events-none absolute top-0 h-full border border-repair/60 bg-repair/10"
-              style={{
-                left: repairRange[0] * cell,
-                width: Math.max(cell, (repairRange[1] - repairRange[0] + 1) * cell),
-              }}
+              style={pxRange(repairRange[0], repairRange[1])}
             />
           )}
           {highlightRange && (
             <div
               className="pointer-events-none absolute bottom-0 h-1 bg-accent"
-              style={{
-                left: highlightRange[0] * cell,
-                width: Math.max(cell, (highlightRange[1] - highlightRange[0] + 1) * cell),
-              }}
+              style={pxRange(highlightRange[0], highlightRange[1])}
             />
           )}
-          <div className="absolute top-0" style={{ left: win.offset, display: "flex" }}>
-            {slice.map((f) => {
+          <div className="absolute top-0 left-0 h-full">
+            {slice.map((cellLayout) => {
+              const f = frames[cellLayout.drawingIndex];
+              if (!f) return null;
               const active = f.frameNumber === engine.currentFrame;
               const selected = engine.selectedFrames.includes(f.frameNumber);
               const sev = consMap.get(f.frameNumber)?.severity;
@@ -241,6 +255,7 @@ export function VisualTimeline({
               const talked = conversationFrames?.includes(f.frameNumber);
               const dim = dimFrames?.has(f.frameNumber);
               const mask = maskBy.get(f.frameNumber);
+              const ticks = cellLayout.ticks;
               return (
                 <button
                   key={f.id}
@@ -253,12 +268,12 @@ export function VisualTimeline({
                   }}
                   onPointerLeave={() => setHover(null)}
                   className={cn(
-                    "relative shrink-0 overflow-hidden border",
+                    "absolute top-0 overflow-hidden border",
                     active ? "border-accent" : selected ? "border-key/60" : "border-border",
                     dim && "opacity-35",
                   )}
-                  style={{ width: cell - 2, height: 70, marginRight: 2 }}
-                  title={`${padFrame(f.frameNumber)} ${mark.title}`}
+                  style={{ left: cellLayout.left, width: Math.max(8, cellLayout.width - 2), height: 70 }}
+                  title={`${padFrame(f.frameNumber)} ${mark.title} · ${exposureLabel(ticks)}`}
                 >
                   {f.thumbnailData ? (
                     <img
@@ -275,6 +290,11 @@ export function VisualTimeline({
                   <span className="absolute left-0.5 top-0.5 font-mono text-[9px] tabular-nums text-fg/90">
                     {f.frameNumber}
                   </span>
+                  {ticks > 1 && (
+                    <span className="absolute left-0.5 bottom-0.5 text-[9px] tabular-nums text-fg/80" title={exposureLabel(ticks)}>
+                      ×{ticks}
+                    </span>
+                  )}
                   <span
                     className={cn(
                       "absolute bottom-0.5 right-0.5 text-[9px] font-medium leading-none",
@@ -322,7 +342,10 @@ export function VisualTimeline({
           </div>
           <div
             className="pointer-events-none absolute top-0 z-10 w-px bg-fg"
-            style={{ left: engine.currentFrame * cell + cell / 2, height: 78 }}
+            style={{
+              left: (byNum.get(engine.currentFrame)?.left ?? engine.currentFrame * cell) + (byNum.get(engine.currentFrame)?.width ?? cell) / 2,
+              height: 78,
+            }}
           />
         </div>
       </div>
@@ -359,7 +382,8 @@ function MiniOverview({
   onJump: (n: number) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const n = Math.max(1, frames.length);
+  const layout = useMemo(() => layoutExposureStrip(frames, 8), [frames]);
+  const n = Math.max(1, layout.totalTicks);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -370,16 +394,31 @@ function MiniOverview({
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = "#16161a";
     ctx.fillRect(0, 0, w, h);
-    const xOf = (frame: number) => (frame / n) * w;
+    const xOf = (tick: number) => (tick / n) * w;
+    const cellOf = (frame: number) => layout.cells.find((x) => x.frameNumber === frame);
     ctx.fillStyle = "rgba(142,160,181,0.35)";
-    for (const g of generated) ctx.fillRect(xOf(g), 10, Math.max(1, w / n), 6);
+    for (const g of generated) {
+      const cell = cellOf(g);
+      if (cell) ctx.fillRect(xOf(cell.startTick), 10, Math.max(1, (cell.ticks / n) * w), 6);
+    }
     ctx.fillStyle = "rgba(196,165,116,0.7)";
-    for (const s of spans) ctx.fillRect(xOf(s.start), 4, Math.max(2, xOf(s.end) - xOf(s.start) + 2), h - 8);
+    for (const s of spans) {
+      const a = cellOf(s.start);
+      const b = cellOf(s.end);
+      if (!a) continue;
+      const start = a.startTick;
+      const end = (b ?? a).startTick + (b ?? a).ticks;
+      ctx.fillRect(xOf(start), 4, Math.max(2, xOf(end) - xOf(start)), h - 8);
+    }
     ctx.fillStyle = "#d7d2c8";
-    for (const k of keys) ctx.fillRect(xOf(k), 2, 2, h - 4);
+    for (const k of keys) {
+      const cell = cellOf(k);
+      if (cell) ctx.fillRect(xOf(cell.startTick), 2, 2, h - 4);
+    }
     ctx.fillStyle = "#f4f4f5";
-    ctx.fillRect(xOf(current), 0, 2, h);
-  }, [frames.length, current, spans, keys, generated, n]);
+    const cur = cellOf(current);
+    ctx.fillRect(xOf(cur?.startTick ?? current), 0, 2, h);
+  }, [layout, current, spans, keys, generated, n]);
 
   return (
     <button
@@ -388,7 +427,8 @@ function MiniOverview({
       onClick={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
         const t = (e.clientX - r.left) / r.width;
-        onJump(Math.round(t * (n - 1)));
+        const tick = Math.round(t * (n - 1));
+        onJump(drawingAtTick(frames, tick)?.frameNumber ?? 0);
       }}
       aria-label="迷你時間軸"
     >
