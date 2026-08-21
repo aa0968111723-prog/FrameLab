@@ -92,10 +92,12 @@ describe("repo does not keep pixels in SQL", () => {
     assert.match(repo, /preview_asset/);
     assert.match(repo, /thumbnail_asset/);
     assert.match(repo, /'' as image_data/);
+    assert.match(repo, /spillFrameToStorage/);
     assert.match(repo, /hydrateFrame/);
     assert.doesNotMatch(api, /listFramesFull\(timeline\.id\)/);
     assert.match(api, /tier=preview/);
     assert.match(api, /tier=thumbnail/);
+    assert.doesNotMatch(api, /f\.thumbnail_data/);
     assert.match(exec, /fullAsset/);
     assert.doesNotMatch(exec, /imageData: frame\.image_data/);
   });

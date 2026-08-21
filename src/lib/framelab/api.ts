@@ -89,9 +89,7 @@ export const getProjectBundle = createServerFn({ method: "GET" })
         timestampMs: f.timestamp_ms,
         durationMs: f.duration_ms,
         frameType: f.frame_type,
-        thumbnailData: f.thumbnail_asset
-          ? `/api/frame-assets?frameId=${encodeURIComponent(f.id)}&tier=thumbnail&v=${encodeURIComponent(f.content_hash || "")}`
-          : f.thumbnail_data,
+        thumbnailData: `/api/frame-assets?frameId=${encodeURIComponent(f.id)}&tier=thumbnail&v=${encodeURIComponent(f.content_hash || "")}`,
         width: f.width,
         height: f.height,
         isLocked: f.is_locked,

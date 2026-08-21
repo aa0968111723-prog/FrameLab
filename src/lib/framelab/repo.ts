@@ -163,7 +163,42 @@ async function persistInlineJpeg(
   });
 }
 
+async function spillFrameToStorage(row: FrameRow): Promise<FrameRow> {
+  if (row.full_asset) return row;
+  if (!isInlineJpeg(row.image_data)) return row;
+  const assets = await persistInlineJpeg(row.timeline_id, row.frame_number, row.image_data);
+  if (!assets) return row;
+  const sql = await getSql();
+  const original = row.original_asset && row.original_asset !== "original" ? row.original_asset : assets.full_asset;
+  const active = row.active_asset && row.active_asset !== "active" ? row.active_asset : assets.full_asset;
+  await sql`
+    update frames set
+      image_data = ${""},
+      thumbnail_data = ${""},
+      full_asset = ${assets.full_asset},
+      preview_asset = ${assets.preview_asset},
+      thumbnail_asset = ${assets.thumbnail_asset},
+      content_hash = ${assets.content_hash},
+      width = ${assets.width},
+      height = ${assets.height},
+      original_asset = ${original},
+      active_asset = ${active},
+      updated_at = now()
+    where id = ${row.id}
+  `;
+  row.full_asset = assets.full_asset;
+  row.preview_asset = assets.preview_asset;
+  row.thumbnail_asset = assets.thumbnail_asset;
+  row.content_hash = assets.content_hash;
+  row.width = assets.width;
+  row.height = assets.height;
+  row.original_asset = original;
+  row.active_asset = active;
+  return row;
+}
+
 async function hydrateFrame(row: FrameRow): Promise<FrameRow> {
+  row = await spillFrameToStorage(row);
   let projectId = row.project_id ?? "";
   if (!projectId && row.timeline_id) {
     const t = await getTimeline(row.timeline_id);
@@ -213,7 +248,8 @@ export async function getFrameMeta(id: string) {
     where f.id = ${id}
     limit 1
   `;
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  return spillFrameToStorage(rows[0]);
 }
 
 export async function listFramesFull(timelineId: string) {
