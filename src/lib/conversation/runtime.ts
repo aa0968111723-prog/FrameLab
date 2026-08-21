@@ -29,6 +29,7 @@ import {
   type SerializedContext,
 } from "@/lib/domain/context-engine";
 import { parseAnimationCommand } from "@/lib/domain/animation-command";
+import { parseVisualAnswer } from "@/lib/domain/visual-answer";
 import { isInbetweenRequest, isCurveAdjustRequest, parseAnimationIntent } from "@/lib/domain/animation-intent";
 import * as repo from "@/lib/framelab/repo";
 import { nid } from "@/lib/domain/ids";
@@ -435,6 +436,7 @@ export async function runAskTurn(input: {
   inbetween: InbetweenAskPayload | null;
   curveAdjust: { curve: string; start: number | null; end: number | null } | null;
   animationCommand: ReturnType<typeof parseAnimationCommand>;
+  visualAnswer: ReturnType<typeof parseVisualAnswer>;
 }> {
   const mode: ConversationMode = input.mode === "ASSIST" ? "ASSIST" : "ASK";
   const session = await repo.getWorkspaceSession(input.ctx.userId, input.sessionId);
@@ -770,6 +772,15 @@ export async function runAskTurn(input: {
         }
       : null,
     animationCommand,
+    visualAnswer:
+      parseVisualAnswer(assistantText, {
+        currentFrame: snapshot.current_frame ?? 0,
+        frameCount: input.frameCount,
+      }) ??
+      parseVisualAnswer(input.userMessage, {
+        currentFrame: snapshot.current_frame ?? 0,
+        frameCount: input.frameCount,
+      }),
   };
 }
 

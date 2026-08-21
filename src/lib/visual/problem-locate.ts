@@ -34,14 +34,23 @@ function boxAround(nx: number, ny: number, size = 0.18): NormBox {
 
 export function locateProblemBox(opts: {
   category?: string | null;
+  preferredJoint?: string | null;
   frameNumber: number;
   frameWidth: number;
   frameHeight: number;
   joints?: PoseJoint[];
   tracking?: TrackSample[];
 }): NormBox | null {
-  const names = CATEGORY_JOINTS[(opts.category ?? "").toUpperCase()] ?? [];
   const joints = opts.joints ?? [];
+  const preferred = opts.preferredJoint;
+  if (preferred) {
+    const hit = joints.find((k) => k.name === preferred || k.name.includes(preferred));
+    if (hit && hit.confidence > 0.15) {
+      const n = toNormalized(hit.x, hit.y, opts.frameWidth, opts.frameHeight);
+      return boxAround(n.x, n.y, 0.2);
+    }
+  }
+  const names = CATEGORY_JOINTS[(opts.category ?? "").toUpperCase()] ?? [];
   for (const name of names) {
     const j = joints.find((k) => k.name === name || k.name.includes(name));
     if (j && j.confidence > 0.15) {

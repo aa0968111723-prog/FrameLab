@@ -62,6 +62,12 @@ import { jobStageLabel, parseJobStage } from "@/lib/domain/job-progress";
 import { annotationsFromProblems, categoryLabel, type VisualAnnotation } from "@/lib/domain/visual-annotation";
 import { parseAnimationIntent, intentToConstraintFlags, isInbetweenRequest, isCurveAdjustRequest } from "@/lib/domain/animation-intent";
 import { parseAnimationCommand, type AnimationCommand } from "@/lib/domain/animation-command";
+import {
+  parseVisualAnswer,
+  visualAnswerAnnotations,
+  visualAnswerFromProblem,
+  type VisualAnswer,
+} from "@/lib/domain/visual-answer";
 import type { InbetweenAskPayload } from "@/lib/domain/conversation";
 import { createEmptyContext, serializeContext, type SerializedContext } from "@/lib/domain/context-engine";
 import { curveCaption, curvePathD, spacingDots } from "@/lib/visual/motion-curve-visual";
@@ -864,11 +870,23 @@ function StudioInner({ projectId }: { projectId: string }) {
     }
   }
 
-  function viewProblem(peak: number, range: [number, number], category?: string) {
-    setEngine((s) => seek(s, peak));
-    setHighlightRange(range);
-    setOverlayStack({ primary: "problems", extras: ["onion"] });
+  function applyVisualAnswer(answer: VisualAnswer) {
+    const peak = answer.frame;
+    setEngine((s) => {
+      const sought = seek(s, peak);
+      const ranged = selectRange(sought, answer.range[0], answer.range[1]);
+      return setOnionSkin(ranged, {
+        enabled: true,
+        prev: Math.max(1, ranged.onionSkin.prev),
+        next: Math.max(1, ranged.onionSkin.next),
+      });
+    });
+    setHighlightRange(answer.range);
+    setTrailTarget(answer.trailTarget);
+    setSelectedJoint(answer.joint);
+    setOverlayStack({ primary: "track", extras: ["onion", "problems"] });
     setWorkspaceMode("ANALYZE");
+    setRightTab("problems");
     const parsePose = () => {
       const row = poses.find((p) => p.frame_number === peak);
       if (!row) return [];
@@ -879,7 +897,8 @@ function StudioInner({ projectId }: { projectId: string }) {
       }
     };
     const box = locateProblemBox({
-      category,
+      category: answer.category,
+      preferredJoint: answer.joint,
       frameNumber: peak,
       frameWidth: current?.width ?? 320,
       frameHeight: current?.height ?? 180,
@@ -891,7 +910,17 @@ function StudioInner({ projectId }: { projectId: string }) {
       setEngine((s) => setZoom(s, suggestedFocusZoom(box)));
       setFocusTick((n) => n + 1);
     }
+    const marks = visualAnswerAnnotations(answer, box);
+    setAnnotations((a) => {
+      const ids = new Set(marks.map((m) => m.id));
+      return [...a.filter((x) => !ids.has(x.id)), ...marks];
+    });
     setProblemMenu(true);
+    setAiState("problem");
+  }
+
+  function viewProblem(peak: number, range: [number, number], category?: string) {
+    applyVisualAnswer(visualAnswerFromProblem(peak, range, category, engine.frameCount));
   }
 
   useEffect(() => {
@@ -1125,6 +1154,11 @@ function StudioInner({ projectId }: { projectId: string }) {
       setPendingCommand(parsedCommand);
       setWorkspaceMode(parsedCommand.kind === "add_inbetweens" ? "GENERATE" : "ANIMATE");
     }
+    const visualFromUser = parseVisualAnswer(text, {
+      currentFrame: engine.currentFrame,
+      frameCount: engine.frameCount,
+    });
+    if (visualFromUser) applyVisualAnswer(visualFromUser);
     try {
       await syncWorkspaceSessionFn({ data: { sessionId, projectId, context: effectiveSnap } });
       const r = await sendAskFn({
@@ -1178,6 +1212,13 @@ function StudioInner({ projectId }: { projectId: string }) {
         setAiState("suggestion");
       }
       if (r.animationCommand) setPendingCommand(r.animationCommand);
+      const visualFromAi =
+        r.visualAnswer ??
+        parseVisualAnswer(r.text, {
+          currentFrame: engine.currentFrame,
+          frameCount: engine.frameCount,
+        });
+      if (visualFromAi) applyVisualAnswer(visualFromAi);
       const intent = parseAnimationIntent(text, {
         start: inb.start ?? engine.selectedRange?.[0] ?? engine.currentFrame,
         end: inb.end ?? engine.selectedRange?.[1] ?? engine.currentFrame,
@@ -1207,7 +1248,9 @@ function StudioInner({ projectId }: { projectId: string }) {
       const visual = assist ? annotationsFromProblems(assist.problem_ranges ?? assist.problems ?? []) : [];
       if (visual.length) setAnnotations((a) => [...a, ...visual]);
       const range = assist?.problem_ranges?.[0];
-      if (range) {
+      if (visualFromAi) {
+        /* already jumped / highlighted / trail */
+      } else if (range) {
         viewProblem(range.peak_frame, [range.start, range.end], range.category);
         setRepairViz(assist.repair_plan ? assist.repair_plan.repair_range : [range.start, range.end]);
         setAiState("problem");
