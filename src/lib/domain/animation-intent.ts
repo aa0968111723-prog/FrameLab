@@ -1,5 +1,6 @@
 /** Deterministic NL → InbetweenIntent. LLM may suggest; Context Engine validates numbers. */
 
+import { parseCountToken } from "./animation-command.ts";
 import type { MotionCurve } from "./types.ts";
 import type { AnimationConstraint, ConstraintKind } from "./animation-constraints.ts";
 import { contactFromPair } from "./animation-constraints.ts";
@@ -32,8 +33,9 @@ const CONSTRAINT_MAP: { re: RegExp; kind: ConstraintKind }[] = [
 
 export function parseAnimationIntent(text: string, ctx?: { start?: number; end?: number }): InbetweenIntent {
   const countMatch =
-    text.match(/補\s*(\d+)\s*幀/) ||
-    text.match(/补\s*(\d+)\s*帧/) ||
+    text.match(/多\s*補\s*([一二兩三四五六七八九十两\d]+)\s*[張张幀帧格]?/) ||
+    text.match(/補\s*([一二兩三四五六七八九十两\d]+)\s*[幀帧張张格]/) ||
+    text.match(/补\s*([一二兩三四五六七八九十两\d]+)\s*[帧帧張张格]/) ||
     text.match(/(\d+)\s*(?:inbetweens?|frames?)/i);
   const range = text.match(/F\s*(\d+)\s*(?:到|→|-|–|—)\s*F?\s*(\d+)/i);
   const constraints: AnimationConstraint[] = [];
@@ -61,7 +63,7 @@ export function parseAnimationIntent(text: string, ctx?: { start?: number; end?:
     }
   }
   return {
-    count: countMatch ? Number(countMatch[1]) : null,
+    count: countMatch ? parseCountToken(countMatch[1]) : null,
     curve,
     constraints,
     want_breakdown: /breakdown|中間姿勢|中间姿势|先拆/i.test(text),
@@ -71,7 +73,7 @@ export function parseAnimationIntent(text: string, ctx?: { start?: number; end?:
 }
 
 export function isInbetweenRequest(text: string): boolean {
-  return /補\s*\d+\s*幀|补\s*\d+\s*帧|inbetween|中間.*幀|中间.*帧|這兩張.*補|这两张.*补|generate\s+\d+\s+frame/i.test(text);
+  return /補\s*\d+\s*[幀帧張张格]|补\s*\d+\s*[帧帧張张格]|多補|多补|inbetween|中間.*幀|中间.*帧|中間.*張|這兩張.*補|这两张.*补|generate\s+\d+\s+frame/i.test(text);
 }
 
 /** Spec §98 — curve change without a new pair. Do not regenerate the whole span by default. */

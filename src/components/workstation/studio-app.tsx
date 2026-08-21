@@ -61,6 +61,7 @@ import { exposureTicks, tickDurationMs } from "@/lib/domain/exposure";
 import { jobStageLabel, parseJobStage } from "@/lib/domain/job-progress";
 import { annotationsFromProblems, categoryLabel, type VisualAnnotation } from "@/lib/domain/visual-annotation";
 import { parseAnimationIntent, intentToConstraintFlags, isInbetweenRequest, isCurveAdjustRequest } from "@/lib/domain/animation-intent";
+import { parseAnimationCommand, type AnimationCommand } from "@/lib/domain/animation-command";
 import type { InbetweenAskPayload } from "@/lib/domain/conversation";
 import { createEmptyContext, serializeContext, type SerializedContext } from "@/lib/domain/context-engine";
 import { curveCaption, curvePathD, spacingDots } from "@/lib/visual/motion-curve-visual";
@@ -95,6 +96,7 @@ import { ProblemNavigator } from "./problem-navigator";
 import { ConsistencyStrips } from "./consistency-strips";
 import { RegionActions } from "./region-actions";
 import { RegionRepairPanel } from "./region-repair-panel";
+import { AnimationCommandCard } from "./animation-command-card";
 import { ConstraintChips, MotionPlanVisual } from "./motion-plan-visual";
 import { AdvancedInspector } from "./inspector-advanced";
 import { ContextInspector } from "./context-inspector";
@@ -240,6 +242,7 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [regionLive, setRegionLive] = useState(false);
   const [regionKind, setRegionKind] = useState("custom");
   const [regionRepair, setRegionRepair] = useState<RegionRepairPipeline | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<AnimationCommand | null>(null);
   const [revisionPreview, setRevisionPreview] = useState<{ frameNumber: number; data: string } | null>(null);
   const [compareSources, setCompareSources] = useState<{
     original?: string | null;
@@ -542,6 +545,7 @@ function StudioInner({ projectId }: { projectId: string }) {
       if (input.tool === "accept_generated_frames" || input.tool === "reject_generated_frames") {
         setInb((s) => ({ ...s, busy: false, candidate: null, confirmation: null }));
         setRegionRepair(null);
+        setPendingCommand(null);
         toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
         refresh();
         return;
@@ -803,6 +807,7 @@ function StudioInner({ projectId }: { projectId: string }) {
       } else {
         toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
       }
+      setPendingCommand((c) => (c && c.tool === input.tool ? null : c));
       refresh();
     },
     onError: (e) => {
@@ -1110,6 +1115,16 @@ function StudioInner({ projectId }: { projectId: string }) {
     setAiOpen(true);
     setAiState("analyzing");
     setChat((c) => [...c, { id: `u-${Date.now()}`, role: "user", content: text, contextVersion }]);
+    const parsedCommand = parseAnimationCommand(text, {
+      currentFrame: engine.currentFrame,
+      currentFrameId: current?.id ?? null,
+      timelineId,
+      selectedRange: engine.selectedRange ?? null,
+    });
+    if (parsedCommand) {
+      setPendingCommand(parsedCommand);
+      setWorkspaceMode(parsedCommand.kind === "add_inbetweens" ? "GENERATE" : "ANIMATE");
+    }
     try {
       await syncWorkspaceSessionFn({ data: { sessionId, projectId, context: effectiveSnap } });
       const r = await sendAskFn({
@@ -1139,9 +1154,9 @@ function StudioInner({ projectId }: { projectId: string }) {
         /* ignore */
       }
       void qc.invalidateQueries({ queryKey: ["conversations", projectId] });
-      if (r.inbetween) {
+      if (r.inbetween && !parsedCommand) {
         applyInbetweenPlan(r.inbetween, text);
-      } else if (r.curveAdjust) {
+      } else if (r.curveAdjust && !parsedCommand) {
         const c = r.curveAdjust;
         setInb((s) => ({
           ...s,
@@ -1162,11 +1177,12 @@ function StudioInner({ projectId }: { projectId: string }) {
         setWorkspaceMode("GENERATE");
         setAiState("suggestion");
       }
+      if (r.animationCommand) setPendingCommand(r.animationCommand);
       const intent = parseAnimationIntent(text, {
         start: inb.start ?? engine.selectedRange?.[0] ?? engine.currentFrame,
         end: inb.end ?? engine.selectedRange?.[1] ?? engine.currentFrame,
       });
-      if (isInbetweenRequest(text) && !r.inbetween) {
+      if (isInbetweenRequest(text) && !r.inbetween && !parsedCommand) {
         setInb((s) => {
           const flags = intentToConstraintFlags(intent);
           return {
@@ -1220,6 +1236,23 @@ function StudioInner({ projectId }: { projectId: string }) {
     } finally {
       setAskBusy(false);
     }
+  }
+
+  function confirmPendingCommand() {
+    if (!pendingCommand) return;
+    if (pendingCommand.kind === "add_inbetweens" && !timelineId) {
+      toast.error("沒有時間軸，無法補幀");
+      return;
+    }
+    tool.mutate({
+      tool: pendingCommand.tool,
+      args: {
+        ...pendingCommand.args,
+        confirmed: true,
+        timelineId: pendingCommand.args.timelineId ?? timelineId,
+        frameId: pendingCommand.args.frameId ?? current?.id,
+      },
+    });
   }
 
   if (bundle.isLoading) {
@@ -1914,6 +1947,14 @@ function StudioInner({ projectId }: { projectId: string }) {
                 只會改 F{repairViz[0]}{repairViz[0] !== repairViz[1] ? `–F${repairViz[1]}` : ""}。
               </div>
             )}
+            {pendingCommand ? (
+              <AnimationCommandCard
+                command={pendingCommand}
+                busy={tool.isPending}
+                onConfirm={confirmPendingCommand}
+                onCancel={() => setPendingCommand(null)}
+              />
+            ) : null}
             {regionRepair ? (
               <RegionRepairPanel
                 pipeline={regionRepair}

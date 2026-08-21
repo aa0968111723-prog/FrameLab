@@ -1240,9 +1240,12 @@ export async function generateBreakdownFrameCmd(ctx: CommandContext, args: Recor
 }
 
 export async function setFrameExposureCmd(ctx: CommandContext, args: Record<string, unknown>) {
-  const frameId = String(args.frameId ?? "");
   const exposure = Math.max(1, Math.min(4, Math.round(Number(args.exposure ?? args.exposure_count ?? 1))));
-  const frame = await repo.getFrame(frameId);
+  let frame =
+    typeof args.frameId === "string" && args.frameId ? await repo.getFrame(args.frameId) : null;
+  if (!frame && typeof args.timelineId === "string" && typeof args.frameNumber === "number") {
+    frame = await repo.getFrameByNumber(args.timelineId, args.frameNumber);
+  }
   if (!frame) fail("FRAME_NOT_FOUND", "Frame not found", 404);
   await ownTimeline(ctx, frame.timeline_id);
   const t = await repo.getTimeline(frame.timeline_id);

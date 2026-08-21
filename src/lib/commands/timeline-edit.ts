@@ -306,12 +306,19 @@ export async function clearFrameCmd(ctx: CommandContext, args: Record<string, un
 }
 
 export async function holdFrameCmd(ctx: CommandContext, args: Record<string, unknown>) {
-  const frame = await repo.getFrameMeta(String(args.frameId ?? ""));
+  let frame = typeof args.frameId === "string" && args.frameId ? await repo.getFrameMeta(args.frameId) : null;
+  if (!frame && typeof args.timelineId === "string" && typeof args.frameNumber === "number") {
+    const row = await repo.getFrameByNumber(args.timelineId, args.frameNumber);
+    frame = row ? await repo.getFrameMeta(row.id) : null;
+  }
   if (!frame) fail("FRAME_NOT_FOUND", "Frame not found", 404);
   const t = await ownTimeline(ctx, frame.timeline_id);
   if (frame.is_locked) fail("VALIDATION_ERROR", "Frame is locked");
   const before = snapFrom(frame);
-  const exposure = Math.max(2, Math.min(4, frame.exposure_count ?? 1));
+  const requested = typeof args.exposure === "number" ? args.exposure : Number(args.exposure ?? args.ticks ?? NaN);
+  const exposure = Number.isFinite(requested)
+    ? Math.max(2, Math.min(4, Math.round(requested)))
+    : Math.max(2, Math.min(4, frame.exposure_count ?? 1));
   const duration = frameDurationMs(t.fps, exposure);
   await repo.updateFrame(frame.id, {
     frame_type: "HOLD",

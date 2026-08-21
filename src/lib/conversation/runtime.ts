@@ -28,6 +28,7 @@ import {
   type FrameLabContext,
   type SerializedContext,
 } from "@/lib/domain/context-engine";
+import { parseAnimationCommand } from "@/lib/domain/animation-command";
 import { isInbetweenRequest, isCurveAdjustRequest, parseAnimationIntent } from "@/lib/domain/animation-intent";
 import * as repo from "@/lib/framelab/repo";
 import { nid } from "@/lib/domain/ids";
@@ -433,6 +434,7 @@ export async function runAskTurn(input: {
   assist: AssistPayload | null;
   inbetween: InbetweenAskPayload | null;
   curveAdjust: { curve: string; start: number | null; end: number | null } | null;
+  animationCommand: ReturnType<typeof parseAnimationCommand>;
 }> {
   const mode: ConversationMode = input.mode === "ASSIST" ? "ASSIST" : "ASK";
   const session = await repo.getWorkspaceSession(input.ctx.userId, input.sessionId);
@@ -497,6 +499,12 @@ export async function runAskTurn(input: {
   const parsedIntent = parseAnimationIntent(input.userMessage, {
     start: snapshot.selected_range?.[0] ?? snapshot.current_frame ?? 0,
     end: snapshot.selected_range?.[1] ?? snapshot.current_frame ?? 0,
+  });
+  const animationCommand = parseAnimationCommand(input.userMessage, {
+    currentFrame: snapshot.current_frame ?? 0,
+    currentFrameId: snapshot.current_frame_id,
+    timelineId: snapshot.timeline_id,
+    selectedRange: snapshot.selected_range,
   });
   const pairStart = parsedIntent.start_frame ?? snapshot.selected_range?.[0] ?? snapshot.current_frame ?? 0;
   const pairEnd = parsedIntent.end_frame ?? snapshot.selected_range?.[1] ?? snapshot.current_frame ?? 0;
@@ -716,6 +724,17 @@ export async function runAskTurn(input: {
       label: `套用 ${parsedIntent.curve ?? "ease_in_out"} 並重新生成（需確認）`,
     });
   }
+  if (animationCommand) {
+    assistantText = [
+      assistantText,
+      `解析成指令：${animationCommand.title}`,
+      animationCommand.summary,
+      "請在確認卡按「確認執行」。現在不會改時間軸。",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   const assistantMessageId = nid("msg");
   await repo.insertMessage({
     id: assistantMessageId,
@@ -750,6 +769,7 @@ export async function runAskTurn(input: {
           end: parsedIntent.end_frame,
         }
       : null,
+    animationCommand,
   };
 }
 

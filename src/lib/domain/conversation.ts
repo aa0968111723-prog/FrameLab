@@ -205,6 +205,7 @@ const SYSTEM = [
   "3. Which context that judgment is based on.",
   "4. Suggested next actions. Never auto-execute. Never claim you already repaired frames.",
   "When the user asks to fill inbetweens, suggest CREATE_INBETWEEN_PLAN then GENERATE_INBETWEENS. Never call generate_inbetweens yourself.",
+  "Understand animation shorthand: 「F20到F30多補3張」, 「F40停兩格」, 「這張設成關鍵影格」, 「改成一拍二」. These become a structured AnimationCommand. Always show a confirmation card. Never execute until the user confirms.",
   "When suggesting, emit a JSON line: {\"type\":\"suggestion\",\"action\":\"ANALYZE_MOTION\",\"frame_range\":[135,138]}.",
   "Lightweight visual analysis is pixel MAE / histogram / centroid — label it as such, never as AI pose.",
   "framelab-pose-lite is silhouette extrema, not RTMPose. block-match-16 is not SEA-RAFT. Contact breaks are heuristics.",
