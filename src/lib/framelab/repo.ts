@@ -1013,6 +1013,94 @@ export async function replacePosesForFrames(
   }
 }
 
+export async function updatePoseJoints(frameId: string, joints: unknown) {
+  const sql = await getSql();
+  await sql`update poses set joints_json = ${JSON.stringify(joints)} where frame_id = ${frameId}`;
+}
+
+export async function getPoseForFrame(frameId: string) {
+  const sql = await getSql();
+  const rows = await sql<{
+    frame_id: string;
+    frame_number: number;
+    provider: string;
+    joints_json: string;
+    bbox_json: string;
+  }>`
+    select p.frame_id, coalesce(p.frame_number, f.frame_number) as frame_number, p.provider, p.joints_json, p.bbox_json
+    from poses p join frames f on f.id = p.frame_id
+    where p.frame_id = ${frameId}
+    limit 1
+  `;
+  return rows[0] ?? null;
+}
+
+export type PoseConstraintRow = {
+  id: string;
+  project_id: string;
+  timeline_id: string;
+  frame_id: string;
+  frame_number: number;
+  joint: string;
+  x: number;
+  y: number;
+  previous_x: number;
+  previous_y: number;
+  keypoints_json: string;
+  source: string;
+  kind: string;
+  revision_id: string | null;
+};
+
+export async function insertPoseConstraint(row: PoseConstraintRow) {
+  const sql = await getSql();
+  await sql`
+    insert into pose_constraints (
+      id, project_id, timeline_id, frame_id, frame_number, joint, x, y,
+      previous_x, previous_y, keypoints_json, source, kind, revision_id
+    ) values (
+      ${row.id}, ${row.project_id}, ${row.timeline_id}, ${row.frame_id}, ${row.frame_number},
+      ${row.joint}, ${row.x}, ${row.y}, ${row.previous_x}, ${row.previous_y},
+      ${row.keypoints_json}, ${row.source}, ${row.kind}, ${row.revision_id}
+    )
+  `;
+}
+
+export async function listPoseConstraints(timelineId: string) {
+  const sql = await getSql();
+  return sql<PoseConstraintRow>`
+    select id, project_id, timeline_id, frame_id, frame_number, joint, x, y,
+      previous_x, previous_y, keypoints_json, source, kind, revision_id
+    from pose_constraints
+    where timeline_id = ${timelineId}
+    order by created_at
+  `;
+}
+
+export async function listPoseConstraintsForFrame(frameId: string) {
+  const sql = await getSql();
+  return sql<PoseConstraintRow>`
+    select id, project_id, timeline_id, frame_id, frame_number, joint, x, y,
+      previous_x, previous_y, keypoints_json, source, kind, revision_id
+    from pose_constraints
+    where frame_id = ${frameId}
+    order by created_at
+  `;
+}
+
+export async function replacePoseConstraintsForFrame(frameId: string, rows: PoseConstraintRow[]) {
+  const sql = await getSql();
+  await sql`delete from pose_constraints where frame_id = ${frameId}`;
+  for (const row of rows) {
+    await insertPoseConstraint({ ...row, frame_id: frameId });
+  }
+}
+
+export async function setPoseConstraintRevision(id: string, revisionId: string) {
+  const sql = await getSql();
+  await sql`update pose_constraints set revision_id = ${revisionId} where id = ${id}`;
+}
+
 export async function upsertKeyframe(row: {
   timelineId: string;
   frameId: string;

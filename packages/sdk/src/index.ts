@@ -264,6 +264,19 @@ export class FrameLabClient {
   generateBreakdown(args: { timelineId: string; startFrame: number; endFrame: number; frameNumber?: number; confirmed?: boolean }) {
     return this.call("generate_breakdown_frame", { ...args, confirmed: args.confirmed ?? true });
   }
+  editPose(args: {
+    timelineId: string;
+    frameNumber: number;
+    joint: string;
+    x: number;
+    y: number;
+    keypoints?: { name: string; x: number; y: number; confidence?: number }[];
+  }) {
+    return this.call("edit_pose", args);
+  }
+  listPoseConstraints(args: { timelineId: string; frameNumber?: number }) {
+    return this.call("list_pose_constraints", args);
+  }
   setFrameExposure(args: { frameId: string; exposure: number }) {
     return this.call("set_frame_exposure", args);
   }

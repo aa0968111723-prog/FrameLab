@@ -13,6 +13,7 @@ import {
   drawProblemBubble,
   drawRegionOutline,
   hitAnnotation,
+  hitPoseJoint,
   hitProblemBubble,
   inferContact,
   motionPathPoints,
@@ -27,6 +28,8 @@ import { neighborIds } from "@/lib/visual/thumbnail-cache";
 import type { VisualAnnotation } from "@/lib/domain/visual-annotation";
 import { onionNeighbors } from "@/lib/domain/timeline-engine";
 import type { TimelineEngineState } from "@/lib/domain/types";
+import { toNormalized } from "@/lib/domain/visual-annotation";
+import { movePoseJoint } from "@/lib/domain/pose-edit";
 import { regionBoxFromDrag, isUsableRegionBox } from "@/lib/visual/region-box";
 import { cn } from "@/lib/utils";
 
@@ -101,6 +104,8 @@ export function AnimationCanvas({
   onDrawState,
   onLockedDraw,
   onDrawActionConsumed,
+  onPoseEdit,
+  onSelectJoint,
 }: {
   frames: StudioFrame[];
   imageMap: Map<string, string>;
@@ -146,6 +151,15 @@ export function AnimationCanvas({
   onDrawState?: (s: { canUndo: boolean; canRedo: boolean }) => void;
   onLockedDraw?: () => void;
   onDrawActionConsumed?: () => void;
+  onPoseEdit?: (input: {
+    joint: string;
+    x: number;
+    y: number;
+    keypoints: PoseJoint[];
+    frameNumber: number;
+    frameId: string;
+  }) => void;
+  onSelectJoint?: (name: string | null) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -170,6 +184,35 @@ export function AnimationCanvas({
   });
   const [paintTick, setPaintTick] = useState(0);
   const bumpPaint = () => setPaintTick((n) => n + 1);
+  const [livePose, setLivePose] = useState<PoseJoint[] | null>(null);
+  const poseDrag = useRef<{
+    active: boolean;
+    name: string;
+    keypoints: PoseJoint[];
+    moved: number;
+  } | null>(null);
+
+  const parsePose = useCallback(
+    (n: number): PoseJoint[] => {
+      if (livePose && n === engine.currentFrame) return livePose;
+      const row = poses.find((p) => p.frame_number === n);
+      if (!row) return [];
+      try {
+        const raw = JSON.parse(row.joints_json) as PoseJoint[];
+        return Array.isArray(raw) ? raw : [];
+      } catch {
+        return [];
+      }
+    },
+    [poses, livePose, engine.currentFrame],
+  );
+
+  const poseEditable = (layers.has("pose") || overlay.primary === "pose") && !isDrawTool(tool) && tool !== "region";
+
+  useEffect(() => {
+    setLivePose(null);
+    poseDrag.current = null;
+  }, [engine.currentFrame]);
 
   const emitDrawState = (frameId: string) => {
     const s = paintMap.current.get(frameId);
@@ -543,24 +586,19 @@ export function AnimationCanvas({
       }
     }
 
-    const parsePose = (n: number): PoseJoint[] => {
-      const row = poses.find((p) => p.frame_number === n);
-      if (!row) return [];
-      try {
-        const raw = JSON.parse(row.joints_json) as PoseJoint[];
-        return Array.isArray(raw) ? raw : [];
-      } catch {
-        return [];
-      }
-    };
-
     if (layers.has("pose") || overlay.primary === "pose") {
       const ghostPrev = parsePose(engine.currentFrame - 1);
       const ghostNext = parsePose(engine.currentFrame + 1);
       if (ghostPrev.length) drawPoseSkeleton(ctx, vt, ghostPrev, { ghost: "prev" });
       if (ghostNext.length) drawPoseSkeleton(ctx, vt, ghostNext, { ghost: "next" });
-      const now = parsePose(engine.currentFrame);
-      if (now.length) drawPoseSkeleton(ctx, vt, now, { selected: selectedJoint, dimUnselected: Boolean(selectedJoint) });
+      const now = livePose ?? parsePose(engine.currentFrame);
+      if (now.length) {
+        drawPoseSkeleton(ctx, vt, now, {
+          selected: selectedJoint,
+          dimUnselected: Boolean(selectedJoint),
+          editable: poseEditable,
+        });
+      }
     }
 
     const trailName = pickTrailName(tracking, trailTarget);
@@ -633,6 +671,8 @@ export function AnimationCanvas({
     consMap,
     tracking,
     poses,
+    livePose,
+    poseEditable,
     flowGrid,
     flowPaths,
     annotations,
@@ -717,11 +757,32 @@ export function AnimationCanvas({
       ref={wrapRef}
       className={cn(
         "film-check relative min-h-0 flex-1 touch-none",
-        tool === "region" || isDrawTool(tool) ? "cursor-crosshair" : "cursor-grab",
+        tool === "region" || isDrawTool(tool)
+          ? "cursor-crosshair"
+          : poseEditable
+            ? "cursor-pointer"
+            : "cursor-grab",
       )}
       onPointerDown={(e) => {
         const current = frames.find((f) => f.frameNumber === engine.currentFrame);
         draw.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const wrap = wrapRef.current;
+        const vt = vtRef.current;
+        if (poseEditable && current && wrap && vt && e.button === 0 && !e.altKey) {
+          const rect = wrap.getBoundingClientRect();
+          const px = e.clientX - rect.left;
+          const py = e.clientY - rect.top;
+          const joints = parsePose(engine.currentFrame);
+          const hit = joints.length ? hitPoseJoint(vt, joints, px, py) : null;
+          if (hit) {
+            e.preventDefault();
+            (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+            poseDrag.current = { active: true, name: hit, keypoints: joints, moved: 0 };
+            onSelectJoint?.(hit);
+            setLivePose(joints);
+            return;
+          }
+        }
         const panInstead = shouldPanPointer({
           tool,
           button: e.button,
@@ -754,7 +815,6 @@ export function AnimationCanvas({
           return;
         }
         if (draw.current.active && current) endStroke(current);
-        const vt = vtRef.current;
         pan.current = {
           ...pan.current,
           dragging: true,
@@ -778,6 +838,19 @@ export function AnimationCanvas({
         const pt = draw.current.pointers.get(e.pointerId);
         if (pt) draw.current.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+        if (poseDrag.current?.active && current) {
+          const wrap = wrapRef.current;
+          const vt = vtRef.current;
+          if (!wrap || !vt) return;
+          const rect = wrap.getBoundingClientRect();
+          const f = viewToFrame(vt, e.clientX - rect.left, e.clientY - rect.top);
+          const n = toNormalized(f.x, f.y, current.width, current.height);
+          const next = movePoseJoint(poseDrag.current.keypoints, poseDrag.current.name, n.x, n.y);
+          poseDrag.current.keypoints = next;
+          poseDrag.current.moved += 1;
+          setLivePose(next);
+          return;
+        }
         if (draw.current.active && draw.current.pointerId === e.pointerId && current && draw.current.pointers.size === 1) {
           const at = frameAt(e.clientX, e.clientY);
           if (!at) return;
@@ -804,6 +877,22 @@ export function AnimationCanvas({
       onPointerUp={(e) => {
         draw.current.pointers.delete(e.pointerId);
         const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+        if (poseDrag.current?.active) {
+          const drag = poseDrag.current;
+          poseDrag.current = null;
+          const joint = drag.keypoints.find((k) => k.name === drag.name);
+          if (current && joint && drag.moved > 0) {
+            onPoseEdit?.({
+              joint: drag.name,
+              x: joint.x,
+              y: joint.y,
+              keypoints: drag.keypoints,
+              frameNumber: current.frameNumber,
+              frameId: current.id,
+            });
+          }
+          return;
+        }
         if (draw.current.active && (draw.current.pointerId === e.pointerId || draw.current.pointerId === -1)) {
           endStroke(current);
           return;
@@ -842,6 +931,7 @@ export function AnimationCanvas({
       onPointerCancel={(e) => {
         draw.current.pointers.delete(e.pointerId);
         const current = frames.find((f) => f.frameNumber === engine.currentFrame);
+        poseDrag.current = null;
         endStroke(current);
         pan.current.dragging = false;
         pan.current.region = false;

@@ -360,6 +360,14 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       const { createBreakdownCmd } = await import("./timeline-edit");
       return createBreakdownCmd(ctx, args);
     }
+    case "edit_pose": {
+      const { editPoseCmd } = await import("./pose-edit-tools");
+      return editPoseCmd(ctx, args);
+    }
+    case "list_pose_constraints": {
+      const { listPoseConstraintsCmd } = await import("./pose-edit-tools");
+      return listPoseConstraintsCmd(ctx, args);
+    }
     case "replace_frame":
       return replaceFrame(ctx, args);
     case "delete_frame": {
@@ -1329,6 +1337,12 @@ async function redoFrame(ctx: CommandContext, args: Record<string, unknown>) {
     await repo.updateRevisionStatus(undone.id, "open");
     return { id: undone.id, status: "open" };
   }
+  const { isPoseEdit, applyPoseEditSnap } = await import("./pose-edit-tools");
+  if (isPoseEdit(next)) {
+    await applyPoseEditSnap(next);
+    await repo.updateRevisionStatus(undone.id, "open");
+    return { id: undone.id, status: "open" };
+  }
   if (!undone.frame_id || typeof next.imageData !== "string" || !next.imageData) {
     fail("FRAME_NOT_FOUND", "Redo snapshot missing", 404);
   }
@@ -1350,6 +1364,12 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
   const { isTimelineEdit, applyTimelineEdit } = await import("./timeline-edit");
   if (isTimelineEdit(prev)) {
     await applyTimelineEdit(ctx, prev, "undo");
+    await repo.updateRevisionStatus(revisionId, "reverted");
+    return { id: revisionId, status: "reverted" };
+  }
+  const { isPoseEdit, applyPoseEditSnap } = await import("./pose-edit-tools");
+  if (isPoseEdit(prev)) {
+    await applyPoseEditSnap(prev);
     await repo.updateRevisionStatus(revisionId, "reverted");
     return { id: revisionId, status: "reverted" };
   }

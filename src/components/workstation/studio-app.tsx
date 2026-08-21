@@ -132,6 +132,7 @@ const TOOL_DONE_ZH: Record<string, string> = {
   remove_keyframe: "已取消關鍵影格",
   mark_breakdown: "已標成分解影格",
   create_breakdown: "已加入分解影格",
+  edit_pose: "已儲存姿態約束",
   analyze_consistency: "一致性掃描完成",
   analyze_frame: "影格分析完成",
   analyze_motion: "運動分析完成",
@@ -326,6 +327,10 @@ function StudioInner({ projectId }: { projectId: string }) {
   );
   const poses = useMemo(
     () => (bundle.data?.ok ? (bundle.data.poses ?? []) : []),
+    [bundle.data],
+  );
+  const poseConstraints = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.poseConstraints ?? []) : []),
     [bundle.data],
   );
   const tracking = useMemo(
@@ -1448,6 +1453,22 @@ function StudioInner({ projectId }: { projectId: string }) {
               tool={canvasTool}
               trailTarget={trailTarget}
               selectedJoint={selectedJoint}
+              onSelectJoint={setSelectedJoint}
+              onPoseEdit={(input) => {
+                if (!timelineId) return;
+                tool.mutate({
+                  tool: "edit_pose",
+                  args: {
+                    timelineId,
+                    frameId: input.frameId,
+                    frameNumber: input.frameNumber,
+                    joint: input.joint,
+                    x: input.x,
+                    y: input.y,
+                    keypoints: input.keypoints,
+                  },
+                });
+              }}
               compareFrame={compareFrame}
               flickerOn={flicker}
               compareMode={compareMode}
@@ -1828,6 +1849,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                     setFlicker(true);
                     setCompareMode("flicker");
                   }
+                  if (o.id === "pose" && !e.shiftKey) setCanvasTool("pan");
                 }}
                 className={cn(
                   "rounded-[var(--radius-xs)] px-2 py-1 text-[11px]",
@@ -1889,6 +1911,9 @@ function StudioInner({ projectId }: { projectId: string }) {
             >
               <Redo2 className="size-3.5" />
             </Button>
+            {overlayStack.primary === "pose" ? (
+              <span className="hidden text-[10px] text-faint sm:inline">拖動關節可改骨架，不會改圖</span>
+            ) : null}
             {isDrawTool(canvasTool) ? (
               <label className="ml-1 flex items-center gap-1 text-[10px] text-faint">
                 尺寸
@@ -2389,6 +2414,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                     ...r,
                     previewData: previewFromRevision(r),
                   }))}
+                  poseConstraints={poseConstraints}
                   busy={tool.isPending}
                   regionBox={regionBox}
                   setRegionBox={setRegionBox}

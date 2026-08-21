@@ -22,7 +22,7 @@ Original · Onion · Pose · Motion · Track · Mask · Problems · Compare
 
 Shift-click stacks up to three extras. Pose + flow + mask + heatmap are never all on by default.
 
-Pose ghost draws previous (cool) and next (warm) skeletons under the current pose. Selecting a joint dims the rest of the chain.
+Pose ghost draws previous (cool) and next (warm) skeletons under the current pose. Selecting a joint dims the rest of the chain. With the Pose overlay on, joints are **draggable**; a drop writes a PoseConstraint and a revision, never pixels.
 
 Motion / track draw a single trail (head, hands, hip, foot, object, custom) — not every point at once.
 

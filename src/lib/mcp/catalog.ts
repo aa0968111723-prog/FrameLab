@@ -86,6 +86,8 @@ export const MCP_TOOLS = [
   tool("clear_frame", "Wipe the current frame to blank paper. Writes a revision.", { frameId: str }, ["frameId"]),
   tool("hold_frame", "Mark the current frame as HOLD (停格, exposure ≥ 2). Writes a revision.", { frameId: str }, ["frameId"]),
   tool("create_breakdown", "Create a BREAKDOWN between keyframe A/B. mode=blank | copy | mark. copyFrom=start|end. Never generative. Writes a revision.", { timelineId: str, startFrame: num, endFrame: num, frameA: num, frameB: num, frameNumber: num, mode: str, copyFrom: str, frameType: str }, ["timelineId", "startFrame", "endFrame"]),
+  tool("edit_pose", "Drag a skeleton joint. Writes PoseConstraint + revision. Does not modify the frame image.", { timelineId: str, frameNumber: num, frameId: str, joint: str, x: num, y: num, keypoints: { type: "array" } }, ["timelineId", "joint"]),
+  tool("list_pose_constraints", "List PoseConstraints for a timeline or frame.", { timelineId: str, frameNumber: num }, ["timelineId"]),
   tool("replace_frame", "Replace frame image (base64 JPEG). High-risk, audited.", { frameId: str, imageData: str }, ["frameId", "imageData"]),
   tool("delete_frame", "Delete a frame. High-risk, audited, restorable.", { frameId: str }, ["frameId"]),
   tool("set_frame_duration", "Set hold duration in milliseconds", { frameId: str, durationMs: num }, ["frameId", "durationMs"]),

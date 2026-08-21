@@ -110,11 +110,33 @@ export function poseScreenPoints(
   return map;
 }
 
+/** Screen-space joint pick. Radius is in view pixels so zoom does not change hit feel. */
+export function hitPoseJoint(
+  vt: ViewportTransform,
+  keypoints: PoseJoint[],
+  px: number,
+  py: number,
+  radius = 14,
+): string | null {
+  const pts = poseScreenPoints(vt, keypoints);
+  let best: string | null = null;
+  let bestD = radius;
+  for (const [name, p] of pts) {
+    const d = Math.hypot(p.x - px, p.y - py);
+    if (d <= bestD) {
+      bestD = d;
+      best = name;
+    }
+  }
+  return best;
+}
+
+
 export function drawPoseSkeleton(
   ctx: CanvasRenderingContext2D,
   vt: ViewportTransform,
   keypoints: PoseJoint[],
-  opts: { ghost?: "prev" | "next" | null; selected?: string | null; dimUnselected?: boolean } = {},
+  opts: { ghost?: "prev" | "next" | null; selected?: string | null; dimUnselected?: boolean; editable?: boolean } = {},
 ) {
   const pts = poseScreenPoints(vt, keypoints);
   const chain = opts.selected ? new Set(CHAINS[opts.selected] ?? [opts.selected]) : null;
@@ -137,11 +159,18 @@ export function drawPoseSkeleton(
   }
   for (const [name, p] of pts) {
     const hot = !chain || chain.has(name);
-    ctx.fillStyle = hot ? stroke : BONE_DIM;
+    const selected = opts.selected === name;
     ctx.globalAlpha = hot ? 1 : 0.3;
+    const r = selected ? 5.5 : opts.editable && !opts.ghost ? 4.2 : 2.6;
+    ctx.fillStyle = selected ? "#f4f4f5" : hot ? stroke : BONE_DIM;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, hot && opts.selected === name ? 4.5 : 2.6, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fill();
+    if (opts.editable && !opts.ghost) {
+      ctx.strokeStyle = selected ? "rgba(232, 196, 120, 0.95)" : "rgba(244, 244, 245, 0.55)";
+      ctx.lineWidth = selected ? 1.6 : 1;
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }

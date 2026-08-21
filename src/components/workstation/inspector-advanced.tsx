@@ -59,6 +59,7 @@ export function AdvancedInspector({
   tracking,
   jobs,
   revisions,
+  poseConstraints,
   busy,
   regionBox,
   setRegionBox,
@@ -116,6 +117,7 @@ export function AdvancedInspector({
   tracking: { id: string; name: string; x: number; y: number; frame_number: number; status?: string; score?: number }[];
   jobs: { id: string; type: string; state: string; progress: number; error_code: string | null }[];
   revisions: HistoryRow[];
+  poseConstraints?: { id: string; frame_number: number; joint: string; x: number; y: number }[];
   busy: boolean;
   regionBox: { x: number; y: number; w: number; h: number };
   setRegionBox: (b: { x: number; y: number; w: number; h: number }) => void;
@@ -187,6 +189,29 @@ export function AdvancedInspector({
           ))}
         </select>
       </label>
+      {(() => {
+        const here = (poseConstraints ?? []).filter((c) => c.frame_number === current.frameNumber);
+        if (!here.length) {
+          return (
+            <p className="text-[11px] text-faint">開「骨架」後拖動關節可建立姿態約束，不會改圖。</p>
+          );
+        }
+        return (
+          <div className="space-y-1 rounded-[var(--radius-sm)] border border-border p-2">
+            <p className="text-[10px] uppercase tracking-wide text-faint">姿態約束</p>
+            <ul className="space-y-0.5 text-[11px] text-muted">
+              {here.slice(-6).map((c) => (
+                <li key={c.id} className="flex justify-between font-mono">
+                  <span>{c.joint}</span>
+                  <span>
+                    {c.x.toFixed(2)} · {c.y.toFixed(2)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
       <label className="block text-xs text-muted">
         播放時長
         <p className="mt-1 text-sm tabular-nums text-fg">{holdMs} ms</p>

@@ -43,6 +43,8 @@ function actionZh(action: string) {
       return "標成分解影格";
     case "create_breakdown":
       return "分解影格";
+    case "edit_pose":
+      return "編輯骨架";
     default:
       return action.replaceAll("_", " ");
   }
