@@ -82,6 +82,6 @@ Content-Type: application/json
 | GET | `/api/system/devices` | devices |
 | GET\|POST | `/api/mcp` | MCP |
 
-`regenerate_region` blends **only** a bbox (`x,y,w,h`) from neighbor frames onto the current frame. Named regions (`hand`, `face`, …) without a bbox return `MODEL_NOT_AVAILABLE` (SAM2 is not loaded). `method=generative` returns `PROVIDER_NOT_AVAILABLE`.
+`regenerate_region` default is generative region repair (selection → mask → temporal context → candidate → before/after). Unconfigured Wan returns `PROVIDER_NOT_AVAILABLE` and writes no pixels. `method=preview` is neighborhood bbox paste (快速預覽), never AI.
 
 TypeScript client: `packages/sdk`.

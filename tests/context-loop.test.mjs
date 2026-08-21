@@ -48,7 +48,7 @@ describe("V0.1 core loop wiring", () => {
     assert.match(studio, /r\.stale/);
     assert.match(studio, /promoteKeys: true/);
     assert.match(studio, /點兩張 ★/);
-    assert.match(studio, /請先在畫布上拖出真實選區/);
+    assert.match(studio, /請先選區或切 SAM 2 遮罩/);
     assert.match(tools, /thumbnailRef/);
     assert.match(tools, /Workspace session not found/);
   });

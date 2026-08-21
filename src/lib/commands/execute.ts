@@ -500,8 +500,10 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       return repairFrame(ctx, args);
     case "repair_frame_range":
       return repairFrameRange(ctx, args);
-    case "regenerate_region":
-      return regenerateRegion(ctx, args);
+    case "regenerate_region": {
+      const { repairRegionCmd } = await import("./region-repair-tools");
+      return repairRegionCmd(ctx, args);
+    }
     case "rerun_motion":
     case "recalculate_motion": {
       const { analyzeMotionAssist } = await import("./assist-tools");
@@ -1248,57 +1250,6 @@ async function repairFrameRange(ctx: CommandContext, args: Record<string, unknow
     summarize: (r) => ({ repaired: r.repaired.length }),
   });
   return { ...wrapped.result, jobId: wrapped.jobId };
-}
-
-async function regenerateRegion(ctx: CommandContext, args: Record<string, unknown>) {
-  const frame = await loadOwnedFrame(ctx, args);
-  if (str(args.method) === "generative") {
-    fail("PROVIDER_NOT_AVAILABLE", "Generative region repair is not loaded.");
-  }
-  const x = num(args.x);
-  const y = num(args.y);
-  const w = num(args.w);
-  const h = num(args.h);
-  if (w <= 0 || h <= 0) {
-    fail("MODEL_NOT_AVAILABLE", "Named regions without a bbox need SAM2 → MODEL_NOT_AVAILABLE.");
-  }
-  const t = await ownTimeline(ctx, frame.timeline_id);
-  const prev = await repo.getFrameByNumber(t.id, frame.frame_number - 1);
-  const next = await repo.getFrameByNumber(t.id, frame.frame_number + 1);
-  if (!prev || !next) fail("FRAME_NOT_FOUND", "Neighborhood frames missing", 404);
-  const interpolator = getInterpolation("linear-blend");
-  const [mid] = await interpolator.interpolate(
-    decodeJpegBase64(prev.image_data),
-    decodeJpegBase64(next.image_data),
-    1,
-    { curve: "linear", region: { x, y, w, h } },
-  );
-  const base = decodeJpegBase64(frame.image_data);
-  const box = { x, y, w, h };
-  const patch = cropRgba(mid, box);
-  for (let row = 0; row < patch.height; row += 1) {
-    for (let col = 0; col < patch.width; col += 1) {
-      const di = ((Math.round(y) + row) * base.width + (Math.round(x) + col)) * 4;
-      const si = (row * patch.width + col) * 4;
-      if (di < 0 || di + 3 >= base.data.length) continue;
-      base.data[di] = patch.data[si];
-      base.data[di + 1] = patch.data[si + 1];
-      base.data[di + 2] = patch.data[si + 2];
-      base.data[di + 3] = 255;
-    }
-  }
-  const imageData = encodeJpegBase64(base, 80);
-  const snap = snapshotFrame(frame);
-  const revisionId = await recordRevision(ctx, "regenerate_region", t.project_id, frame.id, snap, {
-    box,
-  });
-  await repo.updateFrame(frame.id, {
-    image_data: imageData,
-    thumbnail_data: makeThumbnail(base),
-    content_hash: hashBytes(imageData),
-    frame_type: "REPAIRED",
-  });
-  return { id: frame.id, revisionId, interpolation: "FULL_FRAME_INTERPOLATION" };
 }
 
 async function createTrackingPoint(ctx: CommandContext, args: Record<string, unknown>) {

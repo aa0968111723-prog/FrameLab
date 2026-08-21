@@ -1,15 +1,19 @@
 # Region Repair UX
 
-1. Region tool — drag a box on the canvas.
-2. Floating actions: **Ask AI · Track · Propagate ±5 · Repair here · Clear**.
-3. Propagate copies the rectangle along the nearest track. Timeline shows mask status (ok / warn / lost). Lost frames get a visual tick — SAM2 is still `MODEL_NOT_AVAILABLE`.
-4. Repair window paints on the timeline. Protected keys cannot be covered. Copy: **Only F106 will change.**
-5. Confirm runs `regenerate_region` / `repair_frame_range` (blend adapter). Face / hair / clothing locks are **evaluation only** on linear-blend.
+Real pipeline — never bbox blend as AI:
 
-Provider interface (`src/lib/domain/region-repair.ts`):
+1. **選區** — drag a box, or click SAM 2 on a character/object.
+2. **遮罩** — SAM 2 contour when present; otherwise a rectangle mask labelled as such (not SAM 2).
+3. **時間脈絡** — neighboring frames (default ±2) shown as references.
+4. **候選** — generative provider writes a candidate, not the active timeline.
+5. **前後比較** — compare overlay, then Accept / Reject.
+
+「在此修復」 calls `regenerate_region` with `method=generative`. If Wan is not loaded the UI shows **生成修復尚未設定** and writes no pixels.
+
+「快速預覽」 is neighborhood bbox paste. It is **not** AI repair.
 
 ```
 repair_region({ frames, masks, references, constraints, temporal_context })
 ```
 
-`BlendRegionRepair` is available. `SamRegionRepair` returns `MODEL_NOT_AVAILABLE`.
+`BlendRegionRepair` is unavailable. `SamRegionRepair` returns masks-only (not inpaint).

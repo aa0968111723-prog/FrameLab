@@ -9,7 +9,7 @@ Adapters live in `src/lib/ai/providers.ts` + the registry. Core commands never i
 - `block-match-16` — 16×16 SAD optical flow CPU fallback (`OpticalFlowProvider`). Not SEA-RAFT.
 - `linear-blend` — 快速預覽 (pixel blend). Not AI inbetweening.
 - `rife` — Practical-RIFE 4.25 Python worker
-- `region-blend` — bbox-only paste of neighbor interpolation (`regenerate_region` with `x,y,w,h`)
+- `neighborhood-preview` — bbox paste from neighbor frames (`regenerate_region` method=preview). Not AI repair.
 - `ffmpeg` — frame extraction (`spawn` argv, no shell)
 - `grok-4.5` — vision, user-initiated, `XAI_API_KEY` (`ExternalAIProvider`)
 - `rtmpose` — RTMPose-s + YOLOX-tiny Python worker

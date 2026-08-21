@@ -44,7 +44,7 @@ ViewportTransform
   → OverlayRenderer (pose / ghost / trail / mask / problems / AI pointer)
 VisualAnnotation (0–1 coords) ← MCP visual tools (never DOM)
 Timeline virtualization (10k frames ≠ 10k DOM nodes)
-RegionRepairProvider.repair_region(...)  (blend ready; SAM2 reserved)
+RegionRepairProvider.repair_region(...)  (generative; bbox preview is not AI)
 ```
 
 `ctx` carries `userId`, `source` (`ui` | `rest` | `mcp`), `caller`, `scopes`, and `projectScope`. Destructive tools always write a **revision**.

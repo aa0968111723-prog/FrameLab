@@ -6,6 +6,7 @@ export function RegionActions({
   onAnalyze,
   onTrack,
   onRepair,
+  onPreview,
   onPropagate,
   onClear,
 }: {
@@ -14,6 +15,7 @@ export function RegionActions({
   onAnalyze: () => void;
   onTrack: () => void;
   onRepair: () => void;
+  onPreview?: () => void;
   onPropagate: () => void;
   onClear: () => void;
 }) {
@@ -33,6 +35,11 @@ export function RegionActions({
       <Button size="sm" variant="secondary" onClick={onRepair}>
         在此修復
       </Button>
+      {onPreview ? (
+        <Button size="sm" variant="ghost" onClick={onPreview}>
+          快速預覽
+        </Button>
+      ) : null}
       <Button size="sm" variant="ghost" onClick={onClear}>
         清除
       </Button>

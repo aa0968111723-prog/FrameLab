@@ -59,6 +59,9 @@ export function jobStageLabel(
   if (running && type === "REPAIR_INTERPOLATION") {
     return frames ? `修復插值 ${frames}` : `修復插值 ${progress}%`;
   }
+  if (running && type === "GENERATIVE_REPAIR") {
+    return "區域生成修復";
+  }
   if (stage?.label && running) return stage.label;
   return `${jobTypeZh(type)} · ${jobStateZh(state)} · ${progress}%`;
 }
@@ -83,6 +86,8 @@ export function jobTypeZh(type: string) {
       return "一致性";
     case "REPAIR_INTERPOLATION":
       return "修復插值";
+    case "GENERATIVE_REPAIR":
+      return "區域生成修復";
     default:
       return type.replaceAll("_", " ");
   }

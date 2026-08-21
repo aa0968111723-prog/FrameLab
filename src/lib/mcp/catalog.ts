@@ -132,7 +132,7 @@ export const MCP_TOOLS = [
   tool("interpolate_frames", "Legacy immediate-write interpolation (does not create a candidate). Prefer generate_inbetweens.", { timelineId: str, frameA: num, frameB: num, count: num, curve: str }, ["timelineId", "frameA", "frameB"]),
   tool("repair_frame", "Neighborhood blend repair. Generative method returns PROVIDER_NOT_AVAILABLE.", { frameId: str, method: str }, ["frameId"]),
   tool("repair_frame_range", "Blend-repair a range. High-risk, audited, creates a job.", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId", "startFrame", "endFrame"]),
-  tool("regenerate_region", "Blend only a bbox (x,y,w,h) from neighbor frames. Named regions without a bbox need SAM2 → MODEL_NOT_AVAILABLE. Generative method → PROVIDER_NOT_AVAILABLE.", { frameId: str, region: str, x: num, y: num, w: num, h: num, method: str }, ["frameId"]),
+  tool("regenerate_region", "Region repair: selection → mask → temporal context → candidate → before/after. Default is generative (Wan). If the provider is not loaded → PROVIDER_NOT_AVAILABLE (never bbox-blend as AI). method=preview is 快速預覽 neighborhood paste, not AI.", { frameId: str, timelineId: str, frameNumber: num, region: str, x: num, y: num, w: num, h: num, method: str, provider: str }, ["frameId"]),
   tool("rerun_tracking", "Re-run LocoTrack-S on existing seeds. provider=framelab-ncc for template fallback.", { timelineId: str, name: str, provider: str }, ["timelineId"]),
   tool("rerun_motion", "Re-run block-matching motion (not SEA-RAFT)", { timelineId: str, provider: str }, ["timelineId"]),
   tool("recalculate_motion", "Alias of rerun_motion", { timelineId: str }, ["timelineId"]),

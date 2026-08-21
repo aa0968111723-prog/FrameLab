@@ -1,7 +1,17 @@
 /**
- * RegionRepairProvider — provider-agnostic region repair.
- * V0.4 ships a real blend adapter. SAM / generative stay honest unavailable.
+ * Region repair pipeline: selection → mask → temporal context → candidate → before/after.
+ * Neighborhood bbox paste is 快速預覽 only. Never AI repair.
  */
+
+export const REGION_REPAIR_STAGES = [
+  "selection",
+  "mask",
+  "temporal",
+  "candidate",
+  "before_after",
+] as const;
+
+export type RegionRepairStage = (typeof REGION_REPAIR_STAGES)[number];
 
 export type RegionMask = {
   frame: number;
@@ -10,6 +20,9 @@ export type RegionMask = {
   w: number;
   h: number;
   confidence?: number;
+  contour?: number[][];
+  status?: string;
+  source?: "sam2" | "rectangle";
 };
 
 export type RegionRepairRequest = {
@@ -35,31 +48,160 @@ export interface RegionRepairProvider {
   repair_region(req: RegionRepairRequest): Promise<RegionRepairResult>;
 }
 
+export const REGION_REPAIR_STAGE_ZH: Record<RegionRepairStage, string> = {
+  selection: "選區",
+  mask: "遮罩",
+  temporal: "時間脈絡",
+  candidate: "候選",
+  before_after: "前後比較",
+};
+
+export function isAiRegionRepair(provider: string): boolean {
+  return provider === "wan" || provider === "fal.ai" || provider === "fal" || provider === "comfyui";
+}
+
+export function isNeighborhoodPreview(method: string | undefined): boolean {
+  const m = String(method ?? "").toLowerCase();
+  return m === "preview" || m === "blend" || m === "neighborhood-preview" || m === "neighborhood-paste";
+}
+
+export function regionRepairUnavailableMessage(providerId = "wan"): string {
+  return `生成修復尚未設定（${providerId} 未載入）。bbox 鄰域貼上不是 AI 修復。`;
+}
+
+export function neighborhoodPreviewNote(): string {
+  return "快速預覽：鄰域 bbox 貼上。不是 AI 修復。";
+}
+
+export type RegionRepairPipeline = {
+  stages: { id: RegionRepairStage; label: string; done: boolean }[];
+  current: RegionRepairStage;
+  selection: { x: number; y: number; w: number; h: number } | null;
+  mask: RegionMask | null;
+  temporal: { before: number[]; current: number; after: number[] };
+  provider: { id: string; available: boolean; ai: boolean };
+  candidateId: string | null;
+  available: boolean;
+  ai: boolean;
+  note: string;
+};
+
+export function usableBox(box: { w: number; h: number } | null | undefined, min = 4): boolean {
+  if (!box) return false;
+  if (box.w <= 1 && box.h <= 1) return box.w >= 0.002 && box.h >= 0.002;
+  return box.w >= min && box.h >= min;
+}
+
+export function maskFromSelection(
+  frame: number,
+  box: { x: number; y: number; w: number; h: number } | null,
+): RegionMask | null {
+  if (!box || !usableBox(box)) return null;
+  return { frame, ...box, source: "rectangle", confidence: 1 };
+}
+
+export function maskToPixels(
+  mask: { x: number; y: number; w: number; h: number },
+  width: number,
+  height: number,
+): { x: number; y: number; w: number; h: number } {
+  if (mask.w <= 1 && mask.h <= 1 && mask.x <= 1 && mask.y <= 1) {
+    return {
+      x: mask.x * width,
+      y: mask.y * height,
+      w: Math.max(1, mask.w * width),
+      h: Math.max(1, mask.h * height),
+    };
+  }
+  return { x: mask.x, y: mask.y, w: mask.w, h: mask.h };
+}
+
+export function temporalContext(
+  frameNumber: number,
+  frameNumbers: number[],
+  beforeCount = 2,
+  afterCount = 2,
+): { before: number[]; current: number; after: number[] } {
+  const sorted = [...new Set(frameNumbers)].sort((a, b) => a - b);
+  const before = sorted.filter((n) => n < frameNumber).slice(-beforeCount);
+  const after = sorted.filter((n) => n > frameNumber).slice(0, afterCount);
+  return { before, current: frameNumber, after };
+}
+
+export function buildRegionRepairPipeline(input: {
+  frameNumber: number;
+  selection?: { x: number; y: number; w: number; h: number } | null;
+  mask?: RegionMask | null;
+  frameNumbers: number[];
+  providerId?: string;
+  providerAvailable?: boolean;
+  candidateId?: string | null;
+  beforeCount?: number;
+  afterCount?: number;
+}): RegionRepairPipeline {
+  const selection = input.selection && usableBox(input.selection) ? input.selection : null;
+  const mask =
+    input.mask && usableBox(input.mask)
+      ? { ...input.mask, frame: input.mask.frame ?? input.frameNumber, source: input.mask.source ?? "sam2" }
+      : maskFromSelection(input.frameNumber, selection);
+  const temporal = temporalContext(
+    input.frameNumber,
+    input.frameNumbers,
+    input.beforeCount,
+    input.afterCount,
+  );
+  const providerId = input.providerId ?? "wan";
+  const available = input.providerAvailable === true;
+  const ai = isAiRegionRepair(providerId) && available;
+  const candidateId = input.candidateId ?? null;
+  const hasTemporal = temporal.before.length + temporal.after.length > 0;
+  const done: Record<RegionRepairStage, boolean> = {
+    selection: Boolean(selection || mask),
+    mask: Boolean(mask),
+    temporal: hasTemporal,
+    candidate: Boolean(candidateId),
+    before_after: Boolean(candidateId),
+  };
+  let current: RegionRepairStage = "selection";
+  if (done.selection) current = "mask";
+  if (done.mask) current = "temporal";
+  if (done.temporal) current = "candidate";
+  if (done.candidate) current = "before_after";
+  const note = candidateId
+    ? ai
+      ? "生成修復候選。尚未寫入時間軸。"
+      : neighborhoodPreviewNote()
+    : available
+      ? "Provider 已載入，可產生候選。"
+      : regionRepairUnavailableMessage(providerId);
+  return {
+    stages: REGION_REPAIR_STAGES.map((id) => ({
+      id,
+      label: REGION_REPAIR_STAGE_ZH[id],
+      done: done[id],
+    })),
+    current,
+    selection,
+    mask,
+    temporal,
+    provider: { id: providerId, available, ai },
+    candidateId,
+    available,
+    ai,
+    note,
+  };
+}
+
+/** Legacy name. Not AI repair. Neighborhood paste lives as method=preview. */
 export class BlendRegionRepair implements RegionRepairProvider {
   id = "blend-region";
-  available = true;
-  async repair_region(req: RegionRepairRequest): Promise<RegionRepairResult> {
-    if (req.masks.length === 0) {
-      return {
-        ok: false,
-        code: "VALIDATION_ERROR",
-        message: "No region mask. Draw a rectangle on the canvas.",
-        provider: this.id,
-      };
-    }
-    const evaluation = req.constraints.filter((c) =>
-      /face|hair|clothing|character/i.test(c),
-    );
+  available = false;
+  async repair_region(_req: RegionRepairRequest): Promise<RegionRepairResult> {
     return {
-      ok: true,
+      ok: false,
+      code: "PROVIDER_NOT_AVAILABLE",
+      message: regionRepairUnavailableMessage("wan"),
       provider: this.id,
-      frames: req.frames.map((frame) => ({
-        frame,
-        note: "Neighborhood blend of the boxed region. Not SAM.",
-      })),
-      evaluation_only: evaluation.length
-        ? evaluation.map((c) => `${c} · evaluation only on linear-blend`)
-        : undefined,
     };
   }
 }
@@ -67,11 +209,11 @@ export class BlendRegionRepair implements RegionRepairProvider {
 export class SamRegionRepair implements RegionRepairProvider {
   id = "sam2";
   available = false;
-  async repair_region(): Promise<RegionRepairResult> {
+  async repair_region(_req: RegionRepairRequest): Promise<RegionRepairResult> {
     return {
       ok: false,
       code: "MODEL_NOT_AVAILABLE",
-      message: "SAM2 checkpoint is not loaded. Rectangle mask is used instead.",
+      message: "SAM 2 produces masks, not inpaint. Generative repair is a separate provider.",
       provider: this.id,
     };
   }

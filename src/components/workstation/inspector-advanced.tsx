@@ -326,7 +326,7 @@ export function AdvancedInspector({
           混合修復
         </Button>
         <Button size="sm" variant="ghost" disabled={busy || !regionLive || regionBox.w < 8 || regionBox.h < 8} onClick={onRepairRegion}>
-          區域混合
+          區域修復
         </Button>
         {onAddFrame && (
           <Button size="sm" variant="ghost" disabled={busy} onClick={onAddFrame}>

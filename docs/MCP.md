@@ -70,7 +70,7 @@ Stdio transport: `node apps/mcp-server/stdio.mjs` proxies JSON-RPC lines to `/ap
 
 High-risk tools (`delete_frame`, `replace_frame`, `repair_frame_range`, `regenerate_region`, `extract_video`, `ingest_frames`) write revisions and audit rows. Analyze / interpolate / repair / render **create jobs**; poll `get_job`. `cancel_job` marks queued/running jobs cancelled.
 
-`regenerate_region` with `x,y,w,h` is a real bbox blend (not Wan). Named region without a bbox → `MODEL_NOT_AVAILABLE`. `list_mcp_clients` is ADMIN and never returns token hashes.
+`regenerate_region` default is generative (Wan). Unconfigured provider → `PROVIDER_NOT_AVAILABLE` (never bbox-blend as AI). `method=preview` is 快速預覽 neighborhood paste. `list_mcp_clients` is ADMIN and never returns token hashes.
 
 `undo` restores the latest frame snapshot. `list_audit_logs` is ADMIN. `create_sample_project` and `ingest_frames` let agents seed a timeline without the UI.
 

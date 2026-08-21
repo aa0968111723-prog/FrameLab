@@ -70,6 +70,7 @@ import { clampBrushSize, DEFAULT_BRUSH_SIZE, isDrawTool } from "@/lib/visual/dra
 import { clampOnionCount, clampOnionOpacity, MAX_ONION_LAYERS } from "@/lib/visual/onion-draw";
 import { buildPresence } from "@/lib/visual/character-track";
 import { maskTrackMarks } from "@/lib/visual/timeline-virtual";
+import { buildRegionRepairPipeline, type RegionRepairPipeline } from "@/lib/domain/region-repair";
 import { suggestedFocusZoom, zoom100Percent } from "@/lib/visual/viewport";
 import {
   MODE_BAR,
@@ -93,6 +94,7 @@ import { SpacingStrip, VisualTimeline } from "./visual-timeline";
 import { ProblemNavigator } from "./problem-navigator";
 import { ConsistencyStrips } from "./consistency-strips";
 import { RegionActions } from "./region-actions";
+import { RegionRepairPanel } from "./region-repair-panel";
 import { ConstraintChips, MotionPlanVisual } from "./motion-plan-visual";
 import { AdvancedInspector } from "./inspector-advanced";
 import { ContextInspector } from "./context-inspector";
@@ -141,7 +143,7 @@ const TOOL_DONE_ZH: Record<string, string> = {
   analyze_pose: "姿態分析完成",
   repair_frame: "影格已修復",
   repair_frame_range: "範圍已修復",
-  regenerate_region: "區域已混合",
+  regenerate_region: "區域修復候選已寫入",
   duplicate_frame: "影格已複製",
   add_frame: "已新增影格",
   insert_frame: "已插入影格",
@@ -175,7 +177,7 @@ function toolErrorZh(code: string, error: string) {
   if (e.includes("keyframe")) return "關鍵影格對無效。請先點兩張 ★，或用中間影格面板設定起點／終點。";
   if (e.includes("candidate")) return "找不到候選版本";
   if (e.includes("not found")) return "找不到對象";
-  if (e.includes("required")) return "還少一個必要參數";
+  if (code === "PROVIDER_NOT_AVAILABLE") return error || "生成修復尚未設定。不會用 bbox 混合冒充 AI。";
   return error ? `${code}: ${error}` : code;
 }
 
@@ -237,6 +239,7 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [regionBox, setRegionBox] = useState({ x: 40, y: 40, w: 64, h: 64 });
   const [regionLive, setRegionLive] = useState(false);
   const [regionKind, setRegionKind] = useState("custom");
+  const [regionRepair, setRegionRepair] = useState<RegionRepairPipeline | null>(null);
   const [revisionPreview, setRevisionPreview] = useState<{ frameNumber: number; data: string } | null>(null);
   const [compareSources, setCompareSources] = useState<{
     original?: string | null;
@@ -530,10 +533,15 @@ function StudioInner({ projectId }: { projectId: string }) {
       if (!r.ok) {
         toast.error(toolErrorZh(r.code, r.error));
         setInb((s) => ({ ...s, busy: false }));
+        if (input.tool === "regenerate_region") {
+          setWorkspaceMode("REPAIR");
+          setOverlayStack({ primary: "mask", extras: ["problems"] });
+        }
         return;
       }
       if (input.tool === "accept_generated_frames" || input.tool === "reject_generated_frames") {
         setInb((s) => ({ ...s, busy: false, candidate: null, confirmation: null }));
+        setRegionRepair(null);
         toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
         refresh();
         return;
@@ -702,6 +710,32 @@ function StudioInner({ projectId }: { projectId: string }) {
       } else if (input.tool === "replace_frame") {
         refresh();
         return;
+      } else if (input.tool === "regenerate_region") {
+        try {
+          const d = JSON.parse(r.payload || "{}") as RegionRepairPipeline & {
+            candidateId?: string;
+            beforeImage?: string | null;
+            afterImage?: string | null;
+            ai?: boolean;
+            note?: string;
+          };
+          setWorkspaceMode("REPAIR");
+          setOverlayStack({ primary: d.candidateId ? "compare" : "mask", extras: ["problems"] });
+          setRegionRepair(d);
+          if (d.candidateId) {
+            setCompareSources({
+              original: d.beforeImage ?? null,
+              candidate: d.afterImage ?? null,
+              previous: null,
+            });
+            setCompareMode("side");
+            toast.success(d.ai ? "區域修復候選已產生" : "快速預覽已產生（非 AI）");
+          } else if (!d.available) {
+            toast.error(d.note || "生成修復尚未設定。不會用 bbox 混合冒充 AI。");
+          }
+        } catch {
+          toast.error("區域修復結果無法讀取，未假裝成功");
+        }
       } else if (input.tool === "analyze_motion") {
         toast.success("SEA-RAFT 光流已寫入");
         setOverlayStack({ primary: "motion", extras: [] });
@@ -1267,6 +1301,51 @@ function StudioInner({ projectId }: { projectId: string }) {
     });
   }
 
+  function startRegionRepair(method: "generative" | "preview") {
+    if (!current || !timelineId) {
+      toast.error("沒有可修復的影格");
+      return;
+    }
+    const maskHere = maskTrack.find((m) => m.frame === engine.currentFrame);
+    const selection = regionLive && regionBox.w >= 4 && regionBox.h >= 4 ? regionBox : null;
+    if (!maskHere && !selection) {
+      toast.error("請先選區或切 SAM 2 遮罩");
+      return;
+    }
+    const pipeline = buildRegionRepairPipeline({
+      frameNumber: engine.currentFrame,
+      selection,
+      mask: maskHere
+        ? {
+            frame: maskHere.frame,
+            ...maskHere.mask,
+            contour: maskHere.contour,
+            status: maskHere.status,
+            confidence: maskHere.confidence,
+            source: "sam2",
+          }
+        : null,
+      frameNumbers: frames.map((f) => f.frameNumber),
+      providerId: method === "preview" ? "neighborhood-preview" : "wan",
+      providerAvailable: method === "preview",
+    });
+    setRegionRepair(pipeline);
+    setWorkspaceMode("REPAIR");
+    setOverlayStack({ primary: "mask", extras: ["problems"] });
+    setRepairViz([engine.currentFrame, engine.currentFrame]);
+    tool.mutate({
+      tool: "regenerate_region",
+      args: {
+        frameId: current.id,
+        timelineId,
+        frameNumber: engine.currentFrame,
+        region: regionKind,
+        method,
+        ...(selection ?? maskHere?.mask ?? {}),
+      },
+    });
+  }
+
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
       <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3">
@@ -1678,7 +1757,7 @@ function StudioInner({ projectId }: { projectId: string }) {
               </div>
             )}
             <RegionActions
-              visible={regionLive && chrome.regionActions}
+              visible={(regionLive || Boolean(maskTrack.find((m) => m.frame === engine.currentFrame))) && chrome.regionActions}
               frame={engine.currentFrame}
               onAnalyze={() => {
                 setAiOpen(true);
@@ -1700,15 +1779,8 @@ function StudioInner({ projectId }: { projectId: string }) {
                   },
                 });
               }}
-              onRepair={() => {
-                if (!current) return;
-                setRepairViz([engine.currentFrame, engine.currentFrame]);
-                setWorkspaceMode("REPAIR");
-                tool.mutate({
-                  tool: "regenerate_region",
-                  args: { frameId: current.id, region: regionKind, method: "blend", x: regionBox.x, y: regionBox.y, w: regionBox.w, h: regionBox.h },
-                });
-              }}
+              onRepair={() => startRegionRepair("generative")}
+              onPreview={() => startRegionRepair("preview")}
               onPropagate={propagateRegion}
               onClear={() => {
                 setRegionLive(false);
@@ -1837,11 +1909,37 @@ function StudioInner({ projectId }: { projectId: string }) {
                 </div>
               </div>
             )}
-            {repairViz && workspaceMode === "REPAIR" && (
+            {repairViz && workspaceMode === "REPAIR" && !regionRepair && (
               <div className="absolute left-3 top-3 z-10 rounded-[var(--radius-sm)] border border-repair/40 bg-surface/90 px-2 py-1 text-[11px]">
                 只會改 F{repairViz[0]}{repairViz[0] !== repairViz[1] ? `–F${repairViz[1]}` : ""}。
               </div>
             )}
+            {regionRepair ? (
+              <RegionRepairPanel
+                pipeline={regionRepair}
+                busy={tool.isPending}
+                onPreview={() => startRegionRepair("preview")}
+                onAccept={
+                  regionRepair.candidateId
+                    ? () =>
+                        tool.mutate({
+                          tool: "accept_generated_frames",
+                          args: { candidateId: regionRepair.candidateId, confirmed: true },
+                        })
+                    : undefined
+                }
+                onReject={
+                  regionRepair.candidateId
+                    ? () =>
+                        tool.mutate({
+                          tool: "reject_generated_frames",
+                          args: { candidateId: regionRepair.candidateId },
+                        })
+                    : undefined
+                }
+                onClose={() => setRegionRepair(null)}
+              />
+            ) : null}
           {aiOpen && chrome.ai ? (
             <ConversationPanel
               open
@@ -2624,16 +2722,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                     toast.message("點畫布上的角色或物件，SAM 2 會切真實遮罩");
                   }}
                   onRepair={() => tool.mutate({ tool: "repair_frame", args: { frameId: current.id, method: "blend" } })}
-                  onRepairRegion={() => {
-                    if (!regionLive || regionBox.w < 8 || regionBox.h < 8) {
-                      toast.error("請先在畫布上拖出真實選區");
-                      return;
-                    }
-                    tool.mutate({
-                      tool: "regenerate_region",
-                      args: { frameId: current.id, region: regionKind, method: "blend", x: regionBox.x, y: regionBox.y, w: regionBox.w, h: regionBox.h },
-                    });
-                  }}
+                  onRepairRegion={() => startRegionRepair("generative")}
                   onDuplicate={() => tool.mutate({ tool: "duplicate_frame", args: { frameId: current.id } })}
                   onDelete={() => tool.mutate({ tool: "delete_frame", args: { frameId: current.id } })}
                   onAddFrame={() => timelineId && tool.mutate({ tool: "add_frame", args: { timelineId, frameNumber: current.frameNumber } })}

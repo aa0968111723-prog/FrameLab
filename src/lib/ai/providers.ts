@@ -814,3 +814,10 @@ export function getSegmentation(provider: string): SegmentationProvider {
   fail("PROVIDER_NOT_AVAILABLE", `Segmentation provider '${provider}' is not loaded.`);
 }
 
+export function getGenerativeRepair(provider: string): GenerativeRepairProvider {
+  if (provider === "wan" || provider === "auto" || provider === "default" || provider === "generative") {
+    return wan;
+  }
+  fail("PROVIDER_NOT_AVAILABLE", `生成修復尚未設定（${provider} 未載入）。bbox 鄰域貼上不是 AI 修復。`);
+}
+
