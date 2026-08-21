@@ -13,5 +13,11 @@ node_modules/
 data/
 !data/.gitkeep
 
+# LocoTrack / RTMPose checkpoints (downloaded on first run)
+workers/gpu-worker/locotrack/weights/*.ckpt
+workers/gpu-worker/**/__pycache__/
+
 # Workspace scratch
 .node_modules.lock
+
+

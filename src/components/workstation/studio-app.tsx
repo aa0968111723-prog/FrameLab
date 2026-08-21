@@ -609,6 +609,15 @@ function StudioInner({ projectId }: { projectId: string }) {
         toast.success("RTMPose 骨架已寫入");
         setOverlayStack({ primary: "pose", extras: [] });
       } else if (
+        input.tool === "create_tracking_point" ||
+        input.tool === "create_track" ||
+        input.tool === "analyze_tracking" ||
+        input.tool === "rerun_tracking"
+      ) {
+        toast.success("LocoTrack 軌跡已寫入");
+        setOverlayStack({ primary: "track", extras: [] });
+        setCanvasTool("point");
+      } else if (
         input.tool === "add_frame" ||
         input.tool === "insert_frame" ||
         input.tool === "duplicate_frame"
@@ -1421,18 +1430,17 @@ function StudioInner({ projectId }: { projectId: string }) {
                   } else {
                     toast.message("請先在圖層選取角色，或到進階面板新增角色");
                   }
+                  return;
                 }
                 tool.mutate({
                   tool: "create_tracking_point",
                   args: {
                     projectId,
-                    name:
-                      canvasTool === "character"
-                        ? (characters.find((c) => c.id === selectedCharacterId)?.name ?? `pt-${engine.currentFrame}`)
-                        : `pt-${engine.currentFrame}`,
+                    name: `click-F${engine.currentFrame}-${Math.round(x)}-${Math.round(y)}`,
                     x,
                     y,
                     frameNumber: engine.currentFrame,
+                    provider: "locotrack",
                   },
                 });
               }}
@@ -1458,7 +1466,14 @@ function StudioInner({ projectId }: { projectId: string }) {
                 const ny = regionBox.y + regionBox.h / 2;
                 tool.mutate({
                   tool: "create_tracking_point",
-                  args: { projectId, name: regionKind === "custom" ? `region-${engine.currentFrame}` : regionKind, x: nx, y: ny, frameNumber: engine.currentFrame },
+                  args: {
+                    projectId,
+                    name: regionKind === "custom" ? `region-F${engine.currentFrame}` : regionKind,
+                    x: nx,
+                    y: ny,
+                    frameNumber: engine.currentFrame,
+                    provider: "locotrack",
+                  },
                 });
               }}
               onRepair={() => {
@@ -2255,7 +2270,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                   onNotes={async (notes) => updateNotesFn({ data: { frameId: current.id, notes } })}
                   onAnalyze={() => timelineId && tool.mutate({ tool: "analyze_frame", args: { timelineId, frameNumber: current.frameNumber, vlm: true } })}
                   onMotion={() => timelineId && tool.mutate({ tool: "analyze_motion", args: { timelineId } })}
-                  onTrack={() => timelineId && tool.mutate({ tool: "analyze_tracking", args: { timelineId } })}
+                  onTrack={() => timelineId && tool.mutate({ tool: "analyze_tracking", args: { timelineId, provider: "locotrack" } })}
                   onPose={() =>
                     timelineId &&
                     tool.mutate({

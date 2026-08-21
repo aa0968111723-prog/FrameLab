@@ -1,4 +1,5 @@
 import { rtmposeHealth } from "@/lib/ai/rtmpose-worker";
+import { locotrackHealth } from "@/lib/ai/locotrack-worker";
 
 export type ProviderStatus =
   | "ready"
@@ -197,17 +198,17 @@ export function listModels(): ModelInfo[] {
     },
     {
       id: "locotrack",
-      provider: "locotrack",
-      modelName: "locotrack",
-      modelVersion: "unwired",
-      checkpoint: "none",
-      license: "check checkpoint",
-      commercialUse: false,
-      device: "cuda",
-      precision: "fp16",
-      status: "unavailable",
+      provider: "cvlab-kaist",
+      modelName: "locotrack-s",
+      modelVersion: "eccv2024",
+      checkpoint: "locotrack_small.ckpt",
+      license: "Apache-2.0",
+      commercialUse: true,
+      device: locotrackHealth().device,
+      precision: "fp32",
+      status: locotrackHealth().ok ? "ready" : "unavailable",
       role: "point_tracking",
-      notes: "Adapter reserved. Use framelab-ncc. MODEL_NOT_AVAILABLE until a LocoTrack checkpoint is loaded.",
+      notes: "Real LocoTrack-S via Python worker. Click canvas to track. Statuses: visible / occluded / lost / recovered.",
     },
     {
       id: "video-depth-anything",

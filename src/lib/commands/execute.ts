@@ -47,6 +47,11 @@ import { FRAME_TYPES, isFrameType, type FrameType } from "@/lib/domain/types";
 import * as repo from "@/lib/framelab/repo";
 import { ownCharacter, ownObject, ownProject, ownTimeline } from "./ownership.ts";
 import { startJob, withJob } from "@/lib/jobs/queue";
+import { runLocotrack } from "@/lib/ai/locotrack-worker";
+import { existsSync } from "node:fs";
+import { mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
   concatJpegSequence,
   extractFramesWithFfmpeg,
@@ -768,12 +773,14 @@ async function analyzeMotion(ctx: CommandContext, args: Record<string, unknown>)
 
 async function analyzeTracking(ctx: CommandContext, args: Record<string, unknown>) {
   const t = await ownTimeline(ctx, str(args.timelineId));
-  const providerName = typeof args.provider === "string" ? args.provider : "framelab-ncc";
+  const providerName = typeof args.provider === "string" ? args.provider : "locotrack";
   const tracker = getPointTracker(providerName);
   if (!tracker.available()) {
     fail(
       "MODEL_NOT_AVAILABLE",
-      `${tracker.id} is not loaded. Use provider=framelab-ncc (NCC template matching).`,
+      tracker.id === "locotrack"
+        ? "LocoTrack worker is not loaded. Install workers/gpu-worker requirements or use provider=framelab-ncc."
+        : `${tracker.id} is not loaded. Use provider=framelab-ncc (NCC template matching).`,
     );
   }
   const nameFilter = typeof args.name === "string" ? args.name : null;
@@ -787,7 +794,6 @@ async function analyzeTracking(ctx: CommandContext, args: Record<string, unknown
     work: async (_id, progress) => {
       const frames = await repo.listFramesFull(t.id);
       if (frames.length === 0) return { provider: tracker.id, tracks: [] as unknown[] };
-      const decoded = frames.map((f) => decodeJpegBase64(f.image_data));
       const seeds = await repo.listTrackingPoints(t.project_id);
       const byName = new Map<string, typeof seeds>();
       for (const p of seeds) {
@@ -803,22 +809,18 @@ async function analyzeTracking(ctx: CommandContext, args: Record<string, unknown
           note: "No tracking seed. Click the canvas or call create_tracking_point first.",
         };
       }
-      const tracks = [];
-      let i = 0;
-      for (const [name, list] of byName) {
-        const seed = [...list].sort((a, b) => a.frame_number - b.frame_number)[0];
-        const seedIndex = frames.findIndex((f) => f.frame_number === seed.frame_number);
-        if (seedIndex < 0) continue;
-        const run = await tracker.track({
-          frames: decoded,
-          seed: { x: seed.x, y: seed.y, frameIndex: seedIndex },
-        });
-        if (!run.ok) fail("MODEL_NOT_AVAILABLE", run.error);
+
+      const persist = async (
+        name: string,
+        samples: { frameIndex?: number; frameNumber?: number; x: number; y: number; score: number; status: string }[],
+      ) => {
         await repo.deleteTrackEdgesForName(t.project_id, name);
         await repo.deleteTrackingPointsByName(t.project_id, name);
         let prev: { id: string; x: number; y: number; frame: number } | null = null;
-        for (const s of run.data) {
-          const frameNumber = frames[s.frameIndex]?.frame_number;
+        for (const s of samples) {
+          const frameNumber =
+            s.frameNumber ??
+            (s.frameIndex != null ? frames[s.frameIndex]?.frame_number : undefined);
           if (frameNumber == null) continue;
           const id = nid("trk");
           const status = canonicalTrackStatus(s.status);
@@ -862,6 +864,64 @@ async function analyzeTracking(ctx: CommandContext, args: Record<string, unknown
           }
           prev = { id, x: Math.round(s.x), y: Math.round(s.y), frame: frameNumber };
         }
+      };
+
+      if (tracker.id === "locotrack") {
+        await progress(8, { current: 0, total: byName.size, label: "載入 LocoTrack" });
+        const dir = path.join(tmpdir(), "framelab-locotrack", String(Date.now()));
+        await mkdir(dir, { recursive: true });
+        try {
+          const frameInputs = [];
+          for (const f of frames) {
+            let file = "";
+            const rel = f.full_asset;
+            if (rel && !rel.startsWith("/api") && !rel.startsWith("data:")) {
+              const abs = path.join(projectRoot(t.project_id), rel);
+              if (existsSync(abs)) file = abs;
+            }
+            if (!file) {
+              if (!f.image_data) continue;
+              file = path.join(dir, `${f.id}.jpg`);
+              await writeFile(file, Buffer.from(f.image_data, "base64"));
+            }
+            frameInputs.push({
+              path: file,
+              frameNumber: f.frame_number,
+              width: f.width,
+              height: f.height,
+            });
+          }
+          const queries = [...byName.entries()].map(([name, list]) => {
+            const seed = [...list].sort((a, b) => a.frame_number - b.frame_number)[0];
+            return { name, x: seed.x, y: seed.y, frameNumber: seed.frame_number };
+          });
+          await progress(18, { current: 0, total: queries.length, label: "LocoTrack 推論" });
+          const batch = await runLocotrack({ frames: frameInputs, queries });
+          const tracks = [];
+          for (const tr of batch.tracks) {
+            await persist(tr.name, tr.samples);
+            tracks.push({ name: tr.name, samples: tr.samples.length });
+          }
+          await progress(95, { current: tracks.length, total: tracks.length, label: "寫入軌跡" });
+          return { provider: tracker.id, tracks, device: batch.device, model: batch.model };
+        } finally {
+          await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+        }
+      }
+
+      const decoded = frames.map((f) => decodeJpegBase64(f.image_data));
+      const tracks = [];
+      let i = 0;
+      for (const [name, list] of byName) {
+        const seed = [...list].sort((a, b) => a.frame_number - b.frame_number)[0];
+        const seedIndex = frames.findIndex((f) => f.frame_number === seed.frame_number);
+        if (seedIndex < 0) continue;
+        const run = await tracker.track({
+          frames: decoded,
+          seed: { x: seed.x, y: seed.y, frameIndex: seedIndex },
+        });
+        if (!run.ok) fail("MODEL_NOT_AVAILABLE", run.error);
+        await persist(name, run.data);
         tracks.push({ name, samples: run.data.length });
         i += 1;
         await progress(Math.round((i / Math.max(1, byName.size)) * 90), {
@@ -1234,7 +1294,7 @@ async function createTrackingPoint(ctx: CommandContext, args: Record<string, unk
     const timelines = await repo.listTimelines(project.id);
     const timelineId = timelines[0]?.id;
     if (timelineId) {
-      await analyzeTracking(ctx, { timelineId, name, provider: args.provider });
+      await analyzeTracking(ctx, { timelineId, name, provider: args.provider ?? "locotrack" });
     }
   }
   return { id, name, x, y, frameNumber };

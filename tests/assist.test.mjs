@@ -54,11 +54,12 @@ describe("motion provider", () => {
     assert.ok(pairs.some((p) => p.mean_motion >= 0));
   });
 
-  it("sea-raft / rife / locotrack stay unavailable; rtmpose is a real worker", () => {
+  it("sea-raft / rife stay unavailable; rtmpose and locotrack are real workers", () => {
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
     assert.match(src, /class RtmposeProvider/);
+    assert.match(src, /class LocotrackProvider/);
     assert.doesNotMatch(src, /new Reserved\("rtmpose"\)/);
-    assert.match(src, /new Reserved\("locotrack"\)/);
+    assert.doesNotMatch(src, /new Reserved\("locotrack"\)/);
     assert.match(src, /class RifeInterpolation/);
     assert.match(src, /RIFE is not loaded/);
     assert.doesNotMatch(src, /fake (SEA-RAFT|RTMPose|LocoTrack|RIFE)/i);
@@ -136,7 +137,8 @@ describe("tracking continuity", () => {
     assert.ok(breaks.some((b) => b.kind === "TRACK_BREAK"));
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
     assert.match(src, /class NccPointTracker/);
-    assert.match(src, /new Reserved\("locotrack"\)/);
+    assert.match(src, /class LocotrackProvider/);
+    assert.doesNotMatch(src, /new Reserved\("locotrack"\)/);
   });
 });
 

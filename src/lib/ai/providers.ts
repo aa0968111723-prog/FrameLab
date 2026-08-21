@@ -7,6 +7,7 @@ import type { MotionCurve } from "@/lib/domain/types";
 import { estimatePoseLite, type PoseEstimate } from "@/lib/domain/pose-lite";
 import { encodeJpegBuffer } from "@/lib/domain/image-codec";
 import { rtmposeAvailable, rtmposeHealth, runRtmposeBatch, toPoseEstimate } from "@/lib/ai/rtmpose-worker";
+import { locotrackAvailable, locotrackHealth, runLocotrack } from "@/lib/ai/locotrack-worker";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -222,7 +223,6 @@ export class RifeInterpolation implements InterpolationProvider {
 
 export const sam2: SegmentationProvider = new Reserved("sam2");
 export const seaRaft: OpticalFlowProvider = new Reserved("sea-raft");
-export const locotrack: PointTrackingProvider = new Reserved("locotrack");
 export const videoDepthAnything: DepthProvider = new Reserved("video-depth-anything");
 export const rife = new RifeInterpolation();
 export const wan: GenerativeRepairProvider = new Reserved("wan", "PROVIDER_NOT_AVAILABLE");
@@ -306,6 +306,79 @@ export class BlockMatchFlow implements OpticalFlowProvider {
 }
 
 export const nccTracker = new NccPointTracker();
+
+export class LocotrackProvider implements PointTrackingProvider {
+  readonly id = "locotrack";
+  available() {
+    return locotrackAvailable();
+  }
+  health_check() {
+    const h = locotrackHealth();
+    return Promise.resolve({
+      name: this.id,
+      version: "locotrack-s",
+      status: h.ok ? "ready" : "MODEL_NOT_AVAILABLE",
+      device: h.device,
+      capabilities: h.ok ? ["point_tracking", "occlusion"] : [],
+    } satisfies ProviderMeta);
+  }
+  async track(input: {
+    frames: RgbaFrame[];
+    seed: { x: number; y: number; frameIndex: number };
+    patch?: number;
+    search?: number;
+    minScore?: number;
+  }): Promise<ProviderRun<TrackedPoint[]>> {
+    if (!this.available()) {
+      return {
+        ok: false,
+        code: "MODEL_NOT_AVAILABLE",
+        error: "LocoTrack worker is not loaded.",
+        provider: this.id,
+      };
+    }
+    const dir = path.join(tmpdir(), "framelab-locotrack", `one-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    try {
+      const frames = input.frames.map((frame, i) => {
+        const file = path.join(dir, `f${String(i).padStart(4, "0")}.jpg`);
+        writeFileSync(file, encodeJpegBuffer(frame, 90));
+        return { path: file, frameNumber: i, width: frame.width, height: frame.height };
+      });
+      const { tracks } = await runLocotrack({
+        frames,
+        queries: [
+          {
+            name: "seed",
+            x: input.seed.x,
+            y: input.seed.y,
+            frameNumber: input.seed.frameIndex,
+          },
+        ],
+      });
+      const samples = tracks[0]?.samples ?? [];
+      const data: TrackedPoint[] = frames.map((f, frameIndex) => {
+        const s = samples.find((p) => p.frameNumber === f.frameNumber);
+        return {
+          frameIndex,
+          x: s?.x ?? input.seed.x,
+          y: s?.y ?? input.seed.y,
+          score: s?.score ?? 0,
+          status: s?.status ?? "lost",
+        };
+      });
+      return { ok: true, data, provider: this.id };
+    } finally {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+export const locotrack = new LocotrackProvider();
 export const blockMatchFlow = new BlockMatchFlow();
 
 export class PoseLiteProvider implements PoseProvider {

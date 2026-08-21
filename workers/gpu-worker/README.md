@@ -1,21 +1,21 @@
-# GPU worker — RTMPose
+# GPU worker
 
-Python process used by FrameLab for **real** RTMPose inference.
+Python processes used by FrameLab for real model inference.
 
-```
-UI  →  analyze_pose  →  POSE_ANALYSIS job  →  rtmpose_worker.py  →  YOLOX-tiny + RTMPose-s (ONNX)
-     →  poses table  →  canvas skeleton overlay
-```
+## RTMPose
 
-`pose-lite` remains a CPU silhouette fallback (`provider=framelab-pose-lite`). It is not RTMPose.
+`UI → analyze_pose → POSE_ANALYSIS job → rtmpose_worker.py → YOLOX-tiny + RTMPose-s → poses → canvas skeleton`
 
-## Run
+## LocoTrack
+
+`Canvas click → create_tracking_point → POINT_TRACKING job → locotrack_worker.py → LocoTrack-S → tracking_points → trail`
+
+Statuses: visible / occluded / lost / recovered.
 
 ```bash
 pip install -r workers/gpu-worker/requirements.txt
 python3 workers/gpu-worker/rtmpose_worker.py --health
+python3 workers/gpu-worker/locotrack_worker.py --health
 ```
 
-The Node API spawns this script per pose job (model stays loaded for the batch). CUDA is used when `CUDAExecutionProvider` is present; otherwise CPU.
-
-First run downloads YOLOX-tiny + RTMPose-s ONNX from OpenMMLab into `~/.cache/rtmlib`.
+CUDA is used when available; otherwise CPU. LocoTrack-S checkpoint downloads from Hugging Face on first run into `locotrack/weights/`.

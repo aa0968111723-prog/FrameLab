@@ -1,7 +1,9 @@
 # Tracking
 
-Runnable: `framelab-ncc` template matching. Status: visible / occluded / lost / recovered.
+**LocoTrack-S** is the real tracker:
 
-`locotrack` → `MODEL_NOT_AVAILABLE`.
+`Canvas click → create_tracking_point → POINT_TRACKING job → locotrack_worker.py → LocoTrack-S → tracking_points → trail overlay`
 
-`detectTrackBreaks` emits `TRACK_BREAK`. MCP: `create_track`, `get_track`, `retrack_range`.
+Statuses: `visible` / `occluded` / `lost` / `recovered`.
+
+`framelab-ncc` remains a template-matching fallback (`provider=framelab-ncc`).

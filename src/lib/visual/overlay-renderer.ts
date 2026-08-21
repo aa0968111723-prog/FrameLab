@@ -150,25 +150,34 @@ export function motionPathPoints(
   tracking: TrackSample[],
   vt: ViewportTransform,
   name: string,
-): { x: number; y: number; frame: number; problem: boolean }[] {
+): { x: number; y: number; frame: number; problem: boolean; status: string }[] {
   return tracking
     .filter((t) => t.name === name)
     .sort((a, b) => a.frame_number - b.frame_number)
     .map((t) => {
       const n = toNormalized(t.x, t.y, vt.frameWidth, vt.frameHeight);
       const p = normToView(vt, n.x, n.y);
+      const status = String(t.status ?? "visible").toLowerCase();
       return {
         x: p.x,
         y: p.y,
         frame: t.frame_number,
-        problem: t.status === "lost" || (typeof t.score === "number" && t.score < 0.35),
+        status,
+        problem: status === "lost" || status === "occluded" || (typeof t.score === "number" && t.score < 0.35),
       };
     });
 }
 
+const STATUS_COLOR: Record<string, string> = {
+  visible: "rgba(142, 160, 181, 0.95)",
+  recovered: "rgba(120, 180, 140, 0.95)",
+  occluded: "rgba(196, 165, 116, 0.95)",
+  lost: DANGER,
+};
+
 export function drawMotionPath(
   ctx: CanvasRenderingContext2D,
-  points: { x: number; y: number; frame: number; problem: boolean }[],
+  points: { x: number; y: number; frame: number; problem: boolean; status?: string }[],
   currentFrame: number,
 ) {
   if (points.length < 2) return;
@@ -178,21 +187,33 @@ export function drawMotionPath(
   for (let i = 1; i < points.length; i += 1) {
     const a = points[i - 1];
     const b = points[i];
-    ctx.strokeStyle = a.problem || b.problem ? DANGER : "rgba(142, 160, 181, 0.9)";
+    const st = (b.status ?? (b.problem ? "lost" : "visible")).toLowerCase();
+    ctx.strokeStyle = STATUS_COLOR[st] ?? STATUS_COLOR.visible;
+    ctx.setLineDash(st === "occluded" ? [4, 3] : st === "lost" ? [2, 3] : []);
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
   }
+  ctx.setLineDash([]);
   for (const p of points) {
-    ctx.fillStyle = p.frame === currentFrame ? "#f4f4f5" : p.problem ? DANGER : "rgba(200,204,212,0.85)";
+    const st = (p.status ?? (p.problem ? "lost" : "visible")).toLowerCase();
+    ctx.fillStyle = p.frame === currentFrame ? "#f4f4f5" : STATUS_COLOR[st] ?? STATUS_COLOR.visible;
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.frame === currentFrame ? 3.8 : 2.4, 0, Math.PI * 2);
     ctx.fill();
-    if (p.problem) {
+    if (st === "lost") {
       ctx.fillStyle = DANGER;
       ctx.font = "10px sans-serif";
-      ctx.fillText("!", p.x + 5, p.y - 5);
+      ctx.fillText("×", p.x + 5, p.y - 5);
+    } else if (st === "occluded") {
+      ctx.fillStyle = STATUS_COLOR.occluded;
+      ctx.font = "10px sans-serif";
+      ctx.fillText("◌", p.x + 5, p.y - 5);
+    } else if (st === "recovered") {
+      ctx.fillStyle = STATUS_COLOR.recovered;
+      ctx.font = "10px sans-serif";
+      ctx.fillText("↺", p.x + 5, p.y - 5);
     }
   }
   ctx.restore();

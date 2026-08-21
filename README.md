@@ -50,7 +50,7 @@ Pixel metrics, linear-blend inbetweens, neighborhood repair, timeline, onion ski
 
 ## GPU mode
 
-CUDA adapters (SAM 2, SEA-RAFT, RIFE, Wan, Video Depth Anything) are reserved. **RTMPose is live** via the Python worker (`workers/gpu-worker/rtmpose_worker.py`) on CUDA when present, otherwise CPU. See [docs/POSE_ANALYSIS.md](docs/POSE_ANALYSIS.md).
+CUDA adapters (SAM 2, SEA-RAFT, RIFE, Wan, Video Depth Anything) are reserved. **RTMPose** and **LocoTrack-S** run through Python workers on CUDA when present, otherwise CPU.
 
 ## Web UI
 
@@ -99,7 +99,8 @@ TypeScript client: `packages/sdk`.
 | FFmpeg frame extract | **ready** |
 | xAI grok-4.5 vision (user-initiated frames only) | **ready** if `XAI_API_KEY` |
 | RTMPose-s + YOLOX-tiny (Python worker) | **ready** (CUDA or CPU) |
-| SAM 2, SEA-RAFT, LocoTrack, Depth Anything, RIFE, Wan | adapter only — `MODEL_NOT_AVAILABLE` |
+| LocoTrack-S (Python worker) | **ready** (CUDA or CPU) |
+| SAM 2, SEA-RAFT, Depth Anything, RIFE, Wan | adapter only — `MODEL_NOT_AVAILABLE` |
 
 No random poses. No fake depth. No hardcoded consistency.
 
