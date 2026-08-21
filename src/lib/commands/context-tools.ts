@@ -19,7 +19,7 @@ import {
 } from "@/lib/domain/lightweight-analysis";
 import type { RgbaFrame } from "@/lib/domain/pixel-metrics";
 import * as repo from "@/lib/framelab/repo";
-import type { CommandContext } from "./execute";
+import type { CommandContext } from "./execute.ts";
 
 function sessionIdOf(args: Record<string, unknown>): string {
   const v = args.sessionId ?? args.session_id ?? args.context_id;
@@ -359,7 +359,7 @@ export async function analyzeSelection(ctx: CommandContext, args: Record<string,
 
 export async function analyzeMotionContext(ctx: CommandContext, args: Record<string, unknown>) {
   const session = args.sessionId || args.session_id ? await loadOwnedSession(ctx, args) : null;
-  let timelineId =
+  const timelineId =
     typeof args.timelineId === "string" ? args.timelineId : session?.timeline_id ?? null;
   if (!timelineId) fail("VALIDATION_ERROR", "timelineId or sessionId required");
   const t = await repo.getTimeline(timelineId);

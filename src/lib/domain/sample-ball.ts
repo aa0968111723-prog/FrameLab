@@ -1,6 +1,6 @@
-import type { FrameType } from "./types";
-import { encodeJpegBase64, hashBytes, makeThumbnail } from "./image-codec";
-import type { RgbaFrame } from "./pixel-metrics";
+import type { FrameType } from "./types.ts";
+import { encodeJpegBase64, hashBytes, makeThumbnail } from "./image-codec.ts";
+import type { RgbaFrame } from "./pixel-metrics.ts";
 
 export type GeneratedFrame = {
   frameNumber: number;

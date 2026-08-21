@@ -1,4 +1,4 @@
-import { analyzeFrameWithGrok, type VlmResult } from "./grok-vision";
+import { analyzeFrameWithGrok, type VlmResult } from "./grok-vision.ts";
 
 export type ExternalAIProviderId = "xai" | "openai" | "gemini" | "claude" | "local" | "mcp-agent" | "custom";
 

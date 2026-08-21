@@ -48,7 +48,7 @@ import {
 } from "@/lib/media/ffmpeg";
 import { putBytes, ensureProjectLayout, projectRoot } from "@/lib/storage/local";
 import { callContextBridge, MCP_CONTEXT_TOOLS } from "@/lib/mcp/context-bridge";
-import { dispatchVisualTool, VISUAL_TOOLS } from "./visual-tools";
+import { dispatchVisualTool, VISUAL_TOOLS } from "./visual-tools.ts";
 
 export type CommandContext = {
   userId: string;
@@ -1537,12 +1537,12 @@ export async function extractAndIngestUploadedVideo(
   if (!opts.existingVideoId) {
     await repo.insertVideo({
       id: videoId,
-      projectId: created.id,
+      project_id: created.id,
       filename: opts.filename,
-      mimeType: opts.mimeType,
-      durationMs: extracted.durationMs,
-      frameCount: frames.length,
-      sourcePath,
+      mime_type: opts.mimeType,
+      duration_ms: extracted.durationMs,
+      frame_count: frames.length,
+      source_path: sourcePath,
       status: "extracted",
     });
   }

@@ -1,4 +1,4 @@
-import { fail } from "./errors";
+import { fail } from "./errors.ts";
 
 type Bucket = { times: number[] };
 

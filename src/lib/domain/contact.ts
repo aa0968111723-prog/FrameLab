@@ -1,4 +1,4 @@
-import type { ConsistencyCategory } from "./types";
+import type { ConsistencyCategory } from "./types.ts";
 
 export type TrackPoint = {
   name: string;

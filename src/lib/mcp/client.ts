@@ -8,4 +8,4 @@ export {
   registerServer as registerExternalServer,
   listServers as listExternalServers,
   connect,
-} from "../../../packages/mcp-client/src/index";
+} from "../../../packages/mcp-client/src/index.ts";

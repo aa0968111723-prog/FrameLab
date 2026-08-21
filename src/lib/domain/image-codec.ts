@@ -1,7 +1,7 @@
 import { decode as jpegDecode, encode as jpegEncode } from "jpeg-js";
 import { deflateSync } from "node:zlib";
 import { createHash } from "node:crypto";
-import type { RgbaFrame } from "./pixel-metrics";
+import type { RgbaFrame } from "./pixel-metrics.ts";
 
 export function decodeJpegBase64(b64: string): RgbaFrame {
   const raw = Buffer.from(b64, "base64");

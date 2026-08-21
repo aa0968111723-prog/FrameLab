@@ -3,7 +3,7 @@ import type {
   EdgeType,
   FrameRecord,
   TrackStatus,
-} from "./types";
+} from "./types.ts";
 
 export type GraphNodeKind =
   | "frame"

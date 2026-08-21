@@ -1,4 +1,4 @@
-import type { ConsistencyCategory, ConsistencyResult } from "../domain/types";
+import type { ConsistencyCategory, ConsistencyResult } from "../domain/types.ts";
 import {
   continuityScore,
   lumaVariance,
@@ -6,7 +6,7 @@ import {
   meanLuma,
   motionField,
   type RgbaFrame,
-} from "../domain/pixel-metrics";
+} from "../domain/pixel-metrics.ts";
 
 const UNAVAILABLE: ConsistencyCategory[] = [
   "CHARACTER_IDENTITY",

@@ -3,7 +3,7 @@ import { ALL_SCOPES, executeTool, type CommandContext } from "@/lib/commands/exe
 import { parseScopes } from "@/lib/domain/permissions";
 import * as repo from "@/lib/framelab/repo";
 import { getSessionUser } from "@/lib/auth/verify.server";
-import { mapRestPath } from "./rest-map";
+import { mapRestPath } from "./rest-map.ts";
 
 export async function handleRest(request: Request): Promise<Response> {
   const url = new URL(request.url);

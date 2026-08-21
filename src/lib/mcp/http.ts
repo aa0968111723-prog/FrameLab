@@ -3,7 +3,7 @@ import { executeTool, type CommandContext } from "@/lib/commands/execute";
 import { getDeviceInfo, listModels } from "@/lib/ai/registry";
 import { parseScopes } from "@/lib/domain/permissions";
 import * as repo from "@/lib/framelab/repo";
-import { MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES, MCP_TOOLS, promptText } from "./catalog";
+import { MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES, MCP_TOOLS, promptText } from "./catalog.ts";
 
 type Rpc = {
   jsonrpc?: string;

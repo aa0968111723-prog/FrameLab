@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate } from "@tanstack/react-router";
-import { authEnabled, signOut } from "./client";
-import { useCurrentUser, useCurrentUserState } from "./use-current-user";
+import { authEnabled, signOut } from "./client.ts";
+import { useCurrentUser, useCurrentUserState } from "./use-current-user.ts";
 
 /**
  * Auth state components — plain wrappers around `useCurrentUserState()`.

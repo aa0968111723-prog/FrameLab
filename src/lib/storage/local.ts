@@ -1,6 +1,6 @@
 import { mkdir, writeFile, readFile, access } from "node:fs/promises";
 import path from "node:path";
-import { fail } from "../domain/errors";
+import { fail } from "../domain/errors.ts";
 
 export const STORAGE_DIRS = [
   "source",

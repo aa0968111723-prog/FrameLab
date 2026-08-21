@@ -23,7 +23,7 @@ import { analysisCacheKey, cacheGet, cacheSet } from "@/lib/domain/analysis-cach
 import * as repo from "@/lib/framelab/repo";
 import { putBytes, putJpeg } from "@/lib/storage/local";
 import { withJob } from "@/lib/jobs/queue";
-import type { CommandContext } from "./execute";
+import type { CommandContext } from "./execute.ts";
 import { blendRgba } from "@/lib/domain/pixel-metrics";
 
 function parseRegionArg(

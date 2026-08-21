@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fail } from "../domain/errors";
-import { assertInsideData, dataRoot, safeFilename } from "../storage/local";
+import { fail } from "../domain/errors.ts";
+import { assertInsideData, dataRoot, safeFilename } from "../storage/local.ts";
 
 const ALLOWED_EXT = new Set([".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi"]);
 const MAX_BYTES = 48 * 1024 * 1024;

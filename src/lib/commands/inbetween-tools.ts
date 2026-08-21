@@ -29,7 +29,7 @@ import { nid } from "@/lib/domain/ids";
 import * as repo from "@/lib/framelab/repo";
 import { putBytes, putJpeg } from "@/lib/storage/local";
 import { withJob } from "@/lib/jobs/queue";
-import type { CommandContext } from "./execute";
+import type { CommandContext } from "./execute.ts";
 
 type CandidateFrame = {
   frameNumber: number;

@@ -1,6 +1,6 @@
 /** MCP visual tools. Return VisualAnnotation — never CSS/DOM commands. */
 
-import type { CommandContext } from "./execute";
+import type { CommandContext } from "./execute.ts";
 import { fail } from "@/lib/domain/errors";
 import { nid } from "@/lib/domain/ids";
 import {

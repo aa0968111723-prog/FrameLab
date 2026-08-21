@@ -266,7 +266,7 @@ export async function listCharacters(projectId: string) {
 
 export async function getCharacter(id: string) {
   const sql = await getSql();
-  const rows = await sql<{ id: string; project_id: string; name: string }>`select id, project_id, name from characters where id = ${id} limit 1`;
+  const rows = await sql<{ id: string; project_id: string; name: string; notes: string }>`select id, project_id, name, notes from characters where id = ${id} limit 1`;
   return rows[0] ?? null;
 }
 
@@ -334,7 +334,7 @@ export async function listObjects(projectId: string) {
 
 export async function getObject(id: string) {
   const sql = await getSql();
-  const rows = await sql<{ id: string; project_id: string; name: string }>`select id, project_id, name from objects where id = ${id} limit 1`;
+  const rows = await sql<{ id: string; project_id: string; name: string; notes: string }>`select id, project_id, name, notes from objects where id = ${id} limit 1`;
   return rows[0] ?? null;
 }
 
@@ -584,6 +584,7 @@ export async function getRevision(id: string) {
     timeline_id: string | null;
     start_frame: number | null;
     end_frame: number | null;
+    created_at: string;
   }>`select * from revisions where id = ${id} limit 1`;
   return rows[0] ?? null;
 }
@@ -873,6 +874,7 @@ export async function getVideo(id: string) {
     id: string;
     project_id: string;
     filename: string;
+    mime_type: string;
     source_path: string;
     status: string;
   }>`select * from videos where id = ${id} limit 1`;
@@ -891,14 +893,15 @@ export async function insertVideo(row: {
   content_hash?: string;
   source_path?: string;
   user_id?: string;
+  status?: string;
 }) {
   const sql = await getSql();
   await sql`
-    insert into videos (id, project_id, filename, mime_type, duration_ms, width, height, frame_count, content_hash, source_path, user_id)
+    insert into videos (id, project_id, filename, mime_type, duration_ms, width, height, frame_count, content_hash, source_path, user_id, status)
     values (
       ${row.id}, ${row.project_id}, ${row.filename}, ${row.mime_type}, ${row.duration_ms ?? 0},
       ${row.width ?? 0}, ${row.height ?? 0}, ${row.frame_count ?? 0}, ${row.content_hash ?? ""},
-      ${row.source_path ?? ""}, ${row.user_id ?? null}
+      ${row.source_path ?? ""}, ${row.user_id ?? null}, ${row.status ?? "ready"}
     )
   `;
 }
@@ -1024,13 +1027,23 @@ export async function getConversation(userId: string, id: string) {
     provider: string;
     mode: string;
     title: string;
+    timeline_id: string | null;
+    frame_start: number | null;
+    frame_end: number | null;
+    created_at: string;
   }>`select * from conversations where id = ${id} and user_id = ${userId} limit 1`;
   return rows[0] ?? null;
 }
 
 export async function listConversations(userId: string, projectId: string) {
   const sql = await getSql();
-  return sql`select id, title, provider, mode, created_at from conversations where user_id = ${userId} and project_id = ${projectId} order by updated_at desc`;
+  return sql<{
+    id: string;
+    title: string;
+    provider: string;
+    mode: string;
+    created_at: string;
+  }>`select id, title, provider, mode, created_at from conversations where user_id = ${userId} and project_id = ${projectId} order by updated_at desc`;
 }
 
 export async function updateConversation(
@@ -1120,6 +1133,7 @@ export async function conversationCountsByFrame(userId: string, projectId: strin
 export async function listProblemRanges(timelineId: string) {
   const sql = await getSql();
   return sql<{
+    id: string;
     start_frame: number;
     end_frame: number;
     peak_frame: number;
@@ -1127,7 +1141,7 @@ export async function listProblemRanges(timelineId: string) {
     severity: string;
     score: number;
     reason: string;
-  }>`select start_frame, end_frame, peak_frame, category, severity, score, reason from problem_ranges where timeline_id = ${timelineId} order by start_frame`;
+  }>`select id, start_frame, end_frame, peak_frame, category, severity, score, reason from problem_ranges where timeline_id = ${timelineId} order by start_frame`;
 }
 
 export async function replaceProblemRanges(

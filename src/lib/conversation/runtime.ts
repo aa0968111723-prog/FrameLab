@@ -31,7 +31,7 @@ import {
 import { isInbetweenRequest, isCurveAdjustRequest, parseAnimationIntent } from "@/lib/domain/animation-intent";
 import * as repo from "@/lib/framelab/repo";
 import { nid } from "@/lib/domain/ids";
-import { buildVisionAssets } from "./vision-assets";
+import { buildVisionAssets } from "./vision-assets.ts";
 import { MCP_TOOLS } from "@/lib/mcp/catalog";
 
 const ASK_SCOPES = ["READ", "ANALYZE"] as const;

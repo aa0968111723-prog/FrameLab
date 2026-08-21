@@ -123,8 +123,22 @@ describe("permissions and catalog", () => {
     assert.ok(uris.includes("framelab://objects/{object_id}"));
     assert.ok(uris.includes("framelab://objects/{object_id}/track"));
   });
-  it("ships the seven MCP prompts", () => {
-    assert.equal(MCP_PROMPTS.length, 7);
+  it("ships exactly the MCP prompts documented in docs/MCP.md", () => {
+    // Asserting the set (not just the count) so a rename or a silent addition
+    // names the offender instead of only moving a number.
+    assert.deepEqual(
+      MCP_PROMPTS.map((p) => p.name).sort(),
+      [
+        "analyze_animation_problem",
+        "analyze_character_motion",
+        "analyze_hand_consistency",
+        "analyze_object_contact",
+        "ask_about_selection",
+        "generate_inbetweens",
+        "repair_animation_range",
+        "suggest_repair_window",
+      ],
+    );
   });
 });
 

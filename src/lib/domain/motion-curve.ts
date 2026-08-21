@@ -1,4 +1,4 @@
-import type { MotionCurve } from "./types";
+import type { MotionCurve } from "./types.ts";
 
 export function applyCurve(t: number, curve: MotionCurve): number {
   const x = Math.min(1, Math.max(0, t));

@@ -1,5 +1,5 @@
-import type { RgbaFrame } from "./pixel-metrics";
-import type { TrackStatus } from "./types";
+import type { RgbaFrame } from "./pixel-metrics.ts";
+import type { TrackStatus } from "./types.ts";
 
 export type TrackedPoint = {
   frameIndex: number;
