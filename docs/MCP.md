@@ -57,7 +57,7 @@ Workspace context (session-isolated, ASK-safe): `get_current_context`, `get_curr
 
 V0.3 inbetween: `create_keyframe_pair`, `analyze_keyframe_transition`, `create_motion_plan`, `suggest_breakdown_frames`, `create_inbetween_plan` are SUGGEST/ANALYZE. `generate_inbetweens` / `regenerate_inbetween_range` need GENERATE + `confirmed=true`. `accept_generated_frames` needs EDIT + confirm and writes a revision. ASK/ASSIST conversations cannot call generate or accept.
 
-`generate_inbetweens` writes a **candidate**, not the live timeline.
+`generate_inbetweens` writes a **candidate**, not the live timeline. Default provider is **RIFE**. `linear-blend` is 快速預覽 only (not AI inbetweening).
 
 
 V0.2 Assist tools (READ+ANALYZE+SUGGEST, still no auto-edit): `suggest_repair`, `create_repair_plan`, `get_problem_ranges`, `get_repair_plan`, `compare_before_after`, `analyze_pose` (pose-lite). `execute_repair_plan` / `accept_revision` / `restore_revision` are EDIT and are denied in ASK/ASSIST conversations.

@@ -10,4 +10,4 @@ Keyboard: `C` runs consistency/assist on the selection. `Shift+A` analyzes the c
 
 Motion / Pose / Tracking / Consistency overlays toggle independently. Mask/Depth stay `MODEL_NOT_AVAILABLE`.
 
-Repair is **FULL_FRAME_INTERPOLATION** via `linear-blend`. RIFE remains `PROVIDER_NOT_AVAILABLE`.
+Repair is **FULL_FRAME_INTERPOLATION** via `linear-blend` (快速預覽). Inbetween generation uses **RIFE**.

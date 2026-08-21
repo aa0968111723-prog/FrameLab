@@ -120,7 +120,7 @@ export const MCP_TOOLS = [
   tool("list_audit_logs", "MCP audit log for the caller (ADMIN)", { limit: num }),
   tool("create_sample_project", "Create the 24-frame bouncing-ball study", { name: str }),
   tool("ingest_frames", "Replace a timeline with JPEG frames (base64). High-risk.", { projectId: str, name: str, fps: num, frames: { type: "array" } }),
-  tool("generate_inbetweens", "GENERATE: create a candidate inbetween (linear-blend). Requires confirmed=true. Does not write the active timeline.", { timelineId: str, frameA: num, frameB: num, startFrame: num, endFrame: num, count: num, curve: str, provider: str, confirmed: bool, preserveCharacter: bool, preserveBackground: bool, preserveFace: bool, maintainContact: bool, force: bool, quality: str, intent: str, sessionId: str }, ["timelineId"]),
+  tool("generate_inbetweens", "GENERATE: create a candidate inbetween with RIFE. provider=linear-blend is 快速預覽 only (not AI). Requires confirmed=true. Does not write the active timeline.", { timelineId: str, frameA: num, frameB: num, startFrame: num, endFrame: num, count: num, curve: str, provider: str, confirmed: bool, preserveCharacter: bool, preserveBackground: bool, preserveFace: bool, maintainContact: bool, force: bool, quality: str, intent: str, sessionId: str }, ["timelineId"]),
   tool("interpolate_frames", "Legacy immediate-write interpolation (does not create a candidate). Prefer generate_inbetweens.", { timelineId: str, frameA: num, frameB: num, count: num, curve: str }, ["timelineId", "frameA", "frameB"]),
   tool("repair_frame", "Neighborhood blend repair. Generative method returns PROVIDER_NOT_AVAILABLE.", { frameId: str, method: str }, ["frameId"]),
   tool("repair_frame_range", "Blend-repair a range. High-risk, audited, creates a job.", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId", "startFrame", "endFrame"]),
@@ -161,7 +161,7 @@ export const MCP_TOOLS = [
   tool("accept_generated_frames", "EDIT: promote candidate to active timeline after confirmation. Creates a revision.", { candidateId: str, confirmed: bool }, ["candidateId"]),
   tool("reject_generated_frames", "Mark candidate rejected. Keeps audit metadata.", { candidateId: str }, ["candidateId"]),
   tool("export_frame_sequence", "Write PNG sequence frame_0001.png … into renders/", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),
-  tool("generate_breakdown_frame", "GENERATE: linear-blend midpoint marked GENERATED_BREAKDOWN. Requires confirmed=true. Never pretends to be a human drawing.", { timelineId: str, startFrame: num, endFrame: num, frameNumber: num, confirmed: bool }, ["timelineId", "startFrame", "endFrame"]),
+  tool("generate_breakdown_frame", "GENERATE: RIFE midpoint marked GENERATED_BREAKDOWN. Requires confirmed=true. Never pretends to be a human drawing.", { timelineId: str, startFrame: num, endFrame: num, frameNumber: num, confirmed: bool }, ["timelineId", "startFrame", "endFrame"]),
   tool("get_generated_frame", "Read a generated frame slot from a candidate or timeline frame id.", { id: str, candidateId: str, frameNumber: num, frameId: str }),
   tool("set_frame_exposure", "Set exposure ticks (1=一拍一, 2=一拍二, 3=一拍三). One drawing holds N playback frames. Does not duplicate the image.", { frameId: str, exposure: num, exposure_count: num }, ["frameId"]),
   tool("set_playback_fps", "Set project playback fps (1–60). Independent of drawing exposure_count. Rewrites frame duration_ms.", { projectId: str, fps: num }, ["projectId", "fps"]),
@@ -221,7 +221,7 @@ export const MCP_PROMPTS = [
   },
   {
     name: "generate_inbetweens",
-    description: "Interpolate between two keyframes with linear-blend",
+    description: "Interpolate between two keyframes with RIFE (candidate only). linear-blend is 快速預覽, not AI.",
     arguments: [
       { name: "timelineId", required: true },
       { name: "frameA", required: true },
@@ -253,7 +253,7 @@ export function promptText(name: string, args: Record<string, string>): string {
     case "repair_animation_range":
       return `This is a high-risk edit. Confirm with the user, then call repair_frame_range timelineId=${args.timelineId} startFrame=${args.startFrame} endFrame=${args.endFrame}. A revision and job are created automatically.`;
     case "generate_inbetweens":
-      return `Call create_inbetween_plan first, then generate_inbetweens with confirmed=true after the user confirms. timelineId=${args.timelineId} frameA=${args.frameA} frameB=${args.frameB} provider=linear-blend. Do not claim RIFE or Wan. Do not write the active timeline until accept_generated_frames.`;
+      return `Call create_inbetween_plan first, then generate_inbetweens with confirmed=true after the user confirms. timelineId=${args.timelineId} frameA=${args.frameA} frameB=${args.frameB} provider=rife quality=production. linear-blend is 快速預覽 only — not AI inbetweening. Do not write the active timeline until accept_generated_frames.`;
     case "ask_about_selection":
       return `ASK mode only. Call get_current_context with sessionId=${args.sessionId}, then get_selected_region and analyze_selection. Answer: ${args.question ?? "What looks inconsistent here?"}. Do not invent pose/joint metrics. Never edit frames.`;
     default:

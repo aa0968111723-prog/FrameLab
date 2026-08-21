@@ -18,12 +18,12 @@ Keyframe Pair
 
 | Complexity | Strategy |
 | --- | --- |
-| LOW | linear-blend interpolation |
-| MEDIUM | linear-blend + motion curve |
-| HIGH | generative if available, else linear-blend + warning |
+| LOW | RIFE interpolation |
+| MEDIUM | RIFE + motion curve |
+| HIGH | generative if available, else RIFE + warning |
 | VERY_HIGH | suggest breakdown; generate only with `force=true` |
 
-Wan / RIFE / fal.ai / ComfyUI adapters exist and return `PROVIDER_NOT_AVAILABLE` / `MODEL_NOT_AVAILABLE`. They never invent pixels.
+RIFE-4.25 is the production interpolator. `linear-blend` is **快速預覽** only — it is not AI inbetweening. Wan / fal.ai / ComfyUI adapters return `PROVIDER_NOT_AVAILABLE` / `MODEL_NOT_AVAILABLE`. They never invent pixels.
 
 ## Candidate first
 
@@ -35,7 +35,7 @@ Preview generation downscales to max 960px wide (`GenerationResolutionPolicy`). 
 
 Accept writes `GENERATED_FROM` from both keys onto each generated frame, plus `BETWEEN` and sequential `NEXT_FRAME` / `PREVIOUS_FRAME`. Never a self-loop.
 
-`generate_breakdown_frame` interpolates a midpoint and marks it `GENERATED_BREAKDOWN` — never a human KEY/BREAKDOWN. Requires `confirmed=true`.
+`generate_breakdown_frame` interpolates a RIFE midpoint and marks it `GENERATED_BREAKDOWN` — never a human KEY/BREAKDOWN. Requires `confirmed=true`.
 
 
 Regenerate writes a **new** candidate (previous kept) and re-runs consistency. Compare A/B shows the previous candidate vs the new one.

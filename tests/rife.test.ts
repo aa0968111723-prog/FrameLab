@@ -13,7 +13,7 @@ describe("RIFE worker", () => {
     assert.equal(h.provider, "rife");
   });
 
-  it("interpolates a midpoint between two circles", async () => {
+  it("interpolates a midpoint between two circles (centroid near 64, not a linear blend)", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rife-"));
     const py = `
 import cv2, numpy as np, json, sys
@@ -38,6 +38,26 @@ print("ok")
     assert.equal(model, "rife-4.25");
     assert.equal(frames.length, 1);
     assert.ok(fs.existsSync(frames[0]!.path));
+    const cent = spawnSync(
+      "python3",
+      [
+        "-c",
+        `
+import cv2, numpy as np, sys
+img=cv2.imread(sys.argv[1])
+mask=cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)>20
+ys,xs=np.where(mask)
+print(float(xs.mean()), float(ys.mean()), int(mask.sum()))
+`,
+        frames[0]!.path,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(cent.status, 0, cent.stderr);
+    const [cx, cy, area] = cent.stdout.trim().split(/\s+/).map(Number);
+    assert.ok(area > 200, `midpoint has almost no subject: area=${area}`);
+    assert.ok(Math.abs(cx - 64) < 8, `centroid x=${cx} expected ~64`);
+    assert.ok(Math.abs(cy - 48) < 8, `centroid y=${cy} expected ~48`);
   });
 
   it("wires Key A/B → candidate → preview → accept; linear-blend is 快速預覽 not AI", () => {
@@ -45,9 +65,11 @@ print("ok")
     const tools = fs.readFileSync(path.join(process.cwd(), "src/lib/commands/inbetween-tools.ts"), "utf8");
     const studio = fs.readFileSync(path.join(process.cwd(), "src/components/workstation/studio-app.tsx"), "utf8");
     const panel = fs.readFileSync(path.join(process.cwd(), "src/components/workstation/inbetween-panel.tsx"), "utf8");
+    const catalog = fs.readFileSync(path.join(process.cwd(), "src/lib/mcp/catalog.ts"), "utf8");
     assert.match(providers, /class RifeInbetween/);
     assert.match(providers, /runRife/);
     assert.match(tools, /getInbetween\("rife"\)/);
+    assert.match(studio, /quality: "production"/);
     assert.match(studio, /provider: inb.quality === "preview" \? "linear-blend" : "rife"/);
     assert.match(studio, /accept_generated_frames/);
     assert.match(studio, /reject_generated_frames/);
@@ -55,5 +77,8 @@ print("ok")
     assert.match(panel, /RIFE 中割/);
     assert.match(panel, /不是 AI 中割/);
     assert.doesNotMatch(panel, /供應商：自動（線性混合）/);
+    assert.match(catalog, /provider=rife quality=production/);
+    assert.doesNotMatch(catalog, /Do not claim RIFE/);
+    assert.match(catalog, /linear-blend is 快速預覽/);
   });
 });

@@ -265,7 +265,7 @@ export async function createMotionPlanCmd(ctx: CommandContext, args: Record<stri
     fps: t.fps,
     constraints,
     breakdowns: typeof args.includeSuggestedBreakdown === "boolean" && !args.includeSuggestedBreakdown ? [] : breakdowns,
-    quality: args.quality === "production" ? "production" : "preview",
+    quality: args.quality === "preview" ? "preview" : "production",
     camera: { movement: args.keepCameraStatic ? "static" : "unknown" },
     version,
     characters: [...byChar.entries()].map(([id, name]) => ({
@@ -1153,6 +1153,9 @@ export async function generateBreakdownFrameCmd(ctx: CommandContext, args: Recor
     fail("INVALID_KEYFRAME_PAIR", "Cannot overwrite a locked or KEY frame with a generated breakdown.");
   }
   const inb = getInbetween("rife");
+  if (!inb.available()) {
+    fail("PROVIDER_NOT_AVAILABLE", "RIFE worker is not loaded. Use provider=linear-blend for 快速預覽 (not AI inbetween).");
+  }
   const ra = decodeJpegBase64(a.image_data);
   const rb = decodeJpegBase64(b.image_data);
   const size = resolveGenerationSize(ra, "preview");

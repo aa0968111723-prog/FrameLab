@@ -6,7 +6,7 @@ source (video | image sequence | generated sample)
   → frames (JPEG + thumb + hash + LocalStorage mirror)
   → timeline + Frame Graph (NEXT/PREV, APPEARS_IN)
   → keys / breakdowns / inbetweens / holds
-  → generate_inbetweens (count, curve) via linear-blend
+  → generate_inbetweens (count, curve) via RIFE; linear-blend is 快速預覽 only
   → pixel consistency + optional tracking-point CONTACT_BREAK
   → neighborhood blend repair (range)
   → revision (restore)

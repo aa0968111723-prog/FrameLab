@@ -109,7 +109,7 @@ export function listModels(): ModelInfo[] {
       precision: "fp32",
       status: "ready",
       role: "interpolation",
-      notes: "Per-pixel linear blend with motion curves. Not RIFE.",
+      notes: "快速預覽 only — per-pixel linear blend with motion curves. Not AI inbetweening. Not RIFE.",
     },
     {
       id: "grok-vlm",

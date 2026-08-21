@@ -355,7 +355,7 @@ function toInbetweenAsk(data: unknown): InbetweenAskPayload | null {
           frames: d.confirmation.frames ?? d.pair?.desired_inbetween_count ?? 0,
           curve: d.confirmation.curve ?? d.plan?.curve ?? "ease_in_out",
           constraints: d.confirmation.constraints ?? [],
-          provider: d.confirmation.provider ?? "linear-blend",
+          provider: d.confirmation.provider ?? "rife",
           warnings: d.confirmation.warnings ?? d.warnings ?? [],
           blocked: Boolean(d.confirmation.blocked),
           reason: d.confirmation.reason ?? "",
@@ -389,7 +389,7 @@ function toInbetweenAsk(data: unknown): InbetweenAskPayload | null {
     strategy: d.strategy
       ? {
           kind: d.strategy.kind ?? "interpolation",
-          provider: d.strategy.provider ?? "linear-blend",
+          provider: d.strategy.provider ?? "rife",
           reason: d.strategy.reason ?? "",
         }
       : null,

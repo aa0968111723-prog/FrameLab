@@ -4,8 +4,8 @@
 
 | id | kind | status |
 | --- | --- | --- |
-| `linear-blend` | interpolation | **ready** — per-pixel blend + motion curve |
-| `rife` | interpolation | `PROVIDER_NOT_AVAILABLE` |
+| `linear-blend` | interpolation | **ready** — 快速預覽 (pixel blend). Not AI. |
+| `rife` | interpolation | **ready** — Practical-RIFE 4.25 Python worker |
 | `wan` | generative | `PROVIDER_NOT_AVAILABLE` |
 | `fal.ai` | generative | `MODEL_NOT_AVAILABLE` |
 | `comfyui` | generative | `PROVIDER_NOT_AVAILABLE` |

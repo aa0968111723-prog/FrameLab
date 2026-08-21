@@ -283,7 +283,7 @@ function StudioInner({ projectId }: { projectId: string }) {
     end: null,
     count: 9,
     curve: "ease_in_out",
-    quality: "preview",
+    quality: "production",
     constraints: {
       preserveCharacter: true,
       preserveFace: true,
@@ -512,7 +512,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                   reasons: (d.transition as { reasons?: string[] }).reasons ?? [],
                   suggest_breakdown: Boolean((d.plan as { breakdowns?: number[] } | null)?.breakdowns?.length),
                   suggested_breakdown: (d.plan as { breakdowns?: number[] } | null)?.breakdowns?.[0] ?? null,
-                  strategy: d.strategy ?? { kind: "interpolation", provider: "linear-blend", reason: "" },
+                  strategy: d.strategy ?? { kind: "interpolation", provider: "rife", reason: "" },
                 }
               : s.analysis,
           }));
@@ -575,9 +575,9 @@ function StudioInner({ projectId }: { projectId: string }) {
                   candidateId: d.candidateId ?? "",
                   previousCandidateId: d.previousCandidateId ?? s.candidate?.candidateId,
                   previousFrames: d.previousFrames ?? s.candidate?.frames,
-                  provider: d.provider ?? s.candidate?.provider ?? "linear-blend",
+                  provider: d.provider ?? s.candidate?.provider ?? "rife",
                   count: d.count ?? d.frames?.length ?? 0,
-                  quality: d.quality ?? s.candidate?.quality ?? "preview",
+                  quality: d.quality ?? s.candidate?.quality ?? "production",
                   evaluation: d.evaluation,
                   warnings: d.warnings,
                   frames: d.frames ?? [],
@@ -2144,7 +2144,17 @@ function StudioInner({ projectId }: { projectId: string }) {
                       setInb((s) => ({ ...s, busy: true }));
                       tool.mutate({
                         tool: "create_inbetween_plan",
-                        args: { timelineId, startFrame: inb.start, endFrame: inb.end, count: inb.count, curve: inb.curve, promoteKeys: true, ...inb.constraints },
+                        args: {
+                          timelineId,
+                          startFrame: inb.start,
+                          endFrame: inb.end,
+                          count: inb.count,
+                          curve: inb.curve,
+                          promoteKeys: true,
+                          quality: inb.quality,
+                          provider: inb.quality === "preview" ? "linear-blend" : "rife",
+                          ...inb.constraints,
+                        },
                       });
                     }}
                     onPlan={() => {
@@ -2155,7 +2165,17 @@ function StudioInner({ projectId }: { projectId: string }) {
                       setInb((s) => ({ ...s, busy: true }));
                       tool.mutate({
                         tool: "create_inbetween_plan",
-                        args: { timelineId, startFrame: inb.start, endFrame: inb.end, count: inb.count, curve: inb.curve, promoteKeys: true, ...inb.constraints },
+                        args: {
+                          timelineId,
+                          startFrame: inb.start,
+                          endFrame: inb.end,
+                          count: inb.count,
+                          curve: inb.curve,
+                          promoteKeys: true,
+                          quality: inb.quality,
+                          provider: inb.quality === "preview" ? "linear-blend" : "rife",
+                          ...inb.constraints,
+                        },
                       });
                     }}
                     onConfirmGenerate={() => {
@@ -2191,6 +2211,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                           provider: inb.quality === "preview" ? "linear-blend" : "rife",
                           confirmed: true,
                           force: true,
+                          quality: inb.quality,
                           ...inb.constraints,
                         },
                       });

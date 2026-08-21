@@ -16,4 +16,4 @@ Missing keys never produce a fabricated assistant reply. ASK still returns light
 
 Vision assets (`src/lib/conversation/vision-assets.ts`) downsample the current frame, a padded region crop, and at most a couple of neighbor thumbnails.
 
-Pixel / motion / tracking models (NCC, block-match, linear-blend) are **not** LLM providers. They live in `src/lib/ai/providers.ts` and keep returning `MODEL_NOT_AVAILABLE` / `PROVIDER_NOT_AVAILABLE` for SAM2 / RTMPose / RIFE / Wan until those checkpoints exist.
+Pixel / motion / tracking models (NCC, block-match, linear-blend, RIFE) are **not** LLM providers. They live in `src/lib/ai/providers.ts`. SAM2 / Wan stay `MODEL_NOT_AVAILABLE` / `PROVIDER_NOT_AVAILABLE` until those checkpoints exist. `linear-blend` is 快速預覽 only — not AI inbetweening.
