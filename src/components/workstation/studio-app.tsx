@@ -60,7 +60,6 @@ import { frameDurationMs, PRESET_FPS, clampFps } from "@/lib/domain/fps";
 import { exposureTicks, tickDurationMs } from "@/lib/domain/exposure";
 import { jobStageLabel, parseJobStage } from "@/lib/domain/job-progress";
 import { annotationsFromProblems, categoryLabel, type VisualAnnotation } from "@/lib/domain/visual-annotation";
-import { propagateMask } from "@/lib/domain/region-repair";
 import { parseAnimationIntent, intentToConstraintFlags, isInbetweenRequest, isCurveAdjustRequest } from "@/lib/domain/animation-intent";
 import type { InbetweenAskPayload } from "@/lib/domain/conversation";
 import { createEmptyContext, serializeContext, type SerializedContext } from "@/lib/domain/context-engine";
@@ -134,6 +133,7 @@ const TOOL_DONE_ZH: Record<string, string> = {
   create_breakdown: "已加入分解影格",
   edit_pose: "已儲存姿態約束",
   edit_motion_path: "已儲存路徑約束",
+  segment_object: "SAM 2 遮罩已寫入",
   analyze_consistency: "一致性掃描完成",
   analyze_frame: "影格分析完成",
   analyze_motion: "運動分析完成",
@@ -279,7 +279,17 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [problemFilter, setProblemFilter] = useState<ProblemFilter>("All");
   const [charTrack, setCharTrack] = useState(false);
-  const [maskTrack, setMaskTrack] = useState<{ frame: number; mask: { x: number; y: number; w: number; h: number }; lost?: boolean; confidence?: number }[]>([]);
+  const [maskTrack, setMaskTrack] = useState<
+    {
+      frame: number;
+      mask: { x: number; y: number; w: number; h: number };
+      contour?: number[][];
+      lost?: boolean;
+      confidence?: number;
+      status?: string;
+    }[]
+  >([]);
+  const [maskClick, setMaskClick] = useState<{ x: number; y: number; frame: number } | null>(null);
   const [problemMenu, setProblemMenu] = useState(false);
   const [inb, setInb] = useState<InbetweenPanelState>({
     start: null,
@@ -338,6 +348,30 @@ function StudioInner({ projectId }: { projectId: string }) {
     () => (bundle.data?.ok ? (bundle.data.motionConstraints ?? []) : []),
     [bundle.data],
   );
+  const bundleMasks = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.segmentations ?? []) : []),
+    [bundle.data],
+  );
+  useEffect(() => {
+    if (!bundleMasks.length) return;
+    setMaskTrack(
+      bundleMasks.map((s: {
+        frame_number: number;
+        bbox: { x: number; y: number; w: number; h: number };
+        contour?: number[][];
+        status?: string;
+        confidence?: number | null;
+        score?: number | null;
+      }) => ({
+        frame: s.frame_number,
+        mask: s.bbox,
+        contour: s.contour,
+        lost: s.status === "lost",
+        confidence: s.confidence ?? s.score ?? undefined,
+        status: s.status,
+      })),
+    );
+  }, [bundleMasks]);
   const tracking = useMemo(
     () => (bundle.data?.ok ? (bundle.data.tracking ?? []) : []),
     [bundle.data],
@@ -673,6 +707,41 @@ function StudioInner({ projectId }: { projectId: string }) {
       } else if (input.tool === "analyze_pose") {
         toast.success("RTMPose 骨架已寫入");
         setOverlayStack({ primary: "pose", extras: [] });
+      } else if (input.tool === "segment_object" || input.tool === "analyze_mask") {
+        try {
+          const d = JSON.parse(r.payload || "{}") as {
+            masks?: {
+              frameNumber: number;
+              bbox: { x: number; y: number; w: number; h: number };
+              contour?: number[][];
+              status?: string;
+              confidence?: number;
+              warning?: string | null;
+            }[];
+            warnings?: string[];
+            degraded?: boolean;
+          };
+          if (d.masks?.length) {
+            setMaskTrack(
+              d.masks.map((m) => ({
+                frame: m.frameNumber,
+                mask: m.bbox,
+                contour: m.contour,
+                lost: m.status === "lost",
+                confidence: m.confidence,
+                status: m.status,
+              })),
+            );
+          }
+          setOverlayStack({ primary: "mask", extras: ["problems"] });
+          if (d.degraded || (d.warnings && d.warnings.length)) {
+            toast.error(d.warnings?.[0] || "SAM 2 信心不足，未假裝成功");
+          } else {
+            toast.success("SAM 2 遮罩已寫入");
+          }
+        } catch {
+          toast.error("SAM 2 結果無法讀取，未假裝成功");
+        }
       } else if (
         input.tool === "create_tracking_point" ||
         input.tool === "create_track" ||
@@ -1172,16 +1241,29 @@ function StudioInner({ projectId }: { projectId: string }) {
       : undefined;
 
   function propagateRegion() {
-    const seed = { frame: engine.currentFrame, x: regionBox.x, y: regionBox.y, w: regionBox.w, h: regionBox.h };
-    const start = Math.max(0, engine.currentFrame - 5);
-    const end = Math.min(engine.frameCount - 1, engine.currentFrame + 5);
-    const nums: number[] = [];
-    for (let i = start; i <= end; i += 1) nums.push(i);
-    const next = propagateMask(seed, nums, tracking);
-    setMaskTrack(next.map((n) => ({ frame: n.frame, mask: n.mask, lost: n.lost, confidence: n.confidence })));
-    setHighlightRange([start, end]);
+    if (!current || !timelineId) {
+      toast.error("沒有可傳播的影格");
+      return;
+    }
+    const click = maskClick ?? {
+      x: regionBox.x + regionBox.w / 2,
+      y: regionBox.y + regionBox.h / 2,
+      frame: engine.currentFrame,
+    };
     setOverlayStack({ primary: "mask", extras: ["problems"] });
-    toast.message(`遮罩已套用 F${start}–F${end}`);
+    tool.mutate({
+      tool: "segment_object",
+      args: {
+        timelineId,
+        x: click.x,
+        y: click.y,
+        frameNumber: click.frame,
+        direction: "both",
+        objectId: selectedCharacterId || selectedObjectId || `click-F${click.frame}`,
+        startFrame: Math.max(0, click.frame - 24),
+        endFrame: click.frame + 24,
+      },
+    });
   }
 
   return (
@@ -1544,6 +1626,21 @@ function StudioInner({ projectId }: { projectId: string }) {
                   } else {
                     toast.message("請先在圖層選取角色，或到進階面板新增角色");
                   }
+                }
+                if (canvasTool === "character" || overlayStack.primary === "mask") {
+                  if (!timelineId) return;
+                  setMaskClick({ x, y, frame: engine.currentFrame });
+                  tool.mutate({
+                    tool: "segment_object",
+                    args: {
+                      timelineId,
+                      x,
+                      y,
+                      frameNumber: engine.currentFrame,
+                      direction: "both",
+                      objectId: selectedCharacterId || selectedObjectId || `click-F${engine.currentFrame}`,
+                    },
+                  });
                   return;
                 }
                 tool.mutate({
@@ -1869,6 +1966,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                     setCompareMode("flicker");
                   }
                   if (o.id === "pose" && !e.shiftKey) setCanvasTool("pan");
+                  if (o.id === "mask" && !e.shiftKey) setCanvasTool("pan");
                 }}
                 className={cn(
                   "rounded-[var(--radius-xs)] px-2 py-1 text-[11px]",
@@ -1935,6 +2033,9 @@ function StudioInner({ projectId }: { projectId: string }) {
             ) : null}
             {overlayStack.primary === "track" || overlayStack.primary === "motion" ? (
               <span className="hidden text-[10px] text-faint sm:inline">拖動路徑點可改這一格，不會動關鍵影格</span>
+            ) : null}
+            {overlayStack.primary === "mask" ? (
+              <span className="hidden text-[10px] text-faint sm:inline">點角色／物件切真實遮罩，可向前向後傳播</span>
             ) : null}
             {isDrawTool(canvasTool) ? (
               <label className="ml-1 flex items-center gap-1 text-[10px] text-faint">

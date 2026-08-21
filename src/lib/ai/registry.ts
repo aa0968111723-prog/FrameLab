@@ -2,6 +2,7 @@ import { rtmposeHealth } from "@/lib/ai/rtmpose-worker";
 import { locotrackHealth } from "@/lib/ai/locotrack-worker";
 import { seaRaftHealth } from "@/lib/ai/sea-raft-worker";
 import { rifeHealth } from "@/lib/ai/rife-worker";
+import { sam2Health } from "@/lib/ai/sam2-worker";
 
 export type ProviderStatus =
   | "ready"
@@ -158,16 +159,17 @@ export function listModels(): ModelInfo[] {
     {
       id: "sam2",
       provider: "meta",
-      modelName: "sam2",
-      modelVersion: "unwired",
-      checkpoint: "none",
+      modelName: "sam2.1-hiera-tiny",
+      modelVersion: "2.1",
+      checkpoint: "facebook/sam2.1-hiera-tiny",
       license: "Apache-2.0 (code) / check checkpoint",
       commercialUse: true,
-      device: "cpu",
-      precision: "fp16",
-      status: "unavailable",
+      device: sam2Health().device,
+      precision: "fp32",
+      status: sam2Health().ok ? "ready" : "unavailable",
       role: "segmentation",
-      notes: "Adapter reserved. MODEL_NOT_AVAILABLE until a checkpoint is loaded.",
+      notes:
+        "Real SAM 2.1 video predictor. Click mask + forward/backward propagate. Low confidence is warn/lost, never a fake success.",
     },
     {
       id: "rtmpose",

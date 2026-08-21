@@ -482,6 +482,75 @@ export function drawRegionOutline(
   ctx.restore();
 }
 
+export function drawMaskOverlay(
+  ctx: CanvasRenderingContext2D,
+  vt: ViewportTransform,
+  mask: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    contour?: { x: number; y: number }[] | number[][];
+    status?: string;
+    confidence?: number;
+    lost?: boolean;
+  },
+) {
+  const status = mask.lost ? "lost" : (mask.status ?? "ok");
+  const fill =
+    status === "lost"
+      ? "rgba(196,120,120,0.28)"
+      : status === "warn"
+        ? "rgba(196,165,116,0.28)"
+        : "rgba(120,170,140,0.28)";
+  const stroke =
+    status === "lost"
+      ? "rgba(196,120,120,0.95)"
+      : status === "warn"
+        ? "rgba(196,165,116,0.95)"
+        : "rgba(155,176,160,0.95)";
+  const contour = (mask.contour ?? []).map((p) =>
+    Array.isArray(p) ? { x: Number(p[0]), y: Number(p[1]) } : p,
+  );
+  ctx.save();
+  if (contour.length >= 3) {
+    ctx.beginPath();
+    contour.forEach((pt, i) => {
+      const v = normToView(vt, pt.x, pt.y);
+      if (i === 0) ctx.moveTo(v.x, v.y);
+      else ctx.lineTo(v.x, v.y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  } else {
+    drawRegionOutline(ctx, vt, mask, {
+      normalized: mask.w <= 1 && mask.h <= 1,
+      fill: true,
+      tone: stroke,
+    });
+  }
+  const label =
+    status === "lost"
+      ? "遮罩遺失"
+      : status === "warn"
+        ? `信心不足${mask.confidence != null ? ` ${mask.confidence.toFixed(2)}` : ""}`
+        : "遮罩";
+  const anchor = contour[0]
+    ? normToView(vt, contour[0].x, contour[0].y)
+    : frameToView(vt, mask.x <= 1 ? mask.x * vt.frameWidth : mask.x, mask.y <= 1 ? mask.y * vt.frameHeight : mask.y);
+  ctx.font = "11px sans-serif";
+  const tw = ctx.measureText(label).width + 10;
+  ctx.fillStyle = "rgba(18,18,20,0.86)";
+  ctx.fillRect(anchor.x, Math.max(0, anchor.y - 16), tw, 16);
+  ctx.fillStyle = "#f4f4f5";
+  ctx.fillText(label, anchor.x + 5, Math.max(12, anchor.y - 4));
+  ctx.restore();
+}
+
 export function drawAiPointer(
   ctx: CanvasRenderingContext2D,
   vt: ViewportTransform,

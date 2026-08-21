@@ -50,6 +50,9 @@ export function jobStageLabel(
   if (running && type === "POINT_TRACKING") {
     return frames ? `分析追蹤 ${frames}` : `分析追蹤 ${progress}%`;
   }
+  if (running && type === "SEGMENTATION") {
+    return frames ? `SAM 2 遮罩 ${frames}` : `SAM 2 遮罩 ${progress}%`;
+  }
   if (running && type === "CONSISTENCY_ANALYSIS") {
     return frames ? `評估一致性 ${frames}` : `評估一致性 ${progress}%`;
   }
@@ -74,6 +77,8 @@ export function jobTypeZh(type: string) {
       return "姿態分析";
     case "POINT_TRACKING":
       return "點追蹤";
+    case "SEGMENTATION":
+      return "SAM 2 遮罩";
     case "CONSISTENCY_ANALYSIS":
       return "一致性";
     case "REPAIR_INTERPOLATION":

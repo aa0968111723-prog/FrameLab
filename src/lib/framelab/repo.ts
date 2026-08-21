@@ -1097,6 +1097,74 @@ export async function replaceMotionData(
   }
 }
 
+export type SegmentationRow = {
+  id: string;
+  frame_id: string;
+  frame_number: number;
+  provider: string;
+  kind: string;
+  object_id: string | null;
+  bbox_json: string;
+  contour_json: string;
+  score: number | null;
+  confidence: number | null;
+  status: string;
+  area: number | null;
+  direction: string | null;
+  warning: string | null;
+  path: string;
+};
+
+export async function listSegmentations(timelineId: string) {
+  const sql = await getSql();
+  return sql<SegmentationRow>`
+    select s.id, s.frame_id, coalesce(s.frame_number, f.frame_number) as frame_number,
+      s.provider, s.kind, s.object_id, s.bbox_json, s.contour_json, s.score, s.confidence,
+      s.status, s.area, s.direction, s.warning, s.path
+    from segmentations s
+    join frames f on f.id = s.frame_id
+    where f.timeline_id = ${timelineId}
+    order by f.frame_number
+  `;
+}
+
+export async function replaceSegmentationsForObject(
+  rows: {
+    frameId: string;
+    frameNumber: number;
+    provider: string;
+    objectId: string;
+    bbox: unknown;
+    contour: unknown;
+    score?: number;
+    confidence?: number;
+    status?: string;
+    area?: number;
+    direction?: string | null;
+    warning?: string | null;
+    kind?: string;
+    modelRunId?: string;
+  }[],
+) {
+  if (!rows.length) return;
+  const sql = await getSql();
+  const objectId = rows[0]!.objectId;
+  for (const r of rows) {
+    await sql`delete from segmentations where frame_id = ${r.frameId} and object_id = ${objectId}`;
+    await sql`
+      insert into segmentations (
+        id, frame_id, provider, kind, path, frame_number, object_id, bbox_json, contour_json,
+        score, confidence, status, area, direction, warning, model_run_id
+      ) values (
+        ${nid("seg")}, ${r.frameId}, ${r.provider}, ${r.kind ?? "sam2"}, '',
+        ${r.frameNumber}, ${r.objectId}, ${JSON.stringify(r.bbox ?? {})}, ${JSON.stringify(r.contour ?? [])},
+        ${r.score ?? null}, ${r.confidence ?? null}, ${r.status ?? "ok"}, ${r.area ?? null},
+        ${r.direction ?? null}, ${r.warning ?? null}, ${r.modelRunId ?? r.provider}
+      )
+    `;
+  }
+}
+
 export async function listPoses(timelineId: string) {
   const sql = await getSql();
   return sql<{

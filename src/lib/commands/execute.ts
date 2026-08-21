@@ -312,6 +312,15 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       const { analyzePoseAssist } = await import("./assist-tools");
       return analyzePoseAssist(ctx, args);
     }
+    case "segment_object":
+    case "analyze_mask": {
+      const { segmentObjectCmd } = await import("./sam2-tools");
+      return segmentObjectCmd(ctx, args);
+    }
+    case "list_segmentations": {
+      const { listSegmentationsCmd } = await import("./sam2-tools");
+      return listSegmentationsCmd(ctx, args);
+    }
     case "analyze_motion": {
       const { analyzeMotionAssist } = await import("./assist-tools");
       return analyzeMotionAssist(ctx, args);

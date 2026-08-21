@@ -283,6 +283,16 @@ export class FrameLabClient {
   listMotionConstraints(args: { projectId: string; name?: string; frameNumber?: number }) {
     return this.call("list_motion_constraints", args);
   }
+  segmentObject(args: {
+    timelineId: string;
+    x: number;
+    y: number;
+    frameNumber: number;
+    direction?: "forward" | "backward" | "both";
+    objectId?: string;
+  }) {
+    return this.call("segment_object", args);
+  }
   setFrameExposure(args: { frameId: string; exposure: number }) {
     return this.call("set_frame_exposure", args);
   }

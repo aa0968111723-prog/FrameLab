@@ -10,6 +10,7 @@ import { rtmposeAvailable, rtmposeHealth, runRtmposeBatch, toPoseEstimate } from
 import { locotrackAvailable, locotrackHealth, runLocotrack } from "@/lib/ai/locotrack-worker";
 import { seaRaftAvailable, seaRaftHealth, runSeaRaft } from "@/lib/ai/sea-raft-worker";
 import { rifeAvailable, rifeHealth, runRife } from "@/lib/ai/rife-worker";
+import { sam2Available, sam2Health, runSam2 } from "@/lib/ai/sam2-worker";
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -59,7 +60,7 @@ export interface SegmentationProvider {
   readonly id: string;
   available(): boolean;
   health_check(): Promise<ProviderMeta>;
-  segment(frame: RgbaFrame): Promise<ProviderRun<unknown>>;
+  segment(frame: RgbaFrame, click?: { x: number; y: number }): Promise<ProviderRun<unknown>>;
 }
 
 export interface PoseProvider {
@@ -255,7 +256,52 @@ export class RifeInterpolation implements InterpolationProvider {
   }
 }
 
-export const sam2: SegmentationProvider = new Reserved("sam2");
+export class Sam2Provider implements SegmentationProvider {
+  readonly id = "sam2";
+  available() {
+    return sam2Available();
+  }
+  health_check(): Promise<ProviderMeta> {
+    const h = sam2Health();
+    return Promise.resolve({
+      name: this.id,
+      version: "sam2.1-hiera-tiny",
+      status: h.ok ? "ready" : "MODEL_NOT_AVAILABLE",
+      device: h.device,
+      capabilities: h.ok ? ["click_mask", "forward_propagate", "backward_propagate"] : [],
+    });
+  }
+  async segment(frame: RgbaFrame, click?: { x: number; y: number }): Promise<ProviderRun<unknown>> {
+    if (!this.available()) {
+      return {
+        ok: false,
+        code: "MODEL_NOT_AVAILABLE",
+        error: "SAM 2 worker is not loaded. No fake mask.",
+        provider: this.id,
+      };
+    }
+    const dir = path.join(tmpdir(), "framelab-sam2");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `one-${Date.now()}.jpg`);
+    writeFileSync(file, encodeJpegBuffer(frame, 90));
+    try {
+      const out = await runSam2({
+        frames: [{ id: "one", path: file, frameNumber: 0, width: frame.width, height: frame.height }],
+        click: { x: click?.x ?? frame.width / 2, y: click?.y ?? frame.height / 2, frameNumber: 0 },
+        direction: "both",
+      });
+      return { ok: true, data: out, provider: this.id };
+    } finally {
+      try {
+        rmSync(file, { force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+export const sam2: SegmentationProvider = new Sam2Provider();
 export const videoDepthAnything: DepthProvider = new Reserved("video-depth-anything");
 export const rife = new RifeInterpolation();
 export const wan: GenerativeRepairProvider = new Reserved("wan", "PROVIDER_NOT_AVAILABLE");
@@ -761,5 +807,10 @@ export function getPose(provider: string): PoseProvider {
   }
   if (provider === "rtmpose" || provider === "mmpose") return rtmpose;
   fail("PROVIDER_NOT_AVAILABLE", `Pose provider '${provider}' is not loaded.`);
+}
+
+export function getSegmentation(provider: string): SegmentationProvider {
+  if (provider === "sam2" || provider === "auto" || provider === "default") return sam2;
+  fail("PROVIDER_NOT_AVAILABLE", `Segmentation provider '${provider}' is not loaded.`);
 }
 

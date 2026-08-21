@@ -106,10 +106,17 @@ export function keyBreakdownFlow(
 }
 
 export function maskTrackMarks(
-  track: { frame: number; lost?: boolean; confidence?: number }[],
+  track: { frame: number; lost?: boolean; confidence?: number; status?: string }[],
 ): { frame: number; status: "ok" | "warn" | "lost" }[] {
   return track.map((t) => ({
     frame: t.frame,
-    status: t.lost || (t.confidence != null && t.confidence < 0.35) ? "lost" : (t.confidence != null && t.confidence < 0.6 ? "warn" : "ok"),
+    status:
+      t.status === "lost" || t.status === "warn" || t.status === "ok"
+        ? t.status
+        : t.lost || (t.confidence != null && t.confidence < 0.35)
+          ? "lost"
+          : t.confidence != null && t.confidence < 0.6
+            ? "warn"
+            : "ok",
   }));
 }

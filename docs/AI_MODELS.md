@@ -15,10 +15,11 @@ Adapters live in `src/lib/ai/providers.ts` + the registry. Core commands never i
 - `rtmpose` — RTMPose-s + YOLOX-tiny Python worker
 - `locotrack` — LocoTrack-S Python worker
 - `sea-raft` — SEA-RAFT-S Python worker (two-frame optical flow)
+- `sam2` — SAM 2.1 hiera-tiny Python worker (click mask + forward/backward propagate)
 
 
 **Unavailable (honest errors)**
 
-SAM 2 (`SegmentationProvider`), Video Depth Anything Small (`DepthProvider`), Wan (`GenerativeRepairProvider`), Qwen2.5-VL (spec VLM — v0.1 uses Grok instead), TensorRT (reserved).
+Video Depth Anything Small (`DepthProvider`), Wan (`GenerativeRepairProvider`), Qwen2.5-VL (spec VLM — v0.1 uses Grok instead), TensorRT (reserved).
 
 Adding a provider: implement the interface, register status `ready` only after a real inference test writes to the database.

@@ -50,7 +50,7 @@ Pixel metrics, RIFE inbetweens, neighborhood repair, timeline, onion skin, revis
 
 ## GPU mode
 
-CUDA adapters (SAM 2, Wan, Video Depth Anything) are reserved. **RTMPose**, **LocoTrack-S**, **SEA-RAFT-S**, and **RIFE** run through Python workers on CUDA when present, otherwise CPU.
+CUDA adapters (Wan, Video Depth Anything) are reserved. **RTMPose**, **LocoTrack-S**, **SEA-RAFT-S**, **RIFE**, and **SAM 2** run through Python workers on CUDA when present, otherwise CPU.
 
 ## Web UI
 
@@ -102,7 +102,7 @@ TypeScript client: `packages/sdk`.
 | RTMPose-s + YOLOX-tiny (Python worker) | **ready** (CUDA or CPU) |
 | LocoTrack-S (Python worker) | **ready** (CUDA or CPU) |
 | SEA-RAFT-S (Python worker) | **ready** (CUDA or CPU) |
-| SAM 2, Depth Anything, Wan | adapter only — `MODEL_NOT_AVAILABLE` |
+| SAM 2, Depth Anything, Wan | SAM 2 is wired; Depth / Wan adapter only — `MODEL_NOT_AVAILABLE` |
 
 No random poses. No fake depth. No hardcoded consistency.
 

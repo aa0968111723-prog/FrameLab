@@ -12,6 +12,7 @@ import {
   drawFlowPaths,
   drawProblemBubble,
   drawRegionOutline,
+  drawMaskOverlay,
   hitAnnotation,
   hitMotionPathPoint,
   hitPoseJoint,
@@ -62,7 +63,14 @@ export type StudioFrame = {
   isLocked?: boolean;
 };
 
-export type MaskProp = { frame: number; mask: { x: number; y: number; w: number; h: number }; lost?: boolean };
+export type MaskProp = {
+  frame: number;
+  mask: { x: number; y: number; w: number; h: number };
+  contour?: { x: number; y: number }[] | number[][];
+  lost?: boolean;
+  confidence?: number;
+  status?: string;
+};
 
 export function AnimationCanvas({
   frames,
@@ -677,11 +685,13 @@ export function AnimationCanvas({
     if (regionLive && (layers.has("mask") || overlay.primary === "mask" || tool === "region") && !maskHere) {
       drawRegionOutline(ctx, vt, regionBox, { label: "選區", fill: true });
     }
-    if (maskHere) {
-      drawRegionOutline(ctx, vt, maskHere.mask, {
-        label: maskHere.lost ? "遮罩遺失" : "遮罩",
-        tone: maskHere.lost ? "rgba(196,120,120,0.95)" : "rgba(155,176,160,0.9)",
-        fill: true,
+    if (maskHere && (layers.has("mask") || overlay.primary === "mask")) {
+      drawMaskOverlay(ctx, vt, {
+        ...maskHere.mask,
+        contour: maskHere.contour,
+        lost: maskHere.lost,
+        confidence: maskHere.confidence,
+        status: maskHere.status,
       });
     }
     if (dragBox) drawRegionOutline(ctx, vt, dragBox, { tone: "rgba(200,204,212,0.9)" });

@@ -18,7 +18,14 @@ python3 workers/gpu-worker/rtmpose_worker.py --health
 python3 workers/gpu-worker/locotrack_worker.py --health
 python3 workers/gpu-worker/sea_raft_worker.py --health
 python3 workers/gpu-worker/rife_worker.py --health
+python3 workers/gpu-worker/sam2_worker.py --health
 ```
+
+## SAM 2
+
+`Canvas click → segment_object → SEGMENTATION job → sam2_worker.py → SAM 2.1 → masks → canvas overlay`
+
+Forward and backward video propagate. Low confidence is `warn` / `lost`, never a fake success.
 
 ## SEA-RAFT
 

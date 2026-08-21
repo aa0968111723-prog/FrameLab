@@ -97,6 +97,7 @@ export const getProjectBundle = createServerFn({ method: "GET" })
     );
     const poses = timeline ? await repo.listPoses(timeline.id) : [];
     const poseConstraints = timeline ? await repo.listPoseConstraints(timeline.id) : [];
+    const segmentations = timeline ? await repo.listSegmentations(timeline.id) : [];
     const problemRanges = timeline ? await repo.listProblemRanges(timeline.id) : [];
     const videos = await repo.listVideos(project.id);
     const sourceFps =
@@ -158,6 +159,32 @@ export const getProjectBundle = createServerFn({ method: "GET" })
         previous_y: c.previous_y,
         kind: c.kind,
         revision_id: c.revision_id,
+      })),
+      segmentations: segmentations.map((s) => ({
+        id: s.id,
+        frame_id: s.frame_id,
+        frame_number: s.frame_number,
+        object_id: s.object_id,
+        bbox: (() => {
+          try {
+            return JSON.parse(s.bbox_json);
+          } catch {
+            return { x: 0, y: 0, w: 0, h: 0 };
+          }
+        })(),
+        contour: (() => {
+          try {
+            return JSON.parse(s.contour_json);
+          } catch {
+            return [];
+          }
+        })(),
+        score: s.score,
+        confidence: s.confidence,
+        status: s.status,
+        area: s.area,
+        warning: s.warning,
+        provider: s.provider,
       })),
       problemRanges: problemRanges.map((r) => ({
         start: r.start_frame,

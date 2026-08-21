@@ -7,7 +7,7 @@
 | block-match-16 | this repo | Apache-2.0 intended | n/a | yes | CPU fallback |
 | linear-blend | this repo | Apache-2.0 intended | n/a | yes | 快速預覽 (not AI) |
 | grok-4.5 | xAI API | API ToS | API | per xAI | yes, user-initiated |
-| SAM 2 | facebookresearch/sam2 | Apache-2.0 | check | likely | **no** (unloaded) |
+| SAM 2 | facebookresearch/sam2 | Apache-2.0 | check | likely | **yes** (worker) |
 | RTMPose | open-mmlab/mmpose | Apache-2.0 | check | likely | **yes** (worker) |
 | SEA-RAFT | princeton-vl/SEA-RAFT | BSD-3-Clause | Tartan-C368x496-S | yes | **yes** (worker) |
 | LocoTrack | cvlab-kaist/locotrack | Apache-2.0 | locotrack_small.ckpt | yes | **yes** (worker) |
