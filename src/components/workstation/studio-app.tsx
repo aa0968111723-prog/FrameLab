@@ -198,13 +198,41 @@ function StudioInner({ projectId }: { projectId: string }) {
     for (const c of bundle.data?.ok ? bundle.data.consistency : []) m.set(c.frame_number, c);
     return m;
   }, [bundle.data]);
-  const problemRanges = bundle.data?.ok ? bundle.data.problemRanges ?? [] : [];
-  const poses = bundle.data?.ok ? bundle.data.poses ?? [] : [];
-  const tracking = bundle.data?.ok ? bundle.data.tracking ?? [] : [];
-  const jobs = bundle.data?.ok ? bundle.data.jobs ?? [] : [];
-  const characters = bundle.data?.ok ? bundle.data.characters : [];
-  const objects = bundle.data?.ok ? bundle.data.objects ?? [] : [];
-  const assignments = bundle.data?.ok ? bundle.data.assignments ?? [] : [];
+  // These must be memoised, not derived inline. `?? []` mints a fresh array on
+  // every render whenever the field is absent, and problemRanges/poses/tracking
+  // are dependencies of the annotation effect below: a new identity each render
+  // re-runs the effect, which setAnnotations() with a freshly built array, which
+  // renders again — an unbounded loop that pins the studio the moment a bundle
+  // comes back without one of those fields. Memoising on bundle.data keeps the
+  // identity stable between fetches.
+  const problemRanges = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.problemRanges ?? []) : []),
+    [bundle.data],
+  );
+  const poses = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.poses ?? []) : []),
+    [bundle.data],
+  );
+  const tracking = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.tracking ?? []) : []),
+    [bundle.data],
+  );
+  const jobs = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.jobs ?? []) : []),
+    [bundle.data],
+  );
+  const characters = useMemo(
+    () => (bundle.data?.ok ? bundle.data.characters : []),
+    [bundle.data],
+  );
+  const objects = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.objects ?? []) : []),
+    [bundle.data],
+  );
+  const assignments = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.assignments ?? []) : []),
+    [bundle.data],
+  );
 
   useEffect(() => {
     if (!bundle.data?.ok) return;
@@ -560,7 +588,9 @@ function StudioInner({ projectId }: { projectId: string }) {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", up);
     };
-  }, [current, timelineId, step, tool, engine.currentFrame]);
+  // projectId is captured by the keyboard undo/redo handlers; leaving it out
+  // meant a project switch without a remount kept undoing in the old project.
+  }, [current, timelineId, step, tool, engine.currentFrame, projectId]);
 
   const revisions = useQuery({
     queryKey: ["rev", projectId, current?.id],
