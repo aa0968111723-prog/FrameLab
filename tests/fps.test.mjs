@@ -285,8 +285,9 @@ describe("import paths do not hardcode 12fps", () => {
     const domain = fs.readFileSync(path.join(process.cwd(), "src/lib/domain/fps.ts"), "utf8");
     assert.doesNotMatch(home, /body\.set\("fps",\s*"12"\)/);
     assert.doesNotMatch(home, /fps:\s*12/);
-    assert.match(home, /來源自動/);
-    assert.match(home, /同拆幀/);
+    assert.match(home, /extractField/);
+    assert.match(home, /return "auto"/);
+    assert.match(home, /return "same"/);
     assert.doesNotMatch(videos, /\|\|\s*12/);
     assert.match(videos, /parseFpsField/);
     assert.match(exec, /DEFAULT_PLAYBACK_FPS/);

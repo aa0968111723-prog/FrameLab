@@ -159,8 +159,8 @@ print(json.dumps([{"id":"f0","path":p,"frameNumber":0,"width":80,"height":80}]))
     assert.match(inspector, /不會假裝成功/);
     assert.match(gpu, /sam2_worker\.py/);
     assert.doesNotMatch(gpu, /SAM 2.{0,40}stay reserved/);
-    assert.match(landing, /SAM 2 真實遮罩/);
-    assert.doesNotMatch(landing, /SAM 2、RTMPose/);
+    assert.doesNotMatch(landing, /SAM 2 真實遮罩/);
+    assert.doesNotMatch(landing, /MCP 權杖|MCP Token|可用供應商|RTMPose|LocoTrack/);
     assert.match(registry, /sam2: sam/);
     assert.equal(TOOL_SCOPES.segment_object, "ANALYZE");
     assert.equal(isAskToolAllowed("segment_object"), false);
