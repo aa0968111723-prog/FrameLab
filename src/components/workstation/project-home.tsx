@@ -24,10 +24,11 @@ import {
   ingestSequenceFn,
   listMcpTokensFn,
   listMyProjects,
+  getJobFn,
 } from "@/lib/framelab/api";
 import {
-  extractImageSequence,
-  extractVideoFrames,
+  extractImageSequenceBatches,
+  INGEST_HTTP_BATCH,
 } from "@/lib/extract-frames";
 
 export function ProjectHome() {
@@ -122,44 +123,80 @@ function HomeInner() {
     },
   });
 
+  async function waitForJob(jobId: string) {
+    for (;;) {
+      const job = await getJobFn({ data: { jobId } });
+      if (!job) throw new Error("找不到拆幀工作");
+      let extra = "";
+      try {
+        const parsed = JSON.parse(job.result_json || "{}") as {
+          current?: number;
+          total?: number;
+          stage?: { current?: number; total?: number };
+          frameCount?: number;
+        };
+        const cur = parsed.stage?.current ?? parsed.current;
+        const tot = parsed.stage?.total ?? parsed.total;
+        if (cur != null && tot != null) extra = ` ${cur}/${tot}`;
+        else if (parsed.frameCount != null) extra = ` ${parsed.frameCount} 格`;
+      } catch {
+        extra = "";
+      }
+      setBusy(`拆幀中${extra} ${job.progress ?? 0}%`);
+      if (job.state === "completed") return job;
+      if (job.state === "failed" || job.state === "cancelled") {
+        throw new Error(job.error_message || "拆幀失敗");
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+
   async function onFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     const files = [...list];
-    setBusy("讀取媒體…");
+    const video = files.find((f) => f.type.startsWith("video/"));
+    if (video) {
+      const only = { 0: video, length: 1, item: (i: number) => (i === 0 ? video : null) } as unknown as FileList;
+      await onFfmpeg(only);
+      return;
+    }
+    setBusy("讀取影像序列…");
     try {
-      const video = files.find((f) => f.type.startsWith("video/"));
-      const frames = video
-        ? await extractVideoFrames(video, {
-            fps: 12,
-            maxFrames: 72,
-            onProgress: (d, t) => setBusy(`擷取 ${d}/${t}`),
-          })
-        : await extractImageSequence(files, {
-            onProgress: (d, t) => setBusy(`讀取 ${d}/${t}`),
+      let projectId: string | undefined;
+      let frameCount = 0;
+      await extractImageSequenceBatches(
+        files,
+        {
+          onProgress: (d, t) => setBusy(`讀取 ${d}/${t}`),
+          batchSize: INGEST_HTTP_BATCH,
+        },
+        async (batch) => {
+          setBusy(`儲存 ${batch[0]?.frameNumber ?? 0}–${batch.at(-1)?.frameNumber ?? 0}…`);
+          const result = await ingestSequenceFn({
+            data: {
+              name: "影像序列",
+              fps: 12,
+              projectId,
+              replace: !projectId,
+              frames: batch.map((f) => ({
+                imageData: f.imageData,
+                frameNumber: f.frameNumber,
+              })),
+            },
           });
-      if (frames.length === 0) {
+          if (!result.ok) throw new Error(result.error);
+          projectId = result.projectId;
+          frameCount = result.frameCount;
+        },
+      );
+      if (!projectId || frameCount === 0) {
         toast.error("沒有擷取到影格");
         return;
       }
-      setBusy("儲存時間軸…");
-      const result = await ingestSequenceFn({
-        data: {
-          name: video?.name ?? "影像序列",
-          fps: video ? 12 : 12,
-          frames: frames.map((f) => ({
-            imageData: f.imageData,
-            frameNumber: f.frameNumber,
-          })),
-        },
-      });
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success(`${result.frameCount} 格`);
+      toast.success(`${frameCount} 格`);
       void nav({
         to: "/studio/$projectId",
-        params: { projectId: result.projectId },
+        params: { projectId },
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "匯入失敗");
@@ -171,7 +208,7 @@ function HomeInner() {
   async function onFfmpeg(list: FileList | null) {
     if (!list || list.length === 0) return;
     const file = list[0];
-    setBusy("上傳給 FFmpeg…");
+    setBusy("上傳影片…");
     try {
       const body = new FormData();
       body.set("file", file);
@@ -186,13 +223,23 @@ function HomeInner() {
         jobId?: string;
       };
       if (!json.ok || !json.projectId) {
-        toast.error(json.error || "FFmpeg 擷取失敗");
+        toast.error(json.error || "影片擷取失敗");
         return;
       }
-      toast.success(`${json.frameCount ?? "?"} 格（FFmpeg）`);
+      let frameCount = json.frameCount ?? 0;
+      if (json.jobId) {
+        const job = await waitForJob(json.jobId);
+        try {
+          const parsed = JSON.parse(job.result_json || "{}") as { frameCount?: number };
+          if (parsed.frameCount) frameCount = parsed.frameCount;
+        } catch {
+          /* keep previous */
+        }
+      }
+      toast.success(`${frameCount || "?"} 格`);
       void nav({ to: "/studio/$projectId", params: { projectId: json.projectId } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "FFmpeg failed");
+      toast.error(err instanceof Error ? err.message : "影片匯入失敗");
     } finally {
       setBusy(null);
     }
@@ -386,7 +433,7 @@ function HomeInner() {
 
           <div className="rounded-[var(--radius-md)] border border-border bg-surface p-4 text-xs leading-relaxed text-muted">
             <Film className="mb-2 size-4 text-fg" />
-            影片匯入用瀏覽器解碼器（最多 72 格、12 fps）。空白專案會等你匯入 — 不會用假畫面充數。
+            影片匯入走非同步拆幀，可處理數千格；不會一次把全部畫面塞進單一請求。空白專案會等你匯入 — 不會用假畫面充數。
           </div>
         </aside>
       </div>

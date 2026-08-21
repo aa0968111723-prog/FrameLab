@@ -5,20 +5,24 @@ import { fail } from "../domain/errors.ts";
 import { assertInsideData, dataRoot, safeFilename } from "../storage/local.ts";
 
 const ALLOWED_EXT = new Set([".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi"]);
-const MAX_BYTES = 48 * 1024 * 1024;
+const MAX_BYTES = 512 * 1024 * 1024;
+const FRAME_FILE_PATTERN = "frame_%06d.jpg";
 
 export type ExtractConfig = {
   inputPath: string;
   outputDir: string;
   fps: number;
   maxWidth: number;
-  maxFrames: number;
+  /** 0 / omitted = extract every fps-sampled frame (thousands). */
+  maxFrames?: number;
 };
 
 export function clampExtractNumbers(fps: number, maxWidth: number, maxFrames: number) {
   const f = Math.max(1, Math.min(30, Math.round(fps)));
   const w = Math.max(32, Math.min(640, Math.round(maxWidth) & ~1));
-  const n = Math.max(2, Math.min(160, Math.round(maxFrames)));
+  // 0 = no frame cap (thousands of frames). Positive values are honored as-is.
+  const n =
+    !Number.isFinite(maxFrames) || maxFrames <= 0 ? 0 : Math.max(1, Math.round(maxFrames));
   return { fps: f, maxWidth: w, maxFrames: n };
 }
 
@@ -26,10 +30,10 @@ export function ffmpegExtractArgs(cfg: ExtractConfig): string[] {
   const { fps, maxWidth, maxFrames } = clampExtractNumbers(
     cfg.fps,
     cfg.maxWidth,
-    cfg.maxFrames,
+    cfg.maxFrames ?? 0,
   );
-  const pattern = path.join(cfg.outputDir, "frame_%04d.jpg");
-  return [
+  const pattern = path.join(cfg.outputDir, FRAME_FILE_PATTERN);
+  const args = [
     "-hide_banner",
     "-nostdin",
     "-y",
@@ -41,10 +45,12 @@ export function ffmpegExtractArgs(cfg: ExtractConfig): string[] {
     `fps=${fps},scale=${maxWidth}:-2:flags=lanczos`,
     "-q:v",
     "4",
-    "-frames:v",
-    String(maxFrames),
-    pattern,
   ];
+  if (maxFrames > 0) {
+    args.push("-frames:v", String(maxFrames));
+  }
+  args.push(pattern);
+  return args;
 }
 
 function run(cmd: string, args: string[]): Promise<{ code: number; stderr: string; stdout: string }> {
@@ -90,7 +96,7 @@ export async function extractFramesWithFfmpeg(cfg: ExtractConfig): Promise<{
   const ext = path.extname(input).toLowerCase();
   if (!ALLOWED_EXT.has(ext)) fail("VALIDATION_ERROR", `Unsupported video type ${ext}`);
   const info = await stat(input);
-  if (info.size > MAX_BYTES) fail("VALIDATION_ERROR", "Video exceeds 48MB cap");
+  if (info.size > MAX_BYTES) fail("VALIDATION_ERROR", "影片超過 512MB");
   const outDir = assertInsideData(cfg.outputDir);
   await mkdir(outDir, { recursive: true });
   const durationMs = await probeDurationMs(input).catch(() => 0);
@@ -109,11 +115,15 @@ export async function extractFramesWithFfmpeg(cfg: ExtractConfig): Promise<{
   };
 }
 
+export async function readJpegFileAsBase64(file: string): Promise<string> {
+  const buf = await readFile(assertInsideData(file));
+  return buf.toString("base64");
+}
+
 export async function readJpegFilesAsBase64(files: string[]): Promise<string[]> {
   const out: string[] = [];
   for (const f of files) {
-    const buf = await readFile(assertInsideData(f));
-    out.push(buf.toString("base64"));
+    out.push(await readJpegFileAsBase64(f));
   }
   return out;
 }
@@ -136,13 +146,13 @@ export async function concatJpegSequence(input: {
   await mkdir(seqDir, { recursive: true });
   const sorted = [...input.frames].sort((a, b) => a.frameNumber - b.frameNumber);
   for (let i = 0; i < sorted.length; i += 1) {
-    const file = path.join(seqDir, `frame_${String(i + 1).padStart(4, "0")}.jpg`);
+    const file = path.join(seqDir, `frame_${String(i + 1).padStart(6, "0")}.jpg`);
     await writeFile(assertInsideData(file), Buffer.from(sorted[i].imageData, "base64"));
   }
   const out = assertInsideData(
     path.join(projectRoot(input.projectId), "renders", "preview.mp4"),
   );
-  const pattern = path.join(seqDir, "frame_%04d.jpg");
+  const pattern = path.join(seqDir, FRAME_FILE_PATTERN);
   const fps = Math.max(1, Math.min(30, Math.round(input.fps || 12)));
   const result = await run("ffmpeg", [
     "-hide_banner",
@@ -185,4 +195,4 @@ export async function concatJpegSequence(input: {
   return { outputPath: out, frameCount: sorted.length, provider: "ffmpeg" };
 }
 
-export { MAX_BYTES, ALLOWED_EXT, dataRoot, safeFilename };
+export { MAX_BYTES, ALLOWED_EXT, FRAME_FILE_PATTERN, dataRoot, safeFilename };

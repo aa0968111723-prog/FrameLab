@@ -38,6 +38,9 @@ export function jobStageLabel(
       ? `${stage.current} / ${stage.total} 格`
       : null;
   const running = state === "running" || state === "queued";
+  if (running && type === "FRAME_EXTRACTION") {
+    return frames ? `拆幀 ${frames}` : `拆幀 ${progress}%`;
+  }
   if (running && type === "OPTICAL_FLOW") {
     return frames ? `分析運動 ${frames}` : `分析運動 ${progress}%`;
   }
@@ -61,6 +64,10 @@ export function jobTypeZh(type: string) {
   switch (type) {
     case "GENERATE_INBETWEENS":
       return "產生中間影格";
+    case "FRAME_EXTRACTION":
+      return "拆幀";
+    case "VIDEO_INGEST":
+      return "匯入影片";
     case "OPTICAL_FLOW":
       return "運動分析";
     case "POSE_ANALYSIS":

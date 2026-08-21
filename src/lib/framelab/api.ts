@@ -153,12 +153,17 @@ export const ingestSequenceFn = createServerFn({ method: "POST" })
       name?: string;
       fps: number;
       frames: { imageData: string; frameNumber: number }[];
+      projectId?: string;
+      replace?: boolean;
     }) => data,
   )
   .handler(async ({ context, data }) => {
-    if (data.frames.length === 0) return { ok: false as const, error: "No frames" };
-    if (data.frames.length > 160) {
-      return { ok: false as const, error: "Cap is 160 frames in v0.1" };
+    if (data.frames.length === 0) return { ok: false as const, error: "沒有影格" };
+    if (data.frames.length > 32) {
+      return {
+        ok: false as const,
+        error: "請分批上傳，每批最多 32 格",
+      };
     }
     const { ingestFrames, ALL_SCOPES } = await import("@/lib/commands/execute");
     const result = await ingestFrames(

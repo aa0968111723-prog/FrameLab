@@ -167,7 +167,19 @@ describe("ffmpeg argv", () => {
     const c = clampExtractNumbers(99, 4000, 9999);
     assert.equal(c.fps, 30);
     assert.equal(c.maxWidth, 640);
-    assert.equal(c.maxFrames, 160);
+    assert.equal(c.maxFrames, 9999);
+    const uncapped = clampExtractNumbers(12, 640, 0);
+    assert.equal(uncapped.maxFrames, 0);
+  });
+  it("omits -frames:v when maxFrames is 0", () => {
+    const args = ffmpegExtractArgs({
+      inputPath: "/workspace/data/projects/p/source/clip.mp4",
+      outputDir: "/workspace/data/projects/p/frames",
+      fps: 12,
+      maxWidth: 640,
+      maxFrames: 0,
+    });
+    assert.equal(args.includes("-frames:v"), false);
   });
 });
 

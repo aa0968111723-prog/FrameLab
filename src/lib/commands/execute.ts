@@ -39,11 +39,11 @@ import { canonicalTrackStatus } from "@/lib/domain/track-continuity";
 import { FRAME_TYPES, isFrameType, type FrameType } from "@/lib/domain/types";
 import * as repo from "@/lib/framelab/repo";
 import { ownCharacter, ownObject, ownProject, ownTimeline } from "./ownership.ts";
-import { withJob } from "@/lib/jobs/queue";
+import { startJob, withJob } from "@/lib/jobs/queue";
 import {
   concatJpegSequence,
   extractFramesWithFfmpeg,
-  readJpegFilesAsBase64,
+  readJpegFileAsBase64,
   removeDir,
 } from "@/lib/media/ffmpeg";
 import { putBytes, ensureProjectLayout, projectRoot } from "@/lib/storage/local";
@@ -423,6 +423,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
           frameNumber: number;
         }[],
         projectId: typeof args.projectId === "string" ? args.projectId : undefined,
+        replace: args.replace === false ? false : true,
       });
     case "generate_inbetweens": {
       requireConfirmedEdit("generate_inbetweens", args);
@@ -1478,6 +1479,8 @@ export async function ingestFrames(
     fps: number;
     frames: { imageData: string; frameNumber: number }[];
     projectId?: string;
+    /** Default true: wipe the timeline first. False appends a chunk. */
+    replace?: boolean;
   },
 ) {
   // A caller-supplied projectId used to be trusted outright, and the very next
@@ -1491,8 +1494,10 @@ export async function ingestFrames(
       }
     : await createBlankProject(ctx, { name: data.name || "Imported", fps: data.fps });
   if (!created.timelineId) fail("FRAME_NOT_FOUND", "Timeline missing", 404);
-  const existing = await repo.listFramesMeta(created.timelineId);
-  for (const f of existing) await repo.deleteFrameRow(f.id);
+  if (data.replace !== false) {
+    const existing = await repo.listFramesMeta(created.timelineId);
+    for (const f of existing) await repo.deleteFrameRow(f.id);
+  }
   for (const f of data.frames) {
     const rgba = decodeJpegBase64(f.imageData);
     await repo.insertFrame({
@@ -1509,11 +1514,58 @@ export async function ingestFrames(
       content_hash: hashBytes(f.imageData),
     });
   }
-  await repo.setTimelineFrameCount(created.timelineId, data.frames.length);
-  return { projectId: created.id, timelineId: created.timelineId, frames: data.frames.length, frameCount: data.frames.length };
+  const all = await repo.listFramesMeta(created.timelineId);
+  await repo.setTimelineFrameCount(created.timelineId, all.length);
+  return {
+    projectId: created.id,
+    timelineId: created.timelineId,
+    frames: data.frames.length,
+    frameCount: all.length,
+  };
 }
 
-export async function extractAndIngestUploadedVideo(
+/** Ingest extracted JPEGs from disk one file at a time — never a giant base64 array. */
+export async function ingestJpegFiles(
+  ctx: CommandContext,
+  data: {
+    projectId: string;
+    fps: number;
+    files: string[];
+    onProgress?: (done: number, total: number) => Promise<void> | void;
+  },
+) {
+  const created = {
+    id: (await ownProject(ctx, data.projectId)).id,
+    timelineId: (await repo.listTimelines(data.projectId))[0]?.id,
+  };
+  if (!created.timelineId) fail("FRAME_NOT_FOUND", "Timeline missing", 404);
+  const existing = await repo.listFramesMeta(created.timelineId);
+  for (const f of existing) await repo.deleteFrameRow(f.id);
+  let count = 0;
+  for (const file of data.files) {
+    const imageData = await readJpegFileAsBase64(file);
+    const rgba = decodeJpegBase64(imageData);
+    await repo.insertFrame({
+      id: nid("frm"),
+      timeline_id: created.timelineId,
+      frame_number: count,
+      timestamp_ms: Math.round((count / Math.max(1, data.fps)) * 1000),
+      duration_ms: Math.round(1000 / Math.max(1, data.fps)),
+      frame_type: "INBETWEEN",
+      image_data: imageData,
+      thumbnail_data: makeThumbnail(rgba),
+      width: rgba.width,
+      height: rgba.height,
+      content_hash: hashBytes(imageData),
+    });
+    count += 1;
+    await data.onProgress?.(count, data.files.length);
+  }
+  await repo.setTimelineFrameCount(created.timelineId, count);
+  return { projectId: created.id, timelineId: created.timelineId, frames: count, frameCount: count };
+}
+
+export async function startUploadedVideoIngest(
   ctx: CommandContext,
   opts: {
     filename: string;
@@ -1533,32 +1585,92 @@ export async function extractAndIngestUploadedVideo(
   if (opts.bytes) {
     sourcePath = await putBytes(created.id, "source", sourceName, opts.bytes);
   }
-  if (!sourcePath) fail("VALIDATION_ERROR", "No source video");
+  if (!sourcePath) fail("VALIDATION_ERROR", "沒有來源影片");
   const outDir = `${projectRoot(created.id)}/frames/extract`;
-  const extracted = await extractFramesWithFfmpeg({
-    inputPath: sourcePath,
-    outputDir: outDir,
-    fps: opts.fps,
-    maxWidth: 640,
-    maxFrames: 160,
+  const handle = await startJob({
+    userId: ctx.userId,
+    projectId: created.id,
+    type: "FRAME_EXTRACTION",
+    payload: { filename: opts.filename, fps: opts.fps },
+    provider: "ffmpeg",
+    model: "ffmpeg-extract",
+    device: "cpu",
+    work: async (_jobId, progress) => {
+      await progress(2, { label: "正在拆幀…", current: 0, total: 0 });
+      const extracted = await extractFramesWithFfmpeg({
+        inputPath: sourcePath,
+        outputDir: outDir,
+        fps: opts.fps,
+        maxWidth: 640,
+        maxFrames: 0,
+      });
+      const total = extracted.files.length;
+      await progress(8, { label: "正在寫入時間軸…", current: 0, total });
+      const ingested = await ingestJpegFiles(ctx, {
+        projectId: created.id,
+        fps: opts.fps,
+        files: extracted.files,
+        onProgress: async (done, tot) => {
+          await progress(8 + Math.round((done / Math.max(1, tot)) * 90), {
+            label: "正在寫入時間軸…",
+            current: done,
+            total: tot,
+          });
+        },
+      });
+      if (!opts.existingVideoId) {
+        await repo.insertVideo({
+          id: videoId,
+          project_id: created.id,
+          filename: opts.filename,
+          mime_type: opts.mimeType,
+          duration_ms: extracted.durationMs,
+          frame_count: ingested.frameCount,
+          source_path: sourcePath,
+          status: "extracted",
+        });
+      }
+      await removeDir(outDir).catch(() => undefined);
+      return ingested;
+    },
+    summarize: (r) => ({
+      ok: true,
+      frameCount: r.frameCount,
+      projectId: r.projectId,
+      timelineId: r.timelineId,
+    }),
   });
-  const jpegs = await readJpegFilesAsBase64(extracted.files);
-  const frames = jpegs.map((imageData, i) => ({ imageData, frameNumber: i }));
-  await ingestFrames(ctx, { fps: opts.fps, frames, projectId: created.id });
-  if (!opts.existingVideoId) {
-    await repo.insertVideo({
-      id: videoId,
-      project_id: created.id,
-      filename: opts.filename,
-      mime_type: opts.mimeType,
-      duration_ms: extracted.durationMs,
-      frame_count: frames.length,
-      source_path: sourcePath,
-      status: "extracted",
-    });
-  }
-  await removeDir(outDir).catch(() => undefined);
-  return { projectId: created.id, timelineId: created.timelineId, videoId, frames: frames.length };
+  return {
+    projectId: created.id,
+    timelineId: created.timelineId,
+    videoId,
+    jobId: handle.jobId,
+    done: handle.done,
+  };
+}
+
+export async function extractAndIngestUploadedVideo(
+  ctx: CommandContext,
+  opts: {
+    filename: string;
+    mimeType: string;
+    bytes: Buffer | null;
+    fps: number;
+    name: string;
+    existingVideoId?: string;
+    sourcePath?: string;
+  },
+) {
+  const started = await startUploadedVideoIngest(ctx, opts);
+  const wrapped = await started.done;
+  return {
+    projectId: started.projectId,
+    timelineId: started.timelineId,
+    videoId: started.videoId,
+    jobId: started.jobId,
+    frames: wrapped.result.frameCount,
+    frameCount: wrapped.result.frameCount,
+  };
 }
 
 void parseScopes;
