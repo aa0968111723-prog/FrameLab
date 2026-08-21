@@ -34,7 +34,7 @@ describe("V0.1 core loop wiring", () => {
     assert.match(studio, /fl-ses:/);
     assert.match(studio, /💬/);
     assert.match(studio, /conversation survives|fl-cnv:|sessionStorage.setItem\(`fl-cnv/);
-    assert.match(studio, /前 3/);
+    assert.match(studio, /前透明度/);
     assert.match(studio, /viewport: \{ zoom:/);
     assert.match(studio, /重開此影格的對話/);
     assert.match(studio, /regionLive/);

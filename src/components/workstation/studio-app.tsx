@@ -67,6 +67,7 @@ import { curveCaption, curvePathD, spacingDots } from "@/lib/visual/motion-curve
 import { locateProblemBox } from "@/lib/visual/problem-locate";
 import { jpegUrl } from "@/lib/visual/jpeg-url";
 import { clampBrushSize, DEFAULT_BRUSH_SIZE, isDrawTool } from "@/lib/visual/draw-canvas";
+import { clampOnionCount, clampOnionOpacity, MAX_ONION_LAYERS } from "@/lib/visual/onion-draw";
 import { buildPresence } from "@/lib/visual/character-track";
 import { maskTrackMarks } from "@/lib/visual/timeline-virtual";
 import { suggestedFocusZoom, zoom100Percent } from "@/lib/visual/viewport";
@@ -1529,33 +1530,68 @@ function StudioInner({ projectId }: { projectId: string }) {
               </div>
             )}
             {chrome.onionPeek && engine.onionSkin.enabled && (
-              <div className="pointer-events-auto absolute bottom-3 left-3 flex items-end gap-1.5">
-                {[
-                  { label: "前 3", n: engine.currentFrame - 3 },
-                  { label: "−2", n: engine.currentFrame - 2 },
-                  { label: "−1", n: engine.currentFrame - 1 },
-                  { label: "現在", n: engine.currentFrame },
-                  { label: "+1", n: engine.currentFrame + 1 },
-                  { label: "+2", n: engine.currentFrame + 2 },
-                  { label: "後 3", n: engine.currentFrame + 3 },
-                ].map((s) => {
-                  const f = frames.find((x) => x.frameNumber === s.n);
+              <div className="pointer-events-auto absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-[var(--radius-sm)] border border-border bg-surface/95 p-1.5">
+                <div className="flex items-center gap-2 text-[10px] text-muted">
+                  <span>前</span>
+                  <button type="button" className="rounded-[var(--radius-xs)] px-1 hover:bg-raised hover:text-fg" onClick={() => setEngine((s) => setOnionSkin(s, { prev: clampOnionCount(s.onionSkin.prev - 1) }))}>−</button>
+                  <span className="w-3 text-center tabular-nums text-fg">{engine.onionSkin.prev}</span>
+                  <button type="button" className="rounded-[var(--radius-xs)] px-1 hover:bg-raised hover:text-fg" onClick={() => setEngine((s) => setOnionSkin(s, { prev: clampOnionCount(s.onionSkin.prev + 1) }))}>+</button>
+                  <span>後</span>
+                  <button type="button" className="rounded-[var(--radius-xs)] px-1 hover:bg-raised hover:text-fg" onClick={() => setEngine((s) => setOnionSkin(s, { next: clampOnionCount(s.onionSkin.next - 1) }))}>−</button>
+                  <span className="w-3 text-center tabular-nums text-fg">{engine.onionSkin.next}</span>
+                  <button type="button" className="rounded-[var(--radius-xs)] px-1 hover:bg-raised hover:text-fg" onClick={() => setEngine((s) => setOnionSkin(s, { next: clampOnionCount(s.onionSkin.next + 1) }))}>+</button>
+                </div>
+                <label className="flex items-center gap-1 text-[10px] text-faint">
+                  前透明度
+                  <input
+                    type="range"
+                    min={0.05}
+                    max={0.8}
+                    step={0.05}
+                    value={engine.onionSkin.opacityPrev}
+                    onChange={(e) => setEngine((s) => setOnionSkin(s, { opacityPrev: clampOnionOpacity(Number(e.target.value)) }))}
+                    className="w-16 accent-fg"
+                    aria-label="前一格透明度"
+                  />
+                  後
+                  <input
+                    type="range"
+                    min={0.05}
+                    max={0.8}
+                    step={0.05}
+                    value={engine.onionSkin.opacityNext}
+                    onChange={(e) => setEngine((s) => setOnionSkin(s, { opacityNext: clampOnionOpacity(Number(e.target.value)) }))}
+                    className="w-16 accent-fg"
+                    aria-label="後一格透明度"
+                  />
+                </label>
+                <div className="flex items-end gap-1.5">
+                {Array.from({ length: MAX_ONION_LAYERS * 2 + 1 }, (_, i) => {
+                  const offset = i - MAX_ONION_LAYERS;
+                  const n = engine.currentFrame + offset;
+                  const label = offset === 0 ? "現在" : offset < 0 ? `−${-offset}` : `+${offset}`;
+                  const f = frames.find((x) => x.frameNumber === n);
                   const src = f ? jpegUrl(imageMap.get(f.id) || f.thumbnailData || "") : "";
+                  const inOnion =
+                    offset === 0 ||
+                    (offset < 0 && -offset <= engine.onionSkin.prev) ||
+                    (offset > 0 && offset <= engine.onionSkin.next);
                   return (
                     <button
-                      key={s.label}
+                      key={label}
                       type="button"
                       disabled={!f}
-                      onClick={() => f && setEngine((st) => seek(st, s.n))}
-                      className={cn("flex flex-col items-center gap-0.5", s.n === engine.currentFrame ? "text-fg" : "text-faint")}
+                      onClick={() => f && setEngine((st) => seek(st, n))}
+                      className={cn("flex flex-col items-center gap-0.5", n === engine.currentFrame ? "text-fg" : inOnion ? "text-muted" : "text-faint")}
                     >
-                      <span className="text-[9px] uppercase tracking-wide">{s.label}</span>
-                      <span className={cn("block h-8 w-12 overflow-hidden rounded-[var(--radius-xs)] border", s.n === engine.currentFrame ? "border-accent" : "border-border")}>
+                      <span className="text-[9px] tracking-wide">{label}</span>
+                      <span className={cn("block h-8 w-12 overflow-hidden rounded-[var(--radius-xs)] border", n === engine.currentFrame ? "border-accent" : inOnion ? "border-border" : "border-border/40")}>
                         {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : null}
                       </span>
                     </button>
                   );
                 })}
+                </div>
               </div>
             )}
             {repairViz && workspaceMode === "REPAIR" && (

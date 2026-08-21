@@ -139,15 +139,15 @@ export function setOnionSkin(
     onionSkin: {
       ...state.onionSkin,
       ...patch,
-      prev: Math.min(3, Math.max(0, patch.prev ?? state.onionSkin.prev)),
-      next: Math.min(3, Math.max(0, patch.next ?? state.onionSkin.next)),
+      prev: Math.min(3, Math.max(0, Math.round(patch.prev ?? state.onionSkin.prev))),
+      next: Math.min(3, Math.max(0, Math.round(patch.next ?? state.onionSkin.next))),
       opacityPrev: Math.min(
-        1,
-        Math.max(0, patch.opacityPrev ?? state.onionSkin.opacityPrev),
+        0.8,
+        Math.max(0.05, patch.opacityPrev ?? state.onionSkin.opacityPrev),
       ),
       opacityNext: Math.min(
-        1,
-        Math.max(0, patch.opacityNext ?? state.onionSkin.opacityNext),
+        0.8,
+        Math.max(0.05, patch.opacityNext ?? state.onionSkin.opacityNext),
       ),
       layers: {
         ...state.onionSkin.layers,

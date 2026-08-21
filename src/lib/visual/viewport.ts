@@ -56,6 +56,21 @@ export function viewToFrame(
   return { x: (px - vt.dx) / vt.scale, y: (py - vt.dy) / vt.scale };
 }
 
+/** Map 1 canvas unit to 1 frame pixel. Onion skins and the current drawing must share this. */
+export function enterFrameSpace(
+  ctx: CanvasRenderingContext2D,
+  vt: ViewportTransform,
+  dpr: number,
+): void {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.translate(vt.dx, vt.dy);
+  ctx.scale(vt.scale, vt.scale);
+}
+
+export function leaveFrameSpace(ctx: CanvasRenderingContext2D, dpr: number): void {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
 export function normToFrame(
   vt: ViewportTransform,
   nx: number,

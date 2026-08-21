@@ -18,7 +18,7 @@ import {
   type PoseJoint,
   type TrackSample,
 } from "@/lib/visual/overlay-renderer";
-import { computeViewport, frameToView, panToNormRegion, viewToFrame, type ViewportTransform, zoom100Percent } from "@/lib/visual/viewport";
+import { computeViewport, enterFrameSpace, frameToView, leaveFrameSpace, panToNormRegion, viewToFrame, type ViewportTransform, zoom100Percent } from "@/lib/visual/viewport";
 import type { CompareMode, OverlayStack, TrailTarget } from "@/lib/visual/workspace-mode";
 import { activeOverlays } from "@/lib/visual/workspace-mode";
 import { neighborIds } from "@/lib/visual/thumbnail-cache";
@@ -29,6 +29,12 @@ import { regionBoxFromDrag, isUsableRegionBox } from "@/lib/visual/region-box";
 import { cn } from "@/lib/utils";
 
 import { jpegUrl } from "@/lib/visual/jpeg-url";
+import {
+  ONION_TINT_NEXT,
+  ONION_TINT_PREV,
+  onionAlpha,
+  onionShouldShow,
+} from "@/lib/visual/onion-draw";
 import {
   BRUSH_COLOR,
   ERASER_COLOR,
@@ -319,7 +325,6 @@ export function AnimationCanvas({
         : candidatePreview && candidatePreview.frameNumber === current.frameNumber
           ? candidatePreview.data
           : imageMap.get(current.id);
-    if (!src) return;
 
     const vt = computeViewport({
       viewWidth: rect.width,
@@ -333,6 +338,24 @@ export function AnimationCanvas({
     vtRef.current = vt;
     onViewport?.(vt);
     const { dx, dy, scale } = vt;
+    const fw = current.width;
+    const fh = current.height;
+
+    const blit = (
+      im: CanvasImageSource,
+      alpha: number,
+      tint?: string,
+    ) => {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(im, 0, 0, fw, fh);
+      if (tint) {
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.fillStyle = tint;
+        ctx.fillRect(0, 0, fw, fh);
+      }
+      ctx.restore();
+    };
 
     const drawFrame = (frameNumber: number, alpha: number, tint?: string, dest?: { x: number; y: number; w: number; h: number }) => {
       const f = frames.find((x) => x.frameNumber === frameNumber);
@@ -344,8 +367,8 @@ export function AnimationCanvas({
             : undefined;
       const x = dest?.x ?? dx;
       const y = dest?.y ?? dy;
-      const w = dest?.w ?? current.width * scale;
-      const h = dest?.h ?? current.height * scale;
+      const w = dest?.w ?? fw * scale;
+      const h = dest?.h ?? fh * scale;
       if (!data) {
         ctx.save();
         ctx.globalAlpha = alpha;
@@ -376,9 +399,29 @@ export function AnimationCanvas({
       ctx.restore();
     };
 
+    const drawFramePx = (frameNumber: number, alpha: number, tint?: string) => {
+      const f = frames.find((x) => x.frameNumber === frameNumber);
+      const data =
+        candidatePreview && candidatePreview.frameNumber === frameNumber
+          ? candidatePreview.data
+          : f
+            ? imageMap.get(f.id)
+            : undefined;
+      if (!data) return;
+      const im = load(
+        candidatePreview && candidatePreview.frameNumber === frameNumber ? `cand-${frameNumber}` : f?.id ?? String(frameNumber),
+        data,
+      );
+      if (!im.complete) {
+        im.onload = () => setPan((p) => ({ ...p }));
+        return;
+      }
+      blit(im, alpha, tint);
+    };
+
     const onion = onionNeighbors(engine.currentFrame, engine.frameCount, engine.onionSkin);
-    const showOnion = engine.onionSkin.enabled && (layers.has("onion") || overlay.primary === "onion");
     const showCompare = overlay.primary === "compare" && (compareFrame != null || Boolean(compareSources));
+    const showOnion = onionShouldShow({ enabled: engine.onionSkin.enabled, compareActive: showCompare });
     const hold = holdCompare && compareFrame != null;
 
     if (showCompare && compareMode === "side") {
@@ -424,13 +467,6 @@ export function AnimationCanvas({
       return;
     }
 
-    if (showOnion && !showCompare) {
-      onion.prev.forEach((n, i) => {
-        const a = engine.onionSkin.opacityPrev * ((i + 1) / Math.max(1, onion.prev.length));
-        drawFrame(n, a, "rgba(120,170,210,0.35)");
-      });
-    }
-
     const displayNum =
       flickerOn && compareFrame != null
         ? Math.floor(pulse * 4) % 2 === 0
@@ -444,48 +480,53 @@ export function AnimationCanvas({
       candidatePreview && candidatePreview.frameNumber === displayNum
         ? candidatePreview.data
         : imageMap.get(display.id) ?? src;
-    const img = load(
-      candidatePreview && candidatePreview.frameNumber === displayNum ? `cand-${displayNum}` : display.id,
-      displaySrc,
-    );
-    if (!img.complete) {
+    const img = displaySrc
+      ? load(
+          candidatePreview && candidatePreview.frameNumber === displayNum ? `cand-${displayNum}` : display.id,
+          displaySrc,
+        )
+      : null;
+    if (img && !img.complete) {
       img.onload = () => setPan((p) => ({ ...p }));
-      return;
     }
+
+    enterFrameSpace(ctx, vt, dpr);
     ctx.imageSmoothingEnabled = !pixelView && engine.zoom < 2;
-    const live = paintMap.current.get(display.id);
-    if (live) ctx.drawImage(live.canvas, dx, dy, current.width * scale, current.height * scale);
-    else ctx.drawImage(img, dx, dy, current.width * scale, current.height * scale);
-
-    if (showCompare && compareMode === "overlay" && compareFrame != null) {
-      drawFrame(compareFrame, 0.45);
-    }
-
-    if (showOnion && !showCompare) {
-      onion.next.forEach((n, i) => {
-        const a =
-          engine.onionSkin.opacityNext * ((onion.next.length - i) / Math.max(1, onion.next.length));
-        drawFrame(n, a, "rgba(210,160,120,0.28)");
+    if (showOnion) {
+      onion.prev.forEach((n, i) => {
+        drawFramePx(n, onionAlpha("prev", i, onion.prev.length, engine.onionSkin.opacityPrev), ONION_TINT_PREV);
       });
     }
+    const live = paintMap.current.get(display.id);
+    if (live) blit(live.canvas, 1);
+    else if (img?.complete) blit(img, 1);
+    if (showCompare && compareMode === "overlay" && compareFrame != null) {
+      drawFramePx(compareFrame, 0.45);
+    }
+    if (showOnion) {
+      onion.next.forEach((n, i) => {
+        drawFramePx(n, onionAlpha("next", i, onion.next.length, engine.onionSkin.opacityNext), ONION_TINT_NEXT);
+      });
+    }
+    leaveFrameSpace(ctx, dpr);
 
     const prev = frames.find((f) => f.frameNumber === engine.currentFrame - 1);
     const wantDiff = layers.has("diff") || compareMode === "diff" || overlay.primary === "compare";
-    if (wantDiff && prev && imageMap.get(prev.id) && overlay.primary !== "compare") {
+    if (img?.complete && wantDiff && prev && imageMap.get(prev.id) && overlay.primary !== "compare") {
       paintDiff(ctx, load(prev.id, imageMap.get(prev.id)!), img, dx, dy, current.width * scale, current.height * scale, "diff");
     }
-    if (showCompare && compareMode === "diff" && compareFrame != null) {
+    if (img?.complete && showCompare && compareMode === "diff" && compareFrame != null) {
       const other = frames.find((f) => f.frameNumber === compareFrame);
       if (other && imageMap.get(other.id)) {
         paintDiff(ctx, load(other.id, imageMap.get(other.id)!), img, dx, dy, current.width * scale, current.height * scale, "diff");
       }
     }
-    if (layers.has("heatmap") || overlay.primary === "motion") {
+    if (img?.complete && (layers.has("heatmap") || overlay.primary === "motion")) {
       if (prev && imageMap.get(prev.id)) {
         paintDiff(ctx, load(prev.id, imageMap.get(prev.id)!), img, dx, dy, current.width * scale, current.height * scale, "motion");
       }
     }
-    if (layers.has("flow") || overlay.primary === "motion") {
+    if (img?.complete && (layers.has("flow") || overlay.primary === "motion")) {
       if (prev && imageMap.get(prev.id)) {
         paintFlow(ctx, load(prev.id, imageMap.get(prev.id)!), img, dx, dy, current.width * scale, current.height * scale);
       }
