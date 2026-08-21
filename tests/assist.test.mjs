@@ -54,9 +54,10 @@ describe("motion provider", () => {
     assert.ok(pairs.some((p) => p.mean_motion >= 0));
   });
 
-  it("sea-raft / rife / locotrack / rtmpose stay unavailable", () => {
+  it("sea-raft / rife / locotrack stay unavailable; rtmpose is a real worker", () => {
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
-    assert.match(src, /new Reserved\("rtmpose"\)/);
+    assert.match(src, /class RtmposeProvider/);
+    assert.doesNotMatch(src, /new Reserved\("rtmpose"\)/);
     assert.match(src, /new Reserved\("locotrack"\)/);
     assert.match(src, /class RifeInterpolation/);
     assert.match(src, /RIFE is not loaded/);
@@ -114,12 +115,13 @@ describe("pose-lite", () => {
     assert.ok(events.some((e) => e.kind === "POSE_DIRECTION_CHANGE" && e.joint === "right_wrist"));
   });
 
-  it("rtmpose is unavailable; pose-lite runs", () => {
+  it("pose-lite remains the basic fallback; rtmpose is wired", () => {
     const a = estimatePoseLite(solid(48, 32, 20, 20, 20, 0), 10);
     assert.equal(a.provider, "framelab-pose-lite");
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
     assert.match(src, /class PoseLiteProvider/);
-    assert.match(src, /new Reserved\("rtmpose"\)/);
+    assert.match(src, /class RtmposeProvider/);
+    assert.doesNotMatch(src, /new Reserved\("rtmpose"\)/);
   });
 });
 

@@ -74,6 +74,7 @@ export function AdvancedInspector({
   onMotion,
   onTrack,
   onPose,
+  onPoseLite,
   onRepair,
   onRepairRegion,
   onDuplicate,
@@ -130,6 +131,7 @@ export function AdvancedInspector({
   onMotion: () => void;
   onTrack: () => void;
   onPose: () => void;
+  onPoseLite?: () => void;
   onRepair: () => void;
   onRepairRegion: () => void;
   onDuplicate: () => void;
@@ -247,8 +249,13 @@ export function AdvancedInspector({
           Grok 視覺
         </Button>
         <Button size="sm" variant="secondary" disabled={busy} onClick={onPose}>
-          姿態精簡
+          姿態 RTMPose
         </Button>
+        {onPoseLite && (
+          <Button size="sm" variant="ghost" disabled={busy} onClick={onPoseLite}>
+            精簡
+          </Button>
+        )}
         <Button size="sm" variant="secondary" disabled={busy} onClick={onMotion}>
           運動
         </Button>

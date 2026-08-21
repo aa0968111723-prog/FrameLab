@@ -1,3 +1,5 @@
+import { rtmposeHealth } from "@/lib/ai/rtmpose-worker";
+
 export type ProviderStatus =
   | "ready"
   | "unavailable"
@@ -167,16 +169,17 @@ export function listModels(): ModelInfo[] {
     {
       id: "rtmpose",
       provider: "openmmlab",
-      modelName: "rtmpose",
-      modelVersion: "unwired",
-      checkpoint: "none",
+      modelName: "rtmpose-s",
+      modelVersion: "simcc-body7",
+      checkpoint: "rtmpose-s_simcc-body7 + yolox-tiny",
       license: "Apache-2.0",
       commercialUse: true,
-      device: "cpu",
-      precision: "fp16",
-      status: "unavailable",
+      device: rtmposeHealth().device,
+      precision: "fp32",
+      status: rtmposeHealth().ok ? "ready" : "unavailable",
       role: "pose",
-      notes: "Adapter reserved. MODEL_NOT_AVAILABLE.",
+      notes:
+        "Real RTMPose ONNX via Python worker (YOLOX-tiny detector). pose-lite is the basic fallback only.",
     },
     {
       id: "sea-raft",
@@ -280,14 +283,18 @@ export function listModels(): ModelInfo[] {
 }
 
 export function getDeviceInfo() {
+  const pose = rtmposeHealth();
   return {
     cpu: true,
-    cuda: false,
+    cuda: pose.cuda === true,
     mps: false,
-    gpu: null as string | null,
+    gpu: pose.cuda ? "cuda" : null,
     vram_gb: 0,
-    runtime: "node",
-    note: "GPU adapters are not loaded. Pixel metrics, NCC tracker, block-match flow, linear blend, and xAI vision run on CPU/API.",
+    runtime: pose.ok ? "python+node" : "node",
+    rtmpose: pose,
+    note: pose.ok
+      ? `RTMPose worker ready on ${pose.device}. Other CUDA adapters remain reserved.`
+      : "RTMPose worker not loaded. Pixel metrics, NCC, block-match, linear blend, and xAI vision run on CPU/API.",
   };
 }
 

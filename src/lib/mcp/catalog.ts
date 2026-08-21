@@ -70,7 +70,7 @@ export const MCP_TOOLS = [
   tool("analyze_frame_range", "Pixel consistency over a range (creates a job)", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),
   tool("analyze_consistency", "Alias of analyze_frame_range", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),
   tool("analyze_motion", "16x16 block matching between consecutive frames", { timelineId: str }, ["timelineId"]),
-  tool("analyze_pose", "framelab-pose-lite silhouette extrema (real CPU). provider=rtmpose → MODEL_NOT_AVAILABLE.", { timelineId: str, startFrame: num, endFrame: num, provider: str, sessionId: str }, ["timelineId"]),
+  tool("analyze_pose", "RTMPose (YOLOX-tiny + RTMPose-s ONNX). provider=framelab-pose-lite for basic silhouette mode.", { timelineId: str, startFrame: num, endFrame: num, provider: str, sessionId: str }, ["timelineId"]),
   tool("analyze_tracking", "NCC template tracker (framelab-ncc) across the timeline from existing seeds. provider=locotrack → MODEL_NOT_AVAILABLE.", { timelineId: str, name: str, provider: str }, ["timelineId"]),
   tool("detect_problem_frames", "Run consistency and return warning/error frames", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),
   tool("detect_keyframes", "Mark local-maxima of frame difference as KEY", { timelineId: str }, ["timelineId"]),

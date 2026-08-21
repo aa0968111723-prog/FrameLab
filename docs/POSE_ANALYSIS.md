@@ -1,7 +1,9 @@
 # Pose Analysis
 
-Runnable provider: `framelab-pose-lite` — silhouette extrema from pixel mass / frame difference. Normalized keypoints (`right_wrist`, …), bbox, confidence.
+**RTMPose** is the real pose path:
 
-`rtmpose` / `mmpose` adapters exist and return `MODEL_NOT_AVAILABLE`. No fake skeletons.
+`UI → analyze_pose → POSE_ANALYSIS job → workers/gpu-worker/rtmpose_worker.py → YOLOX-tiny + RTMPose-s (ONNX) → poses table → canvas skeleton`
 
-`poseContinuity` flags `POSE_VELOCITY_SPIKE` and missing joints.
+Device is CUDA when `CUDAExecutionProvider` is present, otherwise CPU. Results are COCO-17 keypoints, stored as metadata (not images).
+
+**pose-lite** (`provider=framelab-pose-lite`) is the basic silhouette fallback only. It is not RTMPose.

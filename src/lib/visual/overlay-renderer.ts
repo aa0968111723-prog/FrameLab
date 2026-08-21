@@ -72,7 +72,7 @@ function derivedJoints(kps: PoseJoint[]): PoseJoint[] {
     mid(get("right_shoulder"), get("right_wrist"), "right_elbow"),
     mid(get("left_hip"), get("left_ankle"), "left_knee"),
     mid(get("right_hip"), get("right_ankle"), "right_knee"),
-  ].filter((j): j is PoseJoint => Boolean(j));
+  ].filter((j): j is PoseJoint => Boolean(j) && !get(j!.name));
   return [...kps, ...extra];
 }
 

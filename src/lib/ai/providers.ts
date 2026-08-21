@@ -5,6 +5,11 @@ import { blendRgba, motionField, motionGrid, type RegionBox, type RgbaFrame } fr
 import { cropRgba } from "@/lib/domain/lightweight-analysis";
 import type { MotionCurve } from "@/lib/domain/types";
 import { estimatePoseLite, type PoseEstimate } from "@/lib/domain/pose-lite";
+import { encodeJpegBuffer } from "@/lib/domain/image-codec";
+import { rtmposeAvailable, rtmposeHealth, runRtmposeBatch, toPoseEstimate } from "@/lib/ai/rtmpose-worker";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import type { InbetweenCapabilities } from "@/lib/domain/animation-constraints";
 import type { MotionPlan } from "@/lib/domain/motion-plan";
 import { linearBlendCapabilities, reservedGenerativeCapabilities } from "@/lib/domain/inbetween-strategy";
@@ -216,7 +221,6 @@ export class RifeInterpolation implements InterpolationProvider {
 }
 
 export const sam2: SegmentationProvider = new Reserved("sam2");
-export const rtmpose: PoseProvider = new Reserved("rtmpose");
 export const seaRaft: OpticalFlowProvider = new Reserved("sea-raft");
 export const locotrack: PointTrackingProvider = new Reserved("locotrack");
 export const videoDepthAnything: DepthProvider = new Reserved("video-depth-anything");
@@ -322,6 +326,56 @@ export class PoseLiteProvider implements PoseProvider {
 }
 
 export const poseLite = new PoseLiteProvider();
+
+export class RtmposeProvider implements PoseProvider {
+  readonly id = "rtmpose";
+  available() {
+    return rtmposeAvailable();
+  }
+  health_check(): Promise<ProviderMeta> {
+    const h = rtmposeHealth();
+    return Promise.resolve({
+      name: this.id,
+      version: "rtmpose-s",
+      status: h.ok ? "ready" : "MODEL_NOT_AVAILABLE",
+      device: h.device,
+      capabilities: h.ok ? ["pose", "coco17"] : [],
+    });
+  }
+  async estimate(frame: RgbaFrame, frameNumber = 0): Promise<ProviderRun<PoseEstimate>> {
+    if (!this.available()) {
+      return {
+        ok: false,
+        code: "MODEL_NOT_AVAILABLE",
+        error: "RTMPose worker is not loaded.",
+        provider: this.id,
+      };
+    }
+    const dir = path.join(tmpdir(), "framelab-rtmpose");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `one-${frameNumber}-${Date.now()}.jpg`);
+    writeFileSync(file, encodeJpegBuffer(frame, 90));
+    try {
+      const { poses } = await runRtmposeBatch([
+        { id: `frm-${frameNumber}`, path: file, frameNumber, width: frame.width, height: frame.height },
+      ]);
+      const first = poses[0];
+      if (!first) {
+        return { ok: false, code: "MODEL_NOT_AVAILABLE", error: "empty RTMPose result", provider: this.id };
+      }
+      return { ok: true, data: toPoseEstimate(first), provider: this.id };
+    } finally {
+      try {
+        rmSync(file, { force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+export const rtmpose = new RtmposeProvider();
+export const mmpose = rtmpose;
 
 export interface InbetweenProvider {
   readonly id: string;

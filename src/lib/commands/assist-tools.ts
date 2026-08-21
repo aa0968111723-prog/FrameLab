@@ -22,10 +22,15 @@ import { detectTrackBreaks, canonicalTrackStatus } from "@/lib/domain/track-cont
 import { analysisCacheKey, cacheGet, cacheSet } from "@/lib/domain/analysis-cache";
 import * as repo from "@/lib/framelab/repo";
 import { ownProject } from "./ownership.ts";
-import { putBytes, putJpeg } from "@/lib/storage/local";
+import { putBytes, putJpeg, projectRoot } from "@/lib/storage/local";
 import { withJob } from "@/lib/jobs/queue";
 import type { CommandContext } from "./execute.ts";
 import { blendRgba } from "@/lib/domain/pixel-metrics";
+import { runRtmposeBatch, toPoseEstimate } from "@/lib/ai/rtmpose-worker";
+import { existsSync } from "node:fs";
+import { mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 function parseRegionArg(
   args: Record<string, unknown>,
@@ -230,10 +235,16 @@ export async function analyzePoseAssist(ctx: CommandContext, args: Record<string
   const t = await repo.getTimeline(timelineId);
   if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
   await ownProject(ctx, t.project_id);
-  const providerName = typeof args.provider === "string" ? args.provider : "framelab-pose-lite";
-  const pose = getPose(providerName);
+  const requested = typeof args.provider === "string" ? args.provider : "rtmpose";
+  const lite = requested === "framelab-pose-lite" || requested === "pose-lite";
+  const pose = getPose(lite ? "framelab-pose-lite" : "rtmpose");
   if (!pose.available()) {
-    fail("MODEL_NOT_AVAILABLE", `${pose.id} is not loaded. Use provider=framelab-pose-lite.`);
+    fail(
+      "MODEL_NOT_AVAILABLE",
+      lite
+        ? "pose-lite is not loaded."
+        : "RTMPose worker is not loaded. Install workers/gpu-worker/requirements.txt or use provider=framelab-pose-lite.",
+    );
   }
   const frames = await repo.listFramesFull(t.id);
   const start = typeof args.startFrame === "number" ? args.startFrame : 0;
@@ -249,7 +260,62 @@ export async function analyzePoseAssist(ctx: CommandContext, args: Record<string
     payload: { timelineId: t.id, start, end, provider: pose.id },
     provider: pose.id,
     model: pose.id,
+    device: pose.id === "rtmpose" ? "cuda-or-cpu" : "cpu",
     work: async (_id, progress) => {
+      if (pose.id === "rtmpose") {
+        await progress(5, { current: 0, total: slice.length, label: "載入 RTMPose" });
+        const dir = path.join(tmpdir(), "framelab-rtmpose", String(Date.now()));
+        await mkdir(dir, { recursive: true });
+        const inputs = [];
+        const temps: string[] = [];
+        try {
+          for (const f of slice) {
+            let file = "";
+            const rel = f.full_asset;
+            if (rel && !rel.startsWith("/api") && !rel.startsWith("data:")) {
+              const abs = path.join(projectRoot(t.project_id), rel);
+              if (existsSync(abs)) file = abs;
+            }
+            if (!file) {
+              if (!f.image_data) continue;
+              file = path.join(dir, `${f.id}.jpg`);
+              await writeFile(file, Buffer.from(f.image_data, "base64"));
+              temps.push(file);
+            }
+            inputs.push({
+              id: f.id,
+              path: file,
+              frameNumber: f.frame_number,
+              width: f.width,
+              height: f.height,
+            });
+          }
+          await progress(15, { current: 0, total: slice.length, label: "RTMPose 推論" });
+          const batch = await runRtmposeBatch(inputs);
+          const estimates = batch.poses.map((p) => toPoseEstimate(p, p.id));
+          await repo.replacePosesForFrames(
+            batch.poses.map((p) => ({
+              frameId: p.id,
+              frameNumber: p.frameNumber,
+              provider: "rtmpose",
+              joints: p.keypoints,
+              bbox: p.bbox,
+              characterId: typeof args.characterId === "string" ? args.characterId : null,
+              modelRunId: batch.model,
+            })),
+          );
+          await progress(95, { current: slice.length, total: slice.length, label: "寫入骨架" });
+          return {
+            estimates,
+            events: poseContinuity(estimates, t.fps),
+            device: batch.device,
+            model: batch.model,
+          };
+        } finally {
+          await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+          void temps;
+        }
+      }
       const estimates = [];
       const poseRows = [];
       let prev = null as ReturnType<typeof decodeJpegBase64> | null;
@@ -281,17 +347,21 @@ export async function analyzePoseAssist(ctx: CommandContext, args: Record<string
       }
       await repo.replacePosesForFrames(poseRows);
       const events = poseContinuity(estimates, t.fps);
-      return { estimates, events };
+      return { estimates, events, device: "cpu", model: pose.id };
     },
-    summarize: (r) => ({ poses: r.estimates.length, provider: pose.id }),
+    summarize: (r) => ({ poses: r.estimates.length, provider: pose.id, model: r.model }),
   });
   return {
     provider: pose.id,
-    device: "cpu",
+    device: wrapped.result.device,
+    model: wrapped.result.model,
     jobId: wrapped.jobId,
     poses: wrapped.result.estimates,
     continuity: wrapped.result.events,
-    note: "framelab-pose-lite silhouette extrema. Not RTMPose / MMPose.",
+    note:
+      pose.id === "rtmpose"
+        ? "RTMPose-s + YOLOX-tiny. Real ONNX inference. pose-lite is the basic fallback."
+        : "framelab-pose-lite silhouette extrema. Basic mode — not RTMPose.",
   };
 }
 

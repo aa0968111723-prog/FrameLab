@@ -605,6 +605,9 @@ function StudioInner({ projectId }: { projectId: string }) {
       } else if (input.tool === "replace_frame") {
         refresh();
         return;
+      } else if (input.tool === "analyze_pose") {
+        toast.success("RTMPose 骨架已寫入");
+        setOverlayStack({ primary: "pose", extras: [] });
       } else if (
         input.tool === "add_frame" ||
         input.tool === "insert_frame" ||
@@ -2253,7 +2256,26 @@ function StudioInner({ projectId }: { projectId: string }) {
                   onAnalyze={() => timelineId && tool.mutate({ tool: "analyze_frame", args: { timelineId, frameNumber: current.frameNumber, vlm: true } })}
                   onMotion={() => timelineId && tool.mutate({ tool: "analyze_motion", args: { timelineId } })}
                   onTrack={() => timelineId && tool.mutate({ tool: "analyze_tracking", args: { timelineId } })}
-                  onPose={() => timelineId && tool.mutate({ tool: "analyze_pose", args: { timelineId } })}
+                  onPose={() =>
+                    timelineId &&
+                    tool.mutate({
+                      tool: "analyze_pose",
+                      args: {
+                        timelineId,
+                        provider: "rtmpose",
+                        ...(engine.selectedRange
+                          ? { startFrame: engine.selectedRange[0], endFrame: engine.selectedRange[1] }
+                          : {}),
+                      },
+                    })
+                  }
+                  onPoseLite={() =>
+                    timelineId &&
+                    tool.mutate({
+                      tool: "analyze_pose",
+                      args: { timelineId, provider: "framelab-pose-lite" },
+                    })
+                  }
                   onRepair={() => tool.mutate({ tool: "repair_frame", args: { frameId: current.id, method: "blend" } })}
                   onRepairRegion={() => {
                     if (!regionLive || regionBox.w < 8 || regionBox.h < 8) {
