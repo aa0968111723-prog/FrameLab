@@ -1,0 +1,7 @@
+# GPU overlay. No worker image in v0.1 — this file exists so CPU
+# developers can keep docker-compose.dev.yml and GPU work can attach later.
+services:
+  gpu-worker:
+    profiles: ["gpu"]
+    image: busybox
+    command: ["echo", "GPU worker not built — MODEL_NOT_AVAILABLE"]

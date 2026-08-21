@@ -1,0 +1,2460 @@
+你現在要繼續開發獨立專案：
+
+FrameLab
+
+這一輪不要只是增加更多 AI 功能。
+
+我要進行一次非常重要的：
+
+FrameLab Visual-first UX / UI 大升級
+
+核心目標：
+
+«把 FrameLab 從「有很多分析數據的工程工具」，升級成「動畫師可以直接看畫面、看動作、圈問題、拖時間、拖骨架、跟 AI 指著畫面溝通」的視覺化逐幀動畫工作站。»
+
+FrameLab 必須：
+
+少看 JSON
+
+少看數字
+
+少看工程資料
+
+多直接看動畫
+
+多直接操作畫面
+
+多直接在 Timeline 上理解問題
+
+---
+
+0. 最高產品原則
+
+不要做成：
+
+Dashboard
+├─ Chart
+├─ Table
+├─ Metrics
+└─ Analysis JSON
+
+我要的是：
+
+Animation Canvas
++
+Timeline
++
+Onion Skin
++
+Motion Path
++
+Pose
++
+Tracking
++
+Visual Problem Highlight
++
+AI Conversation Overlay
+
+使用者應該不用懂：
+
+Optical Flow
+Pose Vector
+Track Confidence
+Motion Magnitude
+
+也能看懂：
+
+«「喔，F105 這裡手突然跳掉了。」»
+
+---
+
+1. 最終工作區
+
+Desktop 主畫面重新設計成：
+
+┌───────────────────────────────────────────────────────────────┐
+│ FrameLab          Project / Scene        ▶ 24fps      AI ●    │
+├─────────────┬───────────────────────────────────┬─────────────┤
+│             │                                   │             │
+│ Frames /    │                                   │ AI /        │
+│ Layers      │              CANVAS               │ Inspector   │
+│             │                                   │             │
+│ Characters  │                                   │             │
+│ Objects     │                                   │             │
+│             │                                   │             │
+├─────────────┴───────────────────────────────────┴─────────────┤
+│ Onion │ Pose │ Motion │ Track │ Mask │ Compare │ Problems     │
+├───────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ★       G       G       ◆       G      ⚠ G       G      ★   │
+│ F100    F101    F102    F103    F104    F105    F106   F110 │
+│                                                               │
+│ ──────────────────── Playhead ─────────────────────────────── │
+│                                                               │
+├───────────────────────────────────────────────────────────────┤
+│ Motion / Timing / Exposure / AI Suggestions                   │
+└───────────────────────────────────────────────────────────────┘
+
+Canvas 永遠是視覺中心。
+
+不要讓 Inspector、聊天、設定搶走 Canvas。
+
+---
+
+2. Canvas 必須成為核心
+
+Canvas 不只是 Image Viewer。
+
+它是一個：
+
+Animation Analysis Canvas
+
+至少支援：
+
+Pan
+Zoom
+Fit
+100%
+Pixel View
+
+Region Select
+
+Character Select
+Object Select
+Tracking Point Select
+
+Pose Overlay
+Motion Overlay
+Mask Overlay
+Onion Skin
+Difference Overlay
+Consistency Overlay
+
+---
+
+3. Visual Mode Switcher
+
+Canvas 下方做簡潔模式列：
+
+[原圖]
+
+[洋蔥皮]
+
+[骨架]
+
+[動作]
+
+[追蹤]
+
+[遮罩]
+
+[問題]
+
+[比較]
+
+不要讓使用者進設定頁才能開。
+
+按一下直接切換。
+
+也可以疊加：
+
+Original + Pose
+
+Original + Motion
+
+Original + Problems
+
+---
+
+4. Onion Skin 強化
+
+Onion Skin 是逐幀動畫核心。
+
+不要只是透明度功能。
+
+Canvas 視覺呈現：
+
+Previous 2
+Previous 1
+CURRENT
+Next 1
+Next 2
+
+提供：
+
+Previous Frames
+1 / 2 / 3
+
+Next Frames
+1 / 2 / 3
+
+Opacity
+
+使用者移動畫面時即時更新。
+
+---
+
+5. Onion Skin Motion Visualization
+
+加入：
+
+Onion Motion Trail
+
+例如：
+
+手從：
+
+F100 ●
+      \
+F101   ●
+         \
+F102      ●
+
+Canvas 上可以直接看到：
+
+●──●──●──●
+
+形成視覺 Motion Trail。
+
+不要一定顯示複雜數字。
+
+---
+
+6. Motion Path
+
+新增核心視覺化：
+
+Motion Path
+
+如果選：
+
+Right Wrist
+
+Canvas 顯示：
+
+F100 ●
+      ╲
+       ● F102
+         ╲
+          ● F104
+            ╲
+             ● F106
+
+顯示：
+
+- 軌跡
+- Direction
+- Current Frame
+- Keyframe points
+- Problem point
+
+問題位置：
+
+●──●──●──⚠──●
+
+---
+
+7. Motion Trail Selection
+
+使用者可以選：
+
+Head
+Left Hand
+Right Hand
+Hip
+Foot
+Object
+Custom Tracking Point
+
+只顯示需要的 Trail。
+
+不要整個畫面塞滿線。
+
+---
+
+8. Pose Visualization
+
+Pose Overlay 要漂亮且容易閱讀。
+
+顯示：
+
+Head
+Shoulders
+Elbows
+Wrists
+Hip
+Knees
+Feet
+
+選到某 Joint：
+
+加強顯示該 Joint。
+
+例如：
+
+Right Wrist Selected
+
+Canvas 只突出：
+
+右肩 → 右手肘 → 右手腕
+
+其他 Skeleton 降低視覺重要度。
+
+---
+
+9. Pose Ghost
+
+加入：
+
+Pose Ghost
+
+像 Onion Skin，但只顯示骨架。
+
+例如：
+
+Previous Pose
+Current Pose
+Next Pose
+
+使用者可以非常直覺看：
+
+«手臂是不是突然跳了？»
+
+這比數字更重要。
+
+---
+
+10. Motion Arrows
+
+Motion Analysis 不要只顯示：
+
+magnitude = 14.2
+
+Canvas 顯示：
+
+→
+↘
+↓
+
+代表區域動作。
+
+Optical Flow 做視覺採樣。
+
+不要一次顯示十萬個向量。
+
+---
+
+11. Heatmap
+
+新增：
+
+Motion Heatmap
+
+顯示：
+
+動得少
+↓
+動得多
+
+直接 Overlay 在 Frame 上。
+
+使用 Theme-aware 色階。
+
+不要使用刺眼彩虹色。
+
+---
+
+12. Problem Heatmap
+
+Consistency Engine 找到問題時：
+
+不要只：
+
+Consistency 61%
+
+Canvas 直接 Highlight：
+
+          ┌──────────┐
+角色 ────▶│ 右手 ⚠   │
+          └──────────┘
+
+支援：
+
+Face
+Hand
+Body
+Object
+Background
+Contact
+Motion
+
+不同問題用圖示 + Label。
+
+不要只靠顏色。
+
+---
+
+13. Visual Problem Region
+
+例如：
+
+F105
+
+右手出錯。
+
+Canvas：
+
+┌─────────────┐
+│ ⚠ 手部跳動 │
+└─────────────┘
+
+點擊 Problem Bubble：
+
+顯示：
+
+F104 → F105
+突然位移
+
+[看前後幀]
+
+[AI 分析]
+
+[建立修復]
+
+---
+
+14. Timeline 必須高度視覺化
+
+Timeline 不只是 Frame Number。
+
+每一格至少：
+
+Thumbnail
+Frame Number
+Frame Type
+Status
+
+例如：
+
+┌──────┐
+│ IMG  │
+│ F100 │ ★
+└──────┘
+
+┌──────┐
+│ IMG  │
+│ F101 │ G
+└──────┘
+
+---
+
+15. Timeline Frame Types
+
+視覺區分：
+
+★ Keyframe
+
+◆ Breakdown
+
+● Inbetween
+
+G AI Generated
+
+R Repaired
+
+H Hold
+
+⚠ Problem
+
+💬 Conversation
+
+不要只靠顏色。
+
+---
+
+16. Timeline Problem Range
+
+如果：
+
+F105–F108
+
+有問題。
+
+Timeline 顯示連續問題區：
+
+F103 F104 [ F105 F106 F107 F108 ] F109
+
+            └── Problem Range ──┘
+
+可以點整個區間。
+
+---
+
+17. Timeline Zoom
+
+加入：
+
+Zoom Out
+Zoom In
+Fit Range
+
+Zoom Out 時：
+
+少顯示細節。
+
+Zoom In：
+
+顯示完整 Thumbnail。
+
+---
+
+18. Mini Timeline Overview
+
+長動畫時增加：
+
+Mini Timeline
+
+例如：
+
+━━━━━━━━━━⚠━━━━━━★━━━━━━⚠━━━━━━━━━━
+
+快速知道：
+
+- Keyframes
+- Problem Areas
+- Generated Areas
+
+點擊直接跳轉。
+
+---
+
+19. Scrubbing
+
+Timeline 拖 Playhead 時：
+
+Canvas 即時切 Frame。
+
+要順。
+
+使用：
+
+thumbnail preload
+neighbor cache
+
+避免拖動一卡一卡。
+
+---
+
+20. Hover Preview
+
+滑鼠 Hover Frame：
+
+顯示較大 Preview。
+
+不要一定點擊。
+
+---
+
+21. Frame Compare
+
+建立真正：
+
+Visual Frame Compare
+
+選：
+
+F104
+F105
+
+可以：
+
+Side by Side
+
+Overlay
+
+Difference
+
+Flicker Toggle
+
+---
+
+22. Flicker Compare
+
+這個很重要。
+
+快速：
+
+F104
+↔
+F105
+
+切換。
+
+如果角色或背景漂移：
+
+人眼很容易直接看到。
+
+支援快捷鍵。
+
+---
+
+23. Difference Overlay
+
+直接顯示：
+
+F104 vs F105 Difference
+
+高差異區 Highlight。
+
+點擊差異區：
+
+Analyze this region
+
+---
+
+24. Before / After Repair
+
+修復後：
+
+Canvas 不要只給兩張縮圖。
+
+建立：
+
+BEFORE    |    AFTER
+
+以及：
+
+Hold to Compare
+
+還可以：
+
+Original
+Repaired
+
+快速 Flicker。
+
+---
+
+25. Region Repair Visual UX
+
+使用者可以：
+
+直接框畫面：
+
+┌───────────┐
+│ 右手      │
+└───────────┘
+
+然後 Bottom / Floating action：
+
+[AI 分析]
+
+[追蹤這個區域]
+
+[只修這裡]
+
+---
+
+26. Region Mask
+
+如果 SAM / Segmentation 可用：
+
+Rectangle 後：
+
+自動 Suggest：
+
+偵測到：右手
+
+[使用精準遮罩]
+
+Canvas 顯示 Mask 邊界。
+
+不要用大面積實心色完全蓋掉圖。
+
+---
+
+27. Mask Propagation Visualization
+
+例如 F105–F110：
+
+Canvas / Timeline 顯示：
+
+Mask Track
+
+F105 ✓
+F106 ✓
+F107 ✓
+F108 ⚠
+F109 ✓
+F110 ✓
+
+如果追蹤遺失：
+
+讓使用者直接知道。
+
+---
+
+28. Character Track Visualization
+
+選角色「小華」。
+
+Timeline 可以切換：
+
+Character Track Mode
+
+只突出有小華的 Frames。
+
+Canvas 顯示：
+
+Character: 小華
+Visible
+Tracked
+
+如果：
+
+lost
+
+Timeline 顯示 Tracking Break。
+
+---
+
+29. Object Contact Visualization
+
+這是 FrameLab 的重要特色。
+
+如果：
+
+右手 ↔ 行李箱
+
+建立 Contact Visual。
+
+Canvas 顯示：
+
+手 ●────● 行李箱
+
+正常時低調。
+
+斷裂：
+
+手 ●  ⚠  ● 行李箱
+
+並顯示：
+
+Contact Break
+F106
+
+---
+
+30. Motion Curve 視覺化
+
+V0.3 已有：
+
+Linear
+Ease In
+Ease Out
+Ease In Out
+
+V0.4 把它真正視覺化。
+
+例如：
+
+Motion
+
+0 ──╮
+    │
+    ╰──────── 1
+
+或者簡單可拖 Curve。
+
+第一版不需要 After Effects 級 Graph Editor。
+
+至少讓使用者「看得到」：
+
+Linear
+Ease
+Acceleration
+Deceleration
+
+---
+
+31. Timing / Spacing Visualization
+
+Timeline 上新增：
+
+Spacing View
+
+例如：
+
+● ●  ●   ●     ●
+
+讓動畫師直接看到：
+
+每一格 Movement 間距。
+
+Ease In：
+
+●   ●  ● ●●
+
+Ease Out：
+
+●● ●  ●   ●
+
+這是動畫真正的視覺語言。
+
+---
+
+32. Keyframe → Breakdown → Inbetween Visual Flow
+
+Timeline 可以清楚看到：
+
+★────────◆────────★
+KEY      BREAK      KEY
+
+中間：
+
+● ● ●   ● ● ●
+
+不要讓使用者只看到 Generated Frames。
+
+---
+
+33. Visual Motion Plan
+
+Motion Plan 不要是一大頁 JSON。
+
+建立：
+
+Motion Plan Canvas / Panel
+
+例如：
+
+小華
+
+Head        ↶ turn left
+
+Body        → move
+
+Right Hand  ↘
+
+Suitcase    ↘ follows hand
+
+Camera      LOCKED
+
+直接圖形化。
+
+---
+
+34. Constraint Chips
+
+生成前顯示：
+
+🔒 Character
+
+🔒 Face
+
+🔒 Background
+
+🔗 Hand ↔ Suitcase
+
+🎥 Camera Locked
+
+讓人一眼知道生成時保留什麼。
+
+---
+
+35. AI Conversation 更視覺化
+
+AI 不要只是：
+
+聊天訊息
+聊天訊息
+聊天訊息
+
+讓 AI 可以在 Canvas 和 Timeline 回答。
+
+例如 AI：
+
+主要問題在 F105–F107。
+
+Timeline 立刻 Highlight：
+
+F105–F107
+
+Canvas 跳 F106。
+
+右手出現 Problem Box。
+
+---
+
+36. AI Visual Answer
+
+AI 回答可以包含：
+
+Problem Range
+
+Selected Region
+
+Before / After
+
+Suggested Fix
+
+例如：
+
+⚠ F105–F107
+
+右手運動不連續
+
+Timeline：
+[105][106][107]
+
+Canvas：
+Highlight Right Hand
+
+[查看]
+
+[比較]
+
+[修復]
+
+---
+
+37. AI Pointer
+
+AI 可以建立：
+
+Visual Pointer
+
+例如：
+
+AI 說：
+
+我指的是這裡。
+
+Canvas 顯示一個 Pointer：
+
+        ↓
+      右手
+
+不要讓 AI 只能用文字說座標。
+
+---
+
+38. AI Region Annotation
+
+AI 可以在分析結果中回傳：
+
+region
+frame
+label
+severity
+
+Frontend Render 成：
+
+Bounding Box
+Arrow
+Marker
+Label
+
+---
+
+39. Conversation Context Chips
+
+對話框頂部：
+
+F105
+
+F103–F108
+
+小華
+
+右手
+
+Motion
+
+讓使用者知道 AI 現在在看什麼。
+
+---
+
+40. Conversation Panel 可縮小
+
+AI Panel 不應永遠占 30–40% Canvas。
+
+支援：
+
+Expanded
+Compact
+Minimized Orb
+
+Compact 可以只顯示：
+
+AI ●
+
+點擊打開。
+
+---
+
+41. AI Orb
+
+可以加入低調的：
+
+FrameLab AI Orb
+
+位於工作區右下角。
+
+狀態：
+
+Idle
+Looking
+Analyzing
+Suggestion
+Problem Found
+
+不要過度動畫。
+
+不要影響專業工作。
+
+---
+
+42. Visual Workflow
+
+重新設計 UX：
+
+使用者不用理解完整 pipeline。
+
+只看到：
+
+選擇
+↓
+分析
+↓
+發現問題
+↓
+比較
+↓
+修復
+↓
+確認
+
+---
+
+43. Analysis Status
+
+不要用複雜 Job List。
+
+Canvas / Timeline 可以顯示：
+
+Analyzing motion...
+18 / 30 frames
+
+問題 Range 上顯示 Processing。
+
+---
+
+44. Progressive Results
+
+分析 F100–F200 不要等全部跑完才顯示。
+
+有結果就逐步在 Timeline 出現：
+
+✓ F100–F130
+
+Analyzing F131–F160...
+
+F146 ⚠ found
+
+---
+
+45. Visual Repair Planner
+
+AI 建議：
+
+Problem:
+F105–F107
+
+Repair:
+F104–F108
+
+Timeline 直接畫：
+
+       Problem
+       ↓↓↓
+F103 [F104 F105 F106 F107 F108] F109
+      └──── Repair Window ─────┘
+
+Boundary：
+
+F104
+F108
+
+顯示為 Protected Boundary。
+
+---
+
+46. Protected Frames
+
+Keyframe / Locked Frame：
+
+Timeline 強烈但簡潔顯示：
+
+🔒 ★
+
+Repair Range 不可以蓋過。
+
+---
+
+47. Minimal Repair Visualization
+
+如果只修：
+
+F106
+
+Canvas / Timeline 清楚顯示：
+
+Only F106 will change.
+
+這是 FrameLab 核心理念。
+
+---
+
+48. Region Repair Preview
+
+Before：
+
+右手
+
+After：
+
+修正後右手
+
+可 Zoom Region。
+
+不要逼使用者看整張圖找差異。
+
+---
+
+49. Auto Focus Problem
+
+按：
+
+View Problem
+
+Canvas 自動 Zoom 到 Problem Region。
+
+但必須有：
+
+Return to Fit
+
+---
+
+50. Character Consistency Visual
+
+建立：
+
+Character Consistency View
+
+選「小華」。
+
+顯示 Strip：
+
+F100  F105  F110  F115  F120
+🙂    🙂     🙂     ⚠      🙂
+
+用 Face / Character Crops。
+
+讓使用者直接看角色是否漂移。
+
+---
+
+51. Face Strip
+
+建立：
+
+Character Face Strip
+
+自動 Crop 每個 Sample Frame 的 Face。
+
+例如：
+
+[Face100] [Face104] [Face108] [Face112]
+
+發現：
+
+Face108 ⚠
+
+直接點擊跳 Frame。
+
+---
+
+52. Hand Strip
+
+同樣可以：
+
+Hand Strip
+
+特別適合 AI 動畫。
+
+使用者直接看：
+
+每幀手是不是變形。
+
+---
+
+53. Object Strip
+
+例如：
+
+Suitcase Track
+
+展示：
+
+F100
+F104
+F108
+F112
+
+Object Crop。
+
+---
+
+54. Consistency Strip
+
+這會比表格重要很多。
+
+因此：
+
+不要只做：
+
+Character 92%
+Hand 71%
+
+一定同時提供：
+
+Visual Samples
+
+---
+
+55. Visual Problem Navigator
+
+右側 Inspector 增加：
+
+Problems
+
+1. F105 Hand
+2. F106 Contact
+3. F119 Face
+
+點一個：
+
+Canvas + Timeline 同步跳轉。
+
+---
+
+56. Problems Filter
+
+可以：
+
+All
+Character
+Face
+Hand
+Motion
+Object
+Contact
+Background
+
+---
+
+57. Visual Layer System
+
+左側增加：
+
+Layers
+
+但不是 Photoshop Clone。
+
+簡單：
+
+Character: Xiaohua 👁
+
+Object: Suitcase 👁
+
+Pose 👁
+
+Motion 👁
+
+Problems 👁
+
+可以 Toggle。
+
+---
+
+58. Don't Overload
+
+任何時刻預設只顯示：
+
+Original
++
+1 main overlay
++
+problem markers
+
+不要預設：
+
+Pose + Flow + Mask + Depth + Track + Heatmap 全開。
+
+會看不懂。
+
+---
+
+59. Focus Mode
+
+增加：
+
+Focus Mode
+
+一鍵：
+
+隱藏：
+
+Left Sidebar
+Right Inspector
+AI Panel
+
+只留下：
+
+Canvas
+Timeline
+
+適合逐幀檢查。
+
+---
+
+60. Review Mode
+
+增加：
+
+Review Mode
+
+專門：
+
+Play
+Pause
+Frame Step
+Onion
+Flicker Compare
+Problem Navigation
+
+不要顯示大量設定。
+
+---
+
+61. Repair Mode
+
+進入修復時：
+
+UI 自動改為：
+
+Canvas
+Mask / Region
+Before / After
+Repair Constraints
+Timeline Range
+
+不要讓使用者自己找功能。
+
+---
+
+62. Generate Mode
+
+Keyframe Inbetween：
+
+UI 顯示：
+
+Start Keyframe
+
+Motion Plan
+
+Breakdown
+
+End Keyframe
+
+Generated Frames
+
+這是一個 Visual Story。
+
+---
+
+63. Visual Mode State
+
+建立：
+
+WorkspaceMode
+
+至少：
+
+ANIMATE
+ANALYZE
+REPAIR
+REVIEW
+
+UI 根據 Mode 改變工具優先級。
+
+不要開四個不同頁面。
+
+同一 Workspace。
+
+---
+
+64. Region Repair Provider
+
+V0.4 同時建立：
+
+RegionRepairProvider
+
+介面：
+
+repair_region(
+    frames,
+    masks,
+    references,
+    constraints,
+    temporal_context
+)
+
+Provider agnostic。
+
+---
+
+65. Temporal Region Mask
+
+選 F105 右手後：
+
+可以：
+
+Propagate ±5 Frames
+
+Timeline 顯示 Mask Track。
+
+如果 Propagation confidence 下降：
+
+視覺提醒。
+
+---
+
+66. Character Reference Board
+
+建立：
+
+Character Reference Board
+
+不是 Database Table。
+
+視覺展示：
+
+小華
+
+[正面]
+[3/4]
+[側面]
+
+[服裝]
+
+[髮型]
+
+[表情]
+
+讓使用者直接拖 / 加 Reference。
+
+---
+
+67. Character Lock
+
+Generate / Repair 時：
+
+顯示：
+
+Character Lock: ON
+
+點擊展開：
+
+Face
+Hair
+Clothing
+Body Proportion
+
+---
+
+68. AI 不能假裝保證一致
+
+如果 Provider 不支援某 Constraint：
+
+視覺標示：
+
+Face Lock
+⚠ Evaluation only
+
+而不是：
+
+✓ Guaranteed
+
+---
+
+69. Visual Confidence
+
+Confidence 不要只：
+
+0.73
+
+可以：
+
+Tracking
+●●●○
+
+但滑鼠 Hover 可看到：
+
+0.73
+
+專業數據仍保留 Inspector。
+
+---
+
+70. Technical Inspector
+
+工程資料不是刪除。
+
+放進：
+
+Advanced
+
+例如：
+
+Model
+Provider
+Confidence
+Raw Motion
+Coordinates
+Job ID
+
+主畫面不要一直顯示。
+
+---
+
+71. Mobile / Tablet
+
+Desktop 是完整動畫工作台。
+
+Tablet：
+
+保留：
+
+Canvas
+Timeline
+AI
+Inspector drawer
+
+手機：
+
+不要硬塞完整工作站。
+
+Mobile 優先：
+
+Review
+AI Conversation
+Problem Navigation
+Approve / Reject
+
+真正逐幀精細編輯以 Desktop / Tablet 為主。
+
+---
+
+72. Performance
+
+視覺化不能讓 UI 爆掉。
+
+Motion / Pose / Tracking Overlay：
+
+使用：
+
+Canvas / WebGL if necessary
+
+不要建立數萬個 DOM Nodes。
+
+---
+
+73. Timeline Virtualization
+
+大量 Frames：
+
+必須 Virtualize。
+
+例如：
+
+10,000 frames
+
+不能全部 DOM render。
+
+---
+
+74. Thumbnail Cache
+
+建立：
+
+ThumbnailCache
+NeighborPreloader
+
+Timeline scrubbing 必須流暢。
+
+---
+
+75. Overlay Renderer
+
+建立統一：
+
+OverlayRenderer
+
+不要：
+
+Pose component
+Motion component
+Tracking component
+Problem component
+
+各自亂算座標。
+
+統一畫面座標轉換：
+
+Frame Coordinates
+↓
+Viewport Transform
+↓
+Overlay
+
+---
+
+76. Normalized Coordinates
+
+所有：
+
+Pose
+Track
+Mask
+Problem Region
+AI Pointer
+
+使用：
+
+0–1 normalized coordinates
+
+避免 Zoom / Resolution 改變位置跑掉。
+
+---
+
+77. AI Annotation Protocol
+
+建立：
+
+VisualAnnotation
+
+Schema 至少：
+
+frame_id
+
+type:
+POINT
+REGION
+PATH
+LABEL
+RANGE
+
+coordinates
+
+label
+
+severity
+
+source
+
+linked_analysis_id
+
+---
+
+78. MCP Visual Tools
+
+MCP 新增：
+
+get_visual_context
+
+annotate_frame
+
+highlight_region
+
+highlight_frame_range
+
+get_motion_path
+
+get_pose_overlay
+
+get_tracking_overlay
+
+get_problem_regions
+
+focus_problem
+
+compare_frames_visual
+
+---
+
+79. MCP 不直接控制 DOM
+
+MCP 回傳：
+
+VisualAnnotation
+
+Frontend 負責 render。
+
+不要讓 AI 傳：
+
+CSS selector
+DOM command
+
+---
+
+80. AI Visual Interaction Example
+
+User：
+
+這裡怪怪的。
+
+AI：
+
+1. 讀 selected region
+2. 讀 neighbors
+3. Motion Analyze
+4. Tracking Analyze
+5. 回傳：
+
+Frame Range:
+F105–F107
+
+Visual Annotation:
+right hand
+
+Problem:
+motion discontinuity
+
+UI：
+
+- Timeline Highlight F105–107
+- Canvas Zoom right hand
+- Motion Trail appears
+- F106 marked ⚠
+
+---
+
+81. AI Repair Example
+
+User：
+
+只修手，不要動其他地方。
+
+FrameLab 建立：
+
+Region:
+Right Hand
+
+Range:
+F105–F107
+
+Locks:
+Character
+Face
+Hair
+Clothing
+Background
+Object
+
+Timeline 顯示 Repair Range。
+
+Canvas 顯示 Mask。
+
+使用者按：
+
+[確認修復]
+
+才執行。
+
+---
+
+82. Visual History
+
+Revision 不要只在資料表。
+
+增加：
+
+Visual History
+
+例如：
+
+Original
+
+Revision 1
+Hand Repair
+
+Revision 2
+Inbetween
+
+Revision 3
+Face Repair
+
+點任何 Revision：
+
+Canvas Preview。
+
+---
+
+83. Candidate Visual Compare
+
+如果生成 3 個 Candidate：
+
+A
+B
+C
+
+用縮圖 / 短 Loop 比較。
+
+不要使用者記 Candidate ID。
+
+---
+
+84. Playback Loop
+
+選 Frame Range 後：
+
+Loop Selection
+
+例如：
+
+F100–F110
+
+持續播放。
+
+非常重要。
+
+---
+
+85. Playback Speed
+
+至少：
+
+0.25x
+0.5x
+1x
+2x
+
+逐幀動畫檢查需要慢播。
+
+---
+
+86. Flipbook Mode
+
+加入：
+
+Flipbook
+
+使用：
+
+Left / Right
+
+快速翻 Frame。
+
+模擬動畫師翻紙。
+
+這個非常適合 FrameLab。
+
+---
+
+87. Flipbook + Onion
+
+Flipbook 時 Onion Skin 可以保持。
+
+讓使用者快速檢查動作。
+
+---
+
+88. Frame Hold
+
+可以長按 / 快捷：
+
+Hold Current
+
+比較前後。
+
+---
+
+89. Full Visual E2E
+
+建立完整測試：
+
+Upload animation
+↓
+Timeline thumbnails
+↓
+Select F100–F110
+↓
+Onion Skin
+↓
+Select character
+↓
+Show Pose Ghost
+↓
+Show Motion Path
+↓
+Detect F105 problem
+↓
+Timeline highlight
+↓
+AI points to hand
+↓
+Region selected
+↓
+Propagate mask
+↓
+Create region repair
+↓
+Before / After
+↓
+Accept
+↓
+Visual Revision history
+
+---
+
+90. UX 驗收標準
+
+請找一個不懂：
+
+Optical Flow
+Pose Model
+SAM
+Tracking
+
+的人。
+
+如果他仍可以：
+
+1. 找到壞掉的 Frame
+2. 看出哪裡出問題
+3. 跳到 Problem
+4. 看前後幀
+5. 圈選問題
+6. 問 AI
+7. 執行修復
+8. 比較前後
+9. Restore
+
+那才代表 Visual UX 成功。
+
+---
+
+91. 不要把首頁做成 Dashboard
+
+FrameLab 開啟 Project：
+
+直接進：
+
+Animation Workspace
+
+不要先看到：
+
+Total Frames
+Jobs
+GPU Usage
+Charts
+Statistics
+
+這些可以藏 System / Advanced。
+
+---
+
+92. Visual Hierarchy
+
+優先順序：
+
+1 Canvas
+
+2 Timeline
+
+3 Current Action
+
+4 AI / Inspector
+
+5 Advanced Technical Data
+
+---
+
+93. Animation Feel
+
+UI 要有：
+
+- 專業
+- 精緻
+- 安靜
+- 高資訊密度但不混亂
+- 動畫工作站感
+- AI-native
+
+不要：
+
+- 玩具感
+- 大量 Gradient
+- 大量 Glow
+- 花俏玻璃特效
+- Dashboard Card 海
+- 每個東西都圓角大卡片
+
+---
+
+94. Microinteraction
+
+可以有：
+
+Playhead smooth movement
+
+Frame selected transition
+
+AI pointer pulse
+
+Problem marker appear
+
+Generation progress
+
+但要克制。
+
+---
+
+95. Visual Accessibility
+
+不要只依靠：
+
+red
+green
+
+區分狀態。
+
+同時使用：
+
+icon
+shape
+label
+
+---
+
+96. Tests
+
+新增：
+
+Canvas coordinate transform
+
+Region select
+
+Overlay alignment
+
+Timeline virtualization
+
+Problem highlight
+
+Motion trail
+
+Pose ghost
+
+Visual annotation
+
+Before / After
+
+Revision preview
+
+AI annotation mapping
+
+---
+
+97. Performance Tests
+
+至少測：
+
+100 frames
+500 frames
+1000 frames
+5000 frames
+
+Timeline 不能隨 Frame 數線性 DOM 爆炸。
+
+---
+
+98. Documentation
+
+新增：
+
+docs/VISUAL_WORKSPACE.md
+
+docs/OVERLAY_SYSTEM.md
+
+docs/VISUAL_ANNOTATIONS.md
+
+docs/MOTION_VISUALIZATION.md
+
+docs/REGION_REPAIR_UX.md
+
+docs/VISUAL_AI_INTERACTION.md
+
+並更新：
+
+ARCHITECTURE.md
+README.md
+MCP.md
+ROADMAP.md
+
+---
+
+99. 本輪 Definition of Done
+
+至少真正做到：
+
+1. Canvas 成為主視覺中心
+2. Timeline 有真正 Frame thumbnails
+3. Onion Skin 可視化完善
+4. Pose Overlay 可使用
+5. Pose Ghost 可使用
+6. Motion Path 可視化
+7. Tracking Trail 可視化
+8. Motion Arrow / sampled Flow 可看
+9. Problem Region 可直接 Highlight
+10. Problem Range 在 Timeline 可直接看
+11. 點 Problem 可以跳 Frame
+12. AI 可以回傳 Visual Annotation
+13. AI 可以 Highlight Region
+14. AI 可以 Highlight Frame Range
+15. Region Selection 可以直接在 Canvas 做
+16. Region Mask 可以顯示
+17. Mask propagation 可以視覺化
+18. Character Track 可以視覺化
+19. Contact Break 可以視覺化
+20. Before / After 真正可用
+21. Flicker Compare 可用
+22. Difference View 可用
+23. Generated / Repaired / Key / Breakdown Frame 清楚區分
+24. Motion Curve 有視覺呈現
+25. Timing / Spacing 開始視覺化
+26. AI Panel 不會遮住主要 Canvas
+27. Focus Mode 可用
+28. Review Mode 可用
+29. Visual Revision History 可用
+30. Timeline virtualized
+31. Overlay position 在 Zoom/Pan 後仍正確
+32. Tests 通過
+33. Frontend Build 通過
+34. 不破壞 V0.1–V0.3 核心能力
+
+---
+
+100. 最重要的產品哲學
+
+FrameLab 不應該讓動畫師一直看到：
+
+motion score 0.72
+
+pose confidence 0.81
+
+tracking confidence 0.63
+
+真正應該先讓他看到：
+
+這隻手從這裡
+      ↓
+突然跳到這裡
+      ↓
+然後又回來
+
+數據只是用來支撐視覺判斷。
+
+---
+
+101. FrameLab 的核心互動
+
+我要做到：
+
+«看得到。»
+
+«點得到。»
+
+«圈得到。»
+
+«拖得到。»
+
+«比得到。»
+
+«問得到。»
+
+«修得到。»
+
+而不是：
+
+«打開一張分析報表才能知道動畫哪裡壞掉。»
+
+---
+
+102. AI 必須「指給我看」
+
+AI 不要只說：
+
+F106 右手 Tracking 可能異常。
+
+AI 應該：
+
+1. 跳到 F106
+2. Highlight 右手
+3. 顯示 Motion Trail
+4. Highlight F105–107
+5. 讓使用者直接看問題
+6. 再提供修復
+
+也就是：
+
+Show me, don't only tell me.
+
+---
+
+103. 最終體驗
+
+理想狀態：
+
+使用者播放動畫。
+
+看到某處怪怪的。
+
+直接停住。
+
+圈角色的手。
+
+問：
+
+AI，這裡怎麼了？
+
+FrameLab：
+
+- 自動看前後 Frame
+- 顯示 Onion Skin
+- 顯示 Motion Trail
+- Highlight 問題 Frames
+- AI 指向右手
+- 解釋問題
+- Timeline 標出範圍
+
+使用者：
+
+只修這裡。
+
+FrameLab：
+
+- Propagate Region
+- 顯示 Repair Range
+- 保護其他區域
+- 顯示修復計畫
+
+使用者確認。
+
+修復完成。
+
+Canvas：
+
+Before ↔ After
+
+使用者 Accept。
+
+這就是我要的 FrameLab。
+
+---
+
+104. 開發順序
+
+請按照：
+
+1. Audit current workspace
+
+2. Canvas architecture
+
+3. Unified Overlay Renderer
+
+4. Timeline visual redesign
+
+5. Onion Skin upgrade
+
+6. Pose Ghost
+
+7. Motion Path
+
+8. Tracking Trail
+
+9. Problem Visualization
+
+10. Frame Compare / Flicker
+
+11. Region Selection
+
+12. Mask Visualization
+
+13. AI VisualAnnotation protocol
+
+14. Conversation visual integration
+
+15. Repair Planner visualization
+
+16. Before / After
+
+17. Character / Face / Hand Strips
+
+18. Visual Revision History
+
+19. Workspace Modes
+
+20. Performance optimization
+
+21. Tests
+
+22. Documentation
+
+23. Final UX audit
+
+不要同時做一堆半成品。
+
+---
+
+105. Git 規則
+
+開始：
+
+git status
+git branch
+git log --oneline -30
+
+如果在 main：
+
+建立：
+
+feat/visual-animation-workspace
+
+禁止：
+
+git add .
+git add -A
+
+只 stage 本輪相關檔案。
+
+不要：
+
+- force push main
+- reset 使用者工作
+- 刪除未知檔案
+- 修改 unrelated modules
+- 偷改 Repository visibility
+
+---
+
+106. 最終回報
+
+完成後回報：
+
+Completed
+
+真正完成的視覺化功能。
+
+Canvas
+
+目前有哪些 Overlay / Interaction。
+
+Timeline
+
+Frame Types、Problem Range、Virtualization 狀態。
+
+Motion Visualization
+
+目前支援哪些。
+
+AI Visual Interaction
+
+AI 可以指向哪些畫面元素。
+
+Region Repair UX
+
+實際流程。
+
+Before / After
+
+實際狀態。
+
+Performance
+
+測試：
+
+100
+500
+1000
+5000 frames
+
+Tests
+
+實際結果。
+
+Known Issues
+
+不要隱藏。
+
+Screens / Visual Evidence
+
+如果可以，提供實際工作區截圖或 Playwright Screenshot，證明 UI 是真的完成，不只程式碼存在。
+
+Next 5 Priorities
+
+只列五項。
+
+---
+
+107. 最終最高原則
+
+如果必須在：
+
+做更多分析數字
+
+與：
+
+讓使用者一眼直接看到動畫哪裡出了問題
+
+之間選擇：
+
+永遠選第二個。
+
+如果必須在：
+
+做更多設定頁
+
+與：
+
+讓使用者可以直接在 Canvas 上圈、拖、比較、修
+
+之間選擇：
+
+永遠選第二個。
+
+FrameLab 最終要成為：
+
+Visual-first AI Frame Animation Workstation
+
+不是：
+
+AI Analysis Dashboard
+
+請現在直接開始實際開發、測試、視覺驗證與修復。
+
+不要只給我設計提案。
+
+我要可以真正操作的實作。

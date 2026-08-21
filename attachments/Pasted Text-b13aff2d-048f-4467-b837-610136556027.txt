@@ -1,0 +1,2004 @@
+你現在要繼續開發獨立專案：
+
+FrameLab
+
+這一輪進入：
+
+FrameLab V0.2 — AI Assist Mode
+
+V0.1 的核心目標是：
+
+«AI 能知道使用者目前正在看哪一幀、哪個 Frame Range、哪個角色與哪個畫面區域，並透過 MCP 與 Context Engine 取得正確上下文。»
+
+V0.2 的目標則是：
+
+«AI 不只「看得懂」，還要能真正分析逐幀動畫問題、定位問題幀、解釋原因、提出最小修復範圍，並在使用者確認後執行安全修復。»
+
+本輪不要擴張成完整影片生成平台。
+
+請專注：
+
+Motion + Pose + Tracking + Consistency + Assist + Revision + Repair
+
+---
+
+0. 本輪最終體驗
+
+使用者選取：
+
+F120–F150
+
+或在 F135 圈選角色右手。
+
+然後問：
+
+這段手的動作為什麼怪怪的？
+
+FrameLab 應該：
+
+Context Engine
+↓
+Motion Analysis
+↓
+Pose Analysis
+↓
+Tracking Analysis
+↓
+Consistency Engine
+↓
+AI Explanation
+
+最後得到：
+
+問題主要出現在 F134–F138。
+
+發現：
+
+1. F135 右手腕位移突然增加。
+2. F136 手腕移動方向與前後幀不一致。
+3. F136–F137 手部與行李箱接觸點短暫中斷。
+4. 動作速度在 F134 → F135 突然提高約 2.4 倍。
+
+建議 Repair Window：
+
+F132–F140
+
+UI 出現：
+
+[查看問題幀]
+
+[Before / After]
+
+[執行建議修復]
+
+使用者確認後：
+
+Create Revision
+↓
+Repair Job
+↓
+Re-analyze
+↓
+Before / After
+↓
+Accept / Restore
+
+---
+
+1. 先 Audit 現有 V0.1
+
+開始任何實作前：
+
+git status
+git branch
+git log --oneline -30
+
+檢查：
+
+- Context Engine
+- Workspace Session
+- Frame Timeline
+- Region Selection
+- Onion Skin
+- Conversation Layer
+- MCP Server
+- MCP Context Tools
+- Job System
+- Storage
+- Frame Graph
+- Revision 架構
+- AI Provider abstraction
+
+不要重新建立第二套相同架構。
+
+如果已有 abstraction：
+
+擴充它。
+
+如果目前在 main：
+
+建立：
+
+feat/assist-consistency-repair
+
+不要直接大量修改 main。
+
+---
+
+2. 本輪禁止事項
+
+不要做：
+
+- 多軌影片剪輯
+- 音訊系統
+- 字幕
+- 影片發布
+- 社群
+- 資產商城
+- 3D 編輯器
+- Blender Clone
+- Premiere Clone
+- 完整 Wan 部署
+- 大型 Video Diffusion Training
+- Multi-Agent swarm
+- 全自動 Agent Mode
+- 自動修改整條 Timeline
+
+這輪重點不是「更多功能」。
+
+是：
+
+把逐幀動畫問題分析與安全修復真正做通。
+
+---
+
+3. V0.2 核心新增模組
+
+本輪主要建立 / 完善：
+
+Motion Analysis Engine
+
+Pose Analysis Engine
+
+Tracking Engine
+
+Consistency Engine
+
+Repair Planner
+
+Assist Mode
+
+Revision / Restore
+
+Interpolation Repair
+
+架構：
+
+Selected Frames / Region
+        ↓
+Context Engine
+        ↓
+Animation Analysis
+        │
+   ┌────┼────┐
+   ↓    ↓    ↓
+Motion Pose Tracking
+   └────┼────┘
+        ↓
+Consistency Engine
+        ↓
+Problem Detection
+        ↓
+Repair Planner
+        ↓
+AI Assist
+        ↓
+User Confirm
+        ↓
+Revision
+        ↓
+Repair
+        ↓
+Re-analysis
+
+---
+
+4. 模型整合原則
+
+不要讓核心程式碼直接 import 模型。
+
+維持：
+
+Model Adapter Layer
+
+至少：
+
+OpticalFlowProvider
+PoseProvider
+PointTrackingProvider
+SegmentationProvider
+InterpolationProvider
+
+每個 Provider 必須支援：
+
+name
+version
+status
+device
+capabilities
+health_check
+
+如果模型沒裝：
+
+MODEL_NOT_AVAILABLE
+
+禁止 fake result。
+
+---
+
+5. Optical Flow
+
+本輪優先實作：
+
+SEA-RAFT Adapter
+
+如果實際環境、授權或安裝條件不適合，可以保留可替換 Provider，但不得偷偷換成假資料。
+
+功能：
+
+analyze_motion(
+    frame_a,
+    frame_b,
+    region=None
+)
+
+輸出至少：
+
+flow field
+average magnitude
+median magnitude
+direction
+motion bounding region
+confidence / quality metadata
+
+---
+
+6. 不要把 Flow 全塞 DB
+
+高維 Flow Array：
+
+存：
+
+Object Storage
+
+DB 保存：
+
+asset_path
+summary_metrics
+model_run_id
+frame_a
+frame_b
+
+例如：
+
+{
+  "frame_a": 134,
+  "frame_b": 135,
+  "mean_motion": 13.4,
+  "median_motion": 9.7,
+  "dominant_direction": {
+    "x": 0.91,
+    "y": 0.21
+  },
+  "flow_asset": "..."
+}
+
+---
+
+7. Region Motion
+
+如果 Context 有 selected_region：
+
+優先分析：
+
+selected region
+
+而不是整張 Frame。
+
+例如使用者圈右手：
+
+比較：
+
+F133 right-hand region
+F134 right-hand region
+F135 right-hand region
+...
+
+必要時使用 Tracking 把 Region propagate 到鄰近 Frame。
+
+---
+
+8. Pose Engine
+
+加入：
+
+RTMPose / MMPose Adapter
+
+至少支援：
+
+body
+
+如果環境合理，再支援：
+
+hands
+face
+whole-body
+
+不要因為 Whole-body 模型太重而阻塞整輪。
+
+先把真正 Body Pose 跑通。
+
+---
+
+9. Pose Schema
+
+至少：
+
+frame_id
+character_id optional
+model_run_id
+
+keypoints
+confidence
+bbox
+
+每個 keypoint：
+
+{
+  "name": "right_wrist",
+  "x": 0.62,
+  "y": 0.41,
+  "confidence": 0.96
+}
+
+保存 normalized coordinate。
+
+---
+
+10. Pose Continuity
+
+建立：
+
+PoseContinuityAnalyzer
+
+比較：
+
+F134
+F135
+F136
+
+計算：
+
+- joint displacement
+- joint velocity
+- joint acceleration
+- sudden direction change
+- impossible / suspicious jump
+- missing keypoints
+
+例如：
+
+right_wrist velocity:
+F134 → F135 = 12
+F135 → F136 = 41 ⚠
+F136 → F137 = 14
+
+標記：
+
+POSE_VELOCITY_SPIKE
+
+---
+
+11. Point Tracking
+
+建立 / 完善：
+
+LocoTrack Adapter
+
+用途：
+
+追蹤：
+
+- 手腕
+- 手
+- 臉部特徵
+- 衣服特徵
+- 道具
+- 自訂點
+
+API：
+
+create_track
+track_points
+get_track
+retrack_range
+
+---
+
+12. Track State
+
+每個 Track Point：
+
+frame
+x
+y
+visibility
+confidence
+status
+
+Status：
+
+VISIBLE
+OCCLUDED
+LOST
+RECOVERED
+
+---
+
+13. Track Break
+
+建立偵測：
+
+TRACK_BREAK
+
+例如：
+
+F120 visible
+F121 visible
+F122 lost
+F123 recovered
+
+如果前後位置不合理：
+
+提高 severity。
+
+---
+
+14. Character / Object Tracking
+
+如果已有 Character ID：
+
+Analysis 優先依：
+
+selected_character_id
+
+分析。
+
+如果 selected object：
+
+依 object track。
+
+不要重新把每幀視為未知圖片。
+
+---
+
+15. Segmentation
+
+如果 SAM 2 已經整合：
+
+使用它做：
+
+region propagation
+character mask
+object mask
+
+如果還沒有：
+
+這輪 SAM 2 可以是第二優先。
+
+不要因為 SAM 2 沒完成阻塞：
+
+Motion + Pose + Tracking + Consistency。
+
+---
+
+16. Consistency Engine v1
+
+建立真正：
+
+Temporal Consistency Engine
+
+不是單一 AI Model。
+
+而是融合：
+
+Motion
+Pose
+Tracking
+Visual Difference
+Character Data
+Object Data
+Contact Data
+
+輸出：
+
+ConsistencyResult
+
+---
+
+17. Consistency Categories
+
+至少：
+
+MOTION_CONTINUITY
+
+POSE_CONTINUITY
+
+TRACKING_CONTINUITY
+
+CHARACTER_STABILITY
+
+OBJECT_STABILITY
+
+CONTACT_CONTINUITY
+
+TEMPORAL_FLICKER
+
+架構預留：
+
+FACE
+HAND
+CLOTHING
+BACKGROUND
+DEPTH
+
+---
+
+18. Consistency Score
+
+不要用 random score。
+
+每一個 score 必須：
+
+有實際 metric
+有來源
+有 threshold
+有 explanation
+
+例如：
+
+{
+  "type": "MOTION_CONTINUITY",
+  "score": 0.62,
+  "severity": "warning",
+  "evidence": {
+    "velocity_ratio": 2.4,
+    "direction_change_deg": 71
+  }
+}
+
+---
+
+19. Severity
+
+統一：
+
+info
+warning
+error
+critical
+
+不要各模組自己發明。
+
+---
+
+20. Problem Frame
+
+建立：
+
+ProblemFrame
+
+Schema：
+
+frame_id
+frame_number
+category
+severity
+score
+reason
+evidence
+region optional
+related_frames
+
+---
+
+21. Problem Range
+
+很多動畫問題不是單一 Frame。
+
+建立：
+
+ProblemRange
+
+例如：
+
+start = F134
+end = F138
+peak_frame = F136
+
+---
+
+22. Repair Window
+
+建立：
+
+Repair Planner
+
+不要直接：
+
+problem F136
+→ repair F136
+
+因為動畫修復通常需要前後 Context。
+
+RepairPlanner：
+
+Problem Range
+↓
+Motion / Pose Window
+↓
+Keyframes
+↓
+Locked Frames
+↓
+Safe Repair Window
+
+輸出：
+
+{
+  "problem_range": [134,138],
+  "repair_range": [132,140],
+  "protected_frames": [132,140],
+  "reason": "Preserve stable boundary frames."
+}
+
+---
+
+23. Keyframe Protection
+
+如果：
+
+F132 ★ Keyframe
+F140 ★ Keyframe
+
+修復：
+
+F133–F139
+
+預設不得改：
+
+F132
+F140
+
+除非使用者明確允許。
+
+---
+
+24. Locked Frame
+
+任何：
+
+is_locked = true
+
+不能被 Repair 覆蓋。
+
+RepairPlanner 必須尊重。
+
+---
+
+25. Assist Mode
+
+V0.1：
+
+ASK
+
+V0.2 正式加入：
+
+ASSIST
+
+權限：
+
+READ
+ANALYZE
+SUGGEST
+
+只有使用者點確認後：
+
+才產生：
+
+EDIT operation
+
+AI 自己不能偷偷執行。
+
+---
+
+26. Assist Response
+
+不要只是聊天文字。
+
+建立結構化：
+
+AssistResponse
+
+例如：
+
+{
+  "summary": "F134–138 right-hand motion is inconsistent.",
+  "problems": [],
+  "suggested_actions": [],
+  "repair_plan": {}
+}
+
+---
+
+27. Suggested Actions
+
+至少：
+
+VIEW_PROBLEM_FRAMES
+COMPARE_FRAMES
+RUN_MOTION_ANALYSIS
+RUN_POSE_ANALYSIS
+RUN_TRACKING
+CREATE_REPAIR_PLAN
+EXECUTE_REPAIR
+
+---
+
+28. AI UI
+
+Conversation Panel 在 ASSIST Mode 顯示：
+
+發現 2 個問題
+
+F134–F138
+右手 Motion Continuity：Warning
+
+F136
+Tracking Break：Error
+
+建議修復範圍：
+F132–F140
+
+[查看]
+
+[比較]
+
+[執行修復]
+
+不是只丟純文字。
+
+---
+
+29. Problem Highlight
+
+Timeline 顯示：
+
+F132 F133 F134 F135 F136 F137 F138 F139 F140
+          ⚠    ⚠    ❗   ⚠    ⚠
+
+Severity 使用一致 UI。
+
+不要太花俏。
+
+---
+
+30. Canvas Overlay
+
+支援：
+
+Motion Overlay
+Pose Overlay
+Tracking Overlay
+Problem Region
+
+可以 Toggle。
+
+---
+
+31. Motion Overlay
+
+顯示：
+
+motion vectors
+
+但不要把數千個向量全部塞畫面。
+
+採樣。
+
+---
+
+32. Pose Overlay
+
+顯示 skeleton：
+
+joints
+bones
+confidence optional
+
+---
+
+33. Tracking Overlay
+
+顯示：
+
+point
+trail
+visibility
+lost state
+
+---
+
+34. Consistency Inspector
+
+Frame Inspector 增加：
+
+Consistency
+
+例如：
+
+Motion      62% ⚠
+Pose        88%
+Tracking    51% ❗
+Contact     57% ⚠
+
+點擊可以看到 Evidence。
+
+---
+
+35. Before / After
+
+修復前建立：
+
+Before / After Viewer
+
+支援：
+
+Original
+Repaired
+
+至少：
+
+- Side by Side
+- Toggle
+
+如果容易實作：
+
+增加 slider。
+
+---
+
+36. Revision System
+
+任何 Repair 前必須：
+
+create_revision()
+
+保存：
+
+affected frames
+original assets
+analysis snapshot
+repair plan
+caller
+timestamp
+
+---
+
+37. Revision Schema
+
+至少：
+
+revision_id
+project_id
+timeline_id
+action
+start_frame
+end_frame
+status
+source
+caller
+created_at
+
+另有：
+
+revision_assets
+
+保存 Frame 對照。
+
+---
+
+38. Repair 不可覆蓋 Original
+
+禁止：
+
+直接把原始 frame PNG 覆蓋
+
+必須建立：
+
+new frame asset
+
+然後 Timeline version 指向新 asset。
+
+Original 保留。
+
+---
+
+39. Restore
+
+加入：
+
+restore_revision
+
+使用者可以：
+
+Restore Original
+
+恢復修復前狀態。
+
+---
+
+40. Repair Provider v1
+
+第一個真正 Repair：
+
+Interpolation Repair
+
+不要先部署大型生成影片模型。
+
+概念：
+
+Stable F134
+   ↓
+repair
+   ↓
+Bad F135
+   ↓
+Stable F136
+
+重新生成 F135。
+
+---
+
+41. InterpolationProvider
+
+介面：
+
+interpolate(
+    start_frame,
+    end_frame,
+    count,
+    region=None,
+    config=None
+)
+
+Provider：
+
+如果 RIFE 可正常整合：
+
+RIFE
+
+如果無法：
+
+提供 Provider unavailable。
+
+禁止做 fake interpolation。
+
+---
+
+42. Single Frame Repair
+
+例如：
+
+F134 good
+F135 bad
+F136 good
+
+生成：
+
+F135 repaired
+
+流程：
+
+Revision
+↓
+Interpolation
+↓
+Replace active version of F135
+↓
+Re-analysis
+
+---
+
+43. Multi Frame Repair
+
+例如：
+
+F134 stable
+
+F135 bad
+F136 bad
+F137 bad
+
+F138 stable
+
+Repair：
+
+F135–F137
+
+使用：
+
+F134 + F138
+
+作 boundaries。
+
+---
+
+44. Region Repair 架構
+
+本輪可以先預留：
+
+region parameter
+
+但如果 RIFE 不支援局部 Region：
+
+不要假裝支援。
+
+清楚標記：
+
+FULL_FRAME_INTERPOLATION
+
+真正 Region Generative Repair 留 V0.3/V0.4。
+
+---
+
+45. Repair Job
+
+建立：
+
+REPAIR_INTERPOLATION
+
+Job。
+
+記錄：
+
+provider
+model
+frames
+revision
+duration
+status
+
+---
+
+46. Re-analysis
+
+Repair 完成：
+
+必須自動建立：
+
+Consistency Re-analysis
+
+比較：
+
+Before
+After
+
+---
+
+47. Improvement Report
+
+例如：
+
+Motion consistency
+Before 0.62
+After  0.89
+
+Tracking continuity
+Before 0.51
+After  0.84
+
+只有有真實 metric 才顯示。
+
+---
+
+48. Repair Acceptance
+
+修復後：
+
+Accept
+Restore
+
+如果使用者 Accept：
+
+Revision 狀態：
+
+accepted
+
+如果 Restore：
+
+reverted
+
+---
+
+49. MCP Analyze Tools
+
+完善：
+
+analyze_motion
+
+analyze_pose
+
+analyze_tracking
+
+analyze_consistency
+
+detect_problem_frames
+
+get_problem_ranges
+
+create_repair_plan
+
+---
+
+50. MCP Assist Tools
+
+新增：
+
+suggest_repair
+
+compare_before_after
+
+這些可以：
+
+READ + ANALYZE + SUGGEST。
+
+---
+
+51. MCP Edit Tools
+
+本輪加入但要求：
+
+EDIT scope
+
+例如：
+
+execute_repair_plan
+restore_revision
+
+Conversation ASSIST 不可自行拿 EDIT。
+
+只有使用者明確確認後，由 Application Layer 執行。
+
+---
+
+52. Confirmation Architecture
+
+不要讓 LLM 說：
+
+「好，我幫你修了」
+
+然後真的直接修。
+
+正確：
+
+AI suggests repair
+↓
+SuggestedAction
+↓
+Frontend confirmation
+↓
+Application Command
+↓
+Permission Check
+↓
+Revision
+↓
+Repair
+
+---
+
+53. MCP Tool Audit
+
+每次：
+
+execute_repair_plan
+restore_revision
+
+必須寫：
+
+mcp_audit_logs
+
+記錄：
+
+caller
+scope
+project
+frame range
+revision
+status
+
+---
+
+54. Conversation Context
+
+Assist Mode 必須繼續遵守 V0.1 Context Engine。
+
+例如：
+
+使用者選 F120–150 再問：
+
+幫我找有問題的幀
+
+AI 不應重新問：
+
+「請問是哪個 Frame？」
+
+除非 Context 不存在。
+
+---
+
+55. Context Snapshot
+
+每個 analysis / repair suggestion：
+
+保存：
+
+context_snapshot_id
+
+確保未來知道當時 AI 分析的是哪段。
+
+---
+
+56. Stale Context
+
+如果 AI Suggestion 是：
+
+F120–150
+
+但使用者已經切去：
+
+F300
+
+Suggestion Card 必須標示：
+
+Based on F120–150
+
+不能讓使用者誤以為是 F300。
+
+---
+
+57. Analysis Cache
+
+建立 cache key：
+
+frame_hash
+frame_range
+region_hash
+provider
+model_version
+analysis_type
+config_hash
+
+同樣分析不要一直跑 GPU。
+
+---
+
+58. Batch Processing
+
+Frame Range Analysis 要 Batch。
+
+不要：
+
+每一幀啟一個 Process
+
+合理使用：
+
+batch inference
+GPU batching
+
+---
+
+59. Job Progress
+
+例如：
+
+Analyzing Motion
+15 / 30 frames
+
+Analyzing Pose
+22 / 30 frames
+
+Evaluating Consistency
+...
+
+UI 必須能看 Progress。
+
+---
+
+60. Cancellation
+
+長分析 Job 支援：
+
+cancel
+
+至少 Job Layer 要支援 cancellation request。
+
+---
+
+61. GPU OOM
+
+若：
+
+GPU_OUT_OF_MEMORY
+
+可以：
+
+- 降 batch
+- retry once
+- fallback CPU if reasonable
+
+但不要無限 retry。
+
+---
+
+62. CPU Development
+
+沒有 GPU 時：
+
+FrameLab 基本工作台仍然能跑。
+
+Lightweight analysis 可用 CPU。
+
+大型 Provider 顯示：
+
+GPU_REQUIRED
+
+---
+
+63. Database 新增
+
+本輪可能需要：
+
+motion_analyses
+
+pose_analyses
+
+tracks
+
+track_points
+
+consistency_results
+
+problem_ranges
+
+repair_plans
+
+repairs
+
+revisions
+
+revision_frames
+
+如果既有 Schema 已能支援：
+
+不要重複建立。
+
+---
+
+64. RepairPlan Schema
+
+例如：
+
+id
+project_id
+timeline_id
+
+problem_start
+problem_end
+
+repair_start
+repair_end
+
+provider
+
+protected_frames
+
+reason
+
+status
+
+created_by
+
+created_at
+
+---
+
+65. API
+
+至少加入 / 完善：
+
+POST /analysis/motion
+
+POST /analysis/pose
+
+POST /analysis/tracking
+
+POST /analysis/consistency
+
+GET /problem-ranges
+
+POST /repair-plans
+
+GET /repair-plans/:id
+
+POST /repair-plans/:id/execute
+
+POST /revisions/:id/restore
+
+GET /revisions/:id/compare
+
+---
+
+66. SDK
+
+加入：
+
+analyzeMotion()
+
+analyzePose()
+
+analyzeTracking()
+
+analyzeConsistency()
+
+getProblemRanges()
+
+createRepairPlan()
+
+executeRepairPlan()
+
+restoreRevision()
+
+compareRevision()
+
+---
+
+67. AI Assistant Prompting
+
+AI 必須優先使用實際分析結果。
+
+例如：
+
+不可以說：
+
+「看起來可能有跳動」
+
+如果已經有 metric。
+
+應說：
+
+F135–136 右手腕的移動速度提高約 2.4 倍，
+且 tracking 在 F136 出現中斷，因此這一段是主要問題來源。
+
+---
+
+68. Explanation Layer
+
+建立：
+
+ConsistencyExplanationBuilder
+
+把 technical metric 轉成人類可理解描述。
+
+不要把這邏輯全丟給 LLM 猜。
+
+---
+
+69. Rule Example
+
+例如：
+
+velocity spike > threshold
+
+產生：
+
+「角色右手移動速度突然增加。」
+
+Tracking lost：
+
+「這個追蹤點在 F136 暫時遺失。」
+
+這些 deterministic explanation 優先。
+
+LLM 再負責整合語氣。
+
+---
+
+70. Contact Continuity v1
+
+如果已經有：
+
+hand point
+object point / bbox
+
+建立簡單 contact heuristic。
+
+例如：
+
+distance(hand, object) < threshold
+
+連續 Frame 突然超出：
+
+CONTACT_BREAK
+
+這是 FrameLab 很重要的特色。
+
+---
+
+71. 不要過度宣稱
+
+如果只是 heuristic：
+
+UI 顯示：
+
+Possible contact break
+
+不要說：
+
+Physics violation confirmed
+
+---
+
+72. Timeline UX
+
+選到 Problem Range：
+
+直接 Highlight：
+
+F134–F138
+
+提供：
+
+Jump to Peak Frame
+
+---
+
+73. Repair Preview
+
+正式修復前，如果 Provider 支援：
+
+可以產 Preview。
+
+但不要為了 Preview 重跑昂貴模型兩次。
+
+---
+
+74. Version Compare
+
+至少支援：
+
+Original
+vs
+Revision
+
+Frame Range 可以逐幀切換。
+
+---
+
+75. Keyboard
+
+可以新增：
+
+A = analyze current selection
+C = consistency
+
+不要覆蓋重要既有 shortcut。
+
+---
+
+76. Testing
+
+本輪必須新增：
+
+Motion Tests
+
+motion provider
+region motion
+cache
+provider unavailable
+
+Pose Tests
+
+pose parsing
+normalized points
+continuity
+missing joints
+
+Tracking Tests
+
+track create
+lost
+recovered
+track break
+
+Consistency Tests
+
+motion spike
+pose spike
+tracking break
+problem range merge
+severity
+
+Repair Planner Tests
+
+safe window
+keyframe protection
+locked frame protection
+
+Revision Tests
+
+create
+repair
+restore
+accept
+
+Permission Tests
+
+ASK cannot edit
+
+ASSIST cannot auto-edit
+
+confirmed repair can edit
+
+---
+
+77. E2E Scenario
+
+建立一個可重現 Demo：
+
+Upload 3–5 second animation
+↓
+Extract Frames
+↓
+Select F20–F40
+↓
+Run Motion
+↓
+Run Pose
+↓
+Run Tracking
+↓
+Consistency Engine
+↓
+Detect F28–F31
+↓
+AI Assist explains problem
+↓
+Create Repair Plan
+↓
+User confirms
+↓
+Create Revision
+↓
+Interpolation Repair
+↓
+Re-analyze
+↓
+Before / After
+↓
+Restore or Accept
+
+---
+
+78. 如果沒有真正 AI Model
+
+如果 CI 沒 GPU：
+
+使用：
+
+unit fixture
+
+測 parsing / pipelines。
+
+但是 Production path：
+
+不得 fake inference。
+
+Integration Tests 可以標記：
+
+requires-gpu
+
+---
+
+79. Documentation
+
+建立 / 更新：
+
+docs/MOTION_ANALYSIS.md
+
+docs/POSE_ANALYSIS.md
+
+docs/TRACKING.md
+
+docs/CONSISTENCY_ENGINE.md
+
+docs/ASSIST_MODE.md
+
+docs/REPAIR_PIPELINE.md
+
+docs/REVISION_SYSTEM.md
+
+docs/MCP.md
+
+更新：
+
+ARCHITECTURE.md
+README.md
+ROADMAP.md
+
+---
+
+80. V0.2 Definition of Done
+
+本輪真正完成標準：
+
+1. V0.1 Core Loop 沒被破壞
+2. Motion Provider abstraction 存在
+3. 至少一個真實 Motion Provider 可運行
+4. Pose Provider abstraction 存在
+5. 至少一個真實 Pose Provider 可運行
+6. Tracking abstraction 存在
+7. 至少一個真正 Tracking Provider 可運行或清楚標示 unavailable
+8. Motion results 可保存
+9. Pose results 可保存
+10. Track data 可保存
+11. Consistency Engine 真正使用分析資料
+12. 可以找到 Problem Frames
+13. 可以合併成 Problem Range
+14. Repair Planner 可產生 Repair Window
+15. Keyframes 受到保護
+16. Locked Frames 受到保護
+17. ASSIST Mode 可用
+18. AI 可以解釋問題
+19. AI 可以產生 Suggested Action
+20. AI 不會未確認就修改
+21. Revision 真正建立
+22. 原始 Frame 不被覆寫
+23. 至少一個真實 Interpolation Repair Provider 可插拔
+24. Repair Job 可執行
+25. Repair 完成會 Re-analyze
+26. Before / After 可查看
+27. Revision 可 Restore
+28. MCP Analyze Tools 可用
+29. MCP Repair 執行需要 Edit Permission
+30. Audit Log 正常
+31. Tests 通過
+32. Frontend Build 通過
+33. Docker 基本功能正常
+
+---
+
+81. 本輪最重要的產品哲學
+
+不要試圖：
+
+「整段影片重新生成」
+
+FrameLab 的核心哲學是：
+
+Minimal Safe Repair
+
+也就是：
+
+找出最小問題範圍
+↓
+保護正確 Frames
+↓
+只修壞掉的 Frames
+↓
+重新檢查
+
+---
+
+82. FrameLab 必須開始理解「動畫」
+
+不是只理解：
+
+這是一張人物圖片
+
+而是理解：
+
+角色在 F134 的手在哪裡
+
+F135 移動到哪裡
+
+F136 是否符合前後運動趨勢
+
+有沒有突然跳動
+
+角色與道具是否維持接觸
+
+哪個 Frame 開始出問題
+
+哪個 Frame 恢復正常
+
+這才是 FrameLab V0.2 的核心。
+
+---
+
+83. 執行順序
+
+請按照：
+
+1. Audit V0.1
+
+2. Motion Provider + real inference
+
+3. Pose Provider + real inference
+
+4. Tracking
+
+5. Analysis persistence
+
+6. Consistency Engine
+
+7. Problem Range
+
+8. Repair Planner
+
+9. Assist Mode UI
+
+10. Revision
+
+11. Interpolation Repair
+
+12. Re-analysis
+
+13. Before / After
+
+14. MCP integration
+
+15. Tests
+
+16. Documentation
+
+17. Final audit
+
+不要同時開很多半成品。
+
+---
+
+84. Git 規則
+
+禁止：
+
+git add .
+git add -A
+
+只 stage 本次相關檔案。
+
+提交前：
+
+git status
+git diff
+git diff --staged
+
+不要：
+
+- force push main
+- reset 使用者工作
+- 刪除未知檔案
+- 改 unrelated modules
+- 偷偷改 Repository visibility
+
+---
+
+85. 最終回報
+
+完成後請回報：
+
+Completed
+
+實際完成什麼。
+
+Motion
+
+使用哪個 Provider、是否真的推理成功。
+
+Pose
+
+模型與實際狀態。
+
+Tracking
+
+模型與實際狀態。
+
+Consistency
+
+目前能偵測哪些問題。
+
+Assist Mode
+
+使用者目前能做什麼。
+
+Repair
+
+哪些修復真的可以執行。
+
+Revision
+
+Restore 是否正常。
+
+MCP
+
+新增哪些 Tools / Resources。
+
+Tests
+
+逐項回報實際結果。
+
+Performance
+
+提供實測：
+
+frames analyzed
+resolution
+device
+time
+fps
+VRAM
+
+如果無 GPU：
+
+清楚說明。
+
+Known Issues
+
+不要隱藏。
+
+Next 5 Priorities
+
+只列五項。
+
+---
+
+86. 最終最高優先
+
+如果在：
+
+做一個看起來很厲害的「AI 一鍵修影片」
+
+與：
+
+真正精準找到 F134–F138 的問題，
+解釋原因，
+保護 F132 / F140，
+只安全修復必要 Frames，
+並且可以 Restore
+
+之間選擇，
+
+永遠選第二個。
+
+FrameLab 必須逐步成為：
+
+AI-native Frame-by-Frame Animation Editor
+
+不是 AI Video Generator。
+
+本輪成功的標準是：
+
+«使用者指著一段動畫問「哪裡怪」，FrameLab 能用真實 Motion / Pose / Tracking 證據找出問題幀；使用者確認後，只修必要 Frame，並且保留完整 Revision 可以復原。»
+
+現在開始實際開發。

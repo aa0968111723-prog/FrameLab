@@ -1,0 +1,2505 @@
+你現在要繼續開發獨立專案：
+
+FrameLab
+
+這一輪進入：
+
+FrameLab V0.3 — AI Inbetween Core
+
+V0.1 已經建立：
+
+- 逐幀工作台
+- Timeline
+- Onion Skin
+- Context Engine
+- 疊加式 AI Conversation
+- MCP Context
+- Frame/Range/Region 選取
+
+V0.2 已經建立或正在完善：
+
+- Motion Analysis
+- Pose Analysis
+- Tracking
+- Consistency Engine
+- Assist Mode
+- Repair Planner
+- Revision / Restore
+- Minimal Safe Repair
+
+V0.3 的唯一核心目標是：
+
+使用兩張 Keyframe，真正產生可用的中間動畫 Frames。
+
+但不要只是：
+
+Frame A
++
+Frame B
+→ 黑盒模型
+→ 一堆圖片
+
+FrameLab 必須先理解：
+
+- 角色怎麼動
+- Pose 如何變化
+- 物件怎麼跟著角色
+- 接觸關係
+- 動作速度
+- Motion Curve
+- 哪些 Frames 是 Breakdown
+- 哪些生成 Frames 出問題
+
+再產生 Inbetweens。
+
+---
+
+0. 最終產品體驗
+
+使用者選：
+
+F100 ★ KEY
+F110 ★ KEY
+
+然後在 AI 對話輸入：
+
+幫我把這兩張中間補 9 幀。
+動作柔和一點，
+小華的右手一定要一直抓著行李箱，
+臉和背景不要亂變。
+
+FrameLab 必須：
+
+Keyframe Pair
+↓
+Analyze Transition
+↓
+Pose / Motion / Tracking
+↓
+Contact Constraints
+↓
+Motion Plan
+↓
+Breakdown Planning
+↓
+Choose Inbetween Provider
+↓
+Generate Frames
+↓
+Frame Graph Update
+↓
+Consistency Evaluation
+↓
+Detect Bad Generated Frames
+↓
+Regenerate Minimum Necessary Range
+↓
+Preview
+↓
+Accept / Reject
+
+Timeline：
+
+F100 ★
+F101 G
+F102 G
+F103 G
+F104 G
+F105 ◆
+F106 G
+F107 G
+F108 G
+F109 G
+F110 ★
+
+其中：
+
+★ = Keyframe
+◆ = Breakdown
+G = AI Generated Inbetween
+
+---
+
+1. 開始前先 Audit
+
+不要直接重寫。
+
+先執行：
+
+git status
+git branch
+git log --oneline -30
+
+檢查現有：
+
+- Frame Graph
+- Timeline Engine
+- Keyframe Model
+- Onion Skin
+- Motion Analysis
+- Pose Analysis
+- Tracking
+- Consistency Engine
+- Repair Planner
+- Revision
+- Conversation Layer
+- MCP Server
+- Job System
+- Model Adapter Layer
+
+如果目前在 main：
+
+建立：
+
+feat/ai-inbetween-core
+
+不要直接在 main 大量開發。
+
+---
+
+2. 本輪禁止事項
+
+這一輪不要做：
+
+- Premiere Clone
+- After Effects Clone
+- Blender Clone
+- 多軌影片剪輯
+- 音訊編輯
+- 字幕
+- 完整 ComfyUI 平台
+- 20 種生成模型
+- Multi-Agent Swarm
+- 自己訓練超大型 Video Model
+- 一鍵重生整支影片
+- 無限制 Agent 自動修改
+- 為展示而塞大量假模型
+
+本輪只專注：
+
+Keyframe → Motion Plan → Inbetween → Evaluation → Minimal Regeneration
+
+---
+
+3. Keyframe Pair System
+
+建立正式：
+
+KeyframePair
+
+Schema 至少：
+
+id
+
+timeline_id
+
+start_frame_id
+end_frame_id
+
+start_frame_number
+end_frame_number
+
+frame_gap
+
+desired_inbetween_count
+
+status
+created_at
+
+驗證：
+
+start < end
+
+且兩端必須存在。
+
+---
+
+4. Keyframe Pair Validation
+
+禁止以下情況直接生成：
+
+start frame missing
+end frame missing
+same frame
+locked invalid state
+corrupted asset
+unsupported format
+
+錯誤碼：
+
+INVALID_KEYFRAME_PAIR
+KEYFRAME_NOT_FOUND
+FRAME_ASSET_UNAVAILABLE
+
+---
+
+5. Keyframe UI
+
+使用者可以：
+
+Select F100
+→ Set Start Keyframe
+
+Select F110
+→ Set End Keyframe
+
+或者：
+
+Select Range F100–F110
+→ Create Inbetween Range
+
+UI 明確顯示：
+
+Start Keyframe: F100
+End Keyframe: F110
+Gap: 10 frames
+Generated: 9
+
+---
+
+6. Frame Types
+
+正式統一：
+
+KEY
+BREAKDOWN
+INBETWEEN
+GENERATED
+REPAIRED
+HOLD
+
+避免不同模組各自定義。
+
+---
+
+7. Motion Transition Analysis
+
+建立：
+
+KeyframeTransitionAnalyzer
+
+輸入：
+
+Start Keyframe
+End Keyframe
+Frame Context optional
+
+分析：
+
+- overall pixel motion
+- character displacement
+- pose change
+- object displacement
+- camera movement
+- contact relations
+- scene similarity
+- appearance change
+
+輸出：
+
+TransitionAnalysis
+
+---
+
+8. Transition Complexity
+
+建立：
+
+TransitionComplexity
+
+至少：
+
+LOW
+MEDIUM
+HIGH
+VERY_HIGH
+
+判斷依據不能 random。
+
+可使用：
+
+pose displacement
+optical flow magnitude
+object displacement
+camera movement
+visual similarity
+character count
+occlusion
+
+---
+
+9. Provider Routing
+
+根據 Complexity 選擇生成策略。
+
+例如：
+
+LOW
+→ traditional interpolation
+
+MEDIUM
+→ interpolation + motion guidance
+
+HIGH
+→ generative inbetween
+
+VERY_HIGH
+→ suggest breakdown frame first
+
+不要硬規定某模型。
+
+建立：
+
+InbetweenStrategyResolver
+
+---
+
+10. Motion Plan
+
+這是 V0.3 核心。
+
+建立：
+
+MotionPlan
+
+不要直接把兩張圖片丟給模型。
+
+Motion Plan 至少描述：
+
+characters
+objects
+camera
+pose transitions
+tracks
+contacts
+motion curves
+constraints
+breakdowns
+
+---
+
+11. Motion Plan Schema
+
+例如：
+
+{
+  "start_frame": 100,
+  "end_frame": 110,
+
+  "characters": [
+    {
+      "character_id": "xiaohua",
+      "motion": {
+        "direction": "right",
+        "distance_normalized": 0.18
+      },
+      "pose_transition": {}
+    }
+  ],
+
+  "objects": [
+    {
+      "object_id": "suitcase",
+      "constraint": "follow_character_right_hand"
+    }
+  ],
+
+  "camera": {
+    "movement": "static"
+  },
+
+  "curve": "ease_in_out",
+
+  "breakdowns": [105],
+
+  "constraints": []
+}
+
+---
+
+12. Motion Constraints
+
+建立正式：
+
+AnimationConstraint
+
+至少支援：
+
+PRESERVE_CHARACTER
+PRESERVE_FACE
+PRESERVE_BACKGROUND
+PRESERVE_CLOTHING
+PRESERVE_OBJECT
+MAINTAIN_CONTACT
+LOCK_REGION
+LOCK_KEYFRAME
+KEEP_CAMERA_STATIC
+
+---
+
+13. Contact Constraint
+
+這是重要能力。
+
+例如：
+
+right_hand ↔ suitcase
+
+建立：
+
+ContactConstraint
+
+Schema：
+
+source_entity
+source_point
+
+target_entity
+target_region
+
+start_frame
+end_frame
+
+strength
+
+---
+
+14. Motion Curves
+
+第一版支援：
+
+LINEAR
+EASE_IN
+EASE_OUT
+EASE_IN_OUT
+HOLD
+
+架構預留：
+
+CUSTOM
+
+---
+
+15. Motion Curve Resolver
+
+將自然語言：
+
+慢慢加速
+
+轉成：
+
+EASE_IN
+
+慢慢停下來
+
+轉成：
+
+EASE_OUT
+
+柔和開始、柔和結束
+
+轉成：
+
+EASE_IN_OUT
+
+這層不要完全靠 LLM。
+
+建立 deterministic mapping + AI assist。
+
+---
+
+16. Breakdown Frame
+
+動畫中不能只有：
+
+A → B
+
+建立：
+
+BreakdownFrame
+
+用途：
+
+表達動作中間的重要 Pose。
+
+例如：
+
+F100 KEY
+
+F105 BREAKDOWN
+
+F110 KEY
+
+---
+
+17. Breakdown Suggestion
+
+建立：
+
+suggest_breakdown_frames()
+
+如果：
+
+- pose difference 過大
+- 動作方向改變
+- contact 複雜
+- character rotation 很大
+- occlusion 發生
+
+FrameLab 建議：
+
+建議在 F105 建立 Breakdown Frame。
+
+不要一定自動建立。
+
+Assist Mode 顯示確認。
+
+---
+
+18. AI Generated Breakdown
+
+架構預留：
+
+generate_breakdown_frame()
+
+但要標記：
+
+GENERATED_BREAKDOWN
+
+不要假裝人類畫的。
+
+---
+
+19. Inbetween Provider Architecture
+
+建立正式：
+
+InbetweenProvider
+
+介面至少：
+
+async def generate(
+    start_frame,
+    end_frame,
+    count,
+    motion_plan,
+    constraints,
+    config
+):
+    ...
+
+---
+
+20. Provider 類型
+
+區分：
+
+InterpolationProvider
+
+GenerativeInbetweenProvider
+
+不要混成同一個。
+
+---
+
+21. Traditional Interpolation
+
+第一版可以使用：
+
+RIFE
+
+或現有已能穩定商用 / 合規的 Provider。
+
+適合：
+
+- 小幅移動
+- Camera movement 輕微
+- 相鄰 Pose
+- 近似實拍 FPS 插幀
+
+---
+
+22. Generative Inbetween
+
+建立：
+
+GenerativeInbetweenProvider
+
+Adapter 可以預留：
+
+Wan
+ComfyUI
+fal.ai
+RunPod
+Custom API
+Local Model
+
+但不要全部實作。
+
+至少完成：
+
+- Provider interface
+- capabilities
+- provider status
+- error handling
+
+如果實際有可用模型：
+
+完成至少一個真實 Provider。
+
+---
+
+23. 不要把某個模型寫死
+
+禁止：
+
+if inbetween:
+    use_wan()
+
+正確：
+
+strategy
+↓
+provider registry
+↓
+capability matching
+↓
+selected provider
+
+---
+
+24. Provider Capabilities
+
+至少：
+
+supports_frame_pair
+supports_multi_frame
+supports_pose_guidance
+supports_mask
+supports_motion_guidance
+supports_seed
+supports_character_reference
+supports_resolution
+
+---
+
+25. Generation Job
+
+建立：
+
+GENERATE_INBETWEENS
+
+Job。
+
+紀錄：
+
+pair_id
+provider
+model
+count
+motion_plan_id
+revision_id
+device
+status
+progress
+started_at
+finished_at
+
+---
+
+26. Generation Progress
+
+Frontend 顯示：
+
+Analyzing keyframes...
+
+Creating motion plan...
+
+Generating 3 / 9 frames...
+
+Evaluating generated frames...
+
+Checking consistency...
+
+不要只顯示：
+
+Loading...
+
+---
+
+27. Generated Frame Metadata
+
+每張生成 Frame 必須知道：
+
+generated = true
+
+generated_from_start
+generated_from_end
+
+provider
+model
+model_version
+
+generation_job_id
+
+motion_plan_id
+
+seed optional
+
+created_at
+
+---
+
+28. Frame Graph 更新
+
+Generated Frames 必須真正加入：
+
+Frame Graph
+
+例如：
+
+F100 KEY
+ ↓ GENERATED_FROM
+F101
+ ↓
+F102
+ ↓
+...
+F109
+ ↓
+F110 KEY
+
+並保留：
+
+GENERATED_FROM
+BETWEEN
+NEXT_FRAME
+PREVIOUS_FRAME
+
+關係。
+
+---
+
+29. 不可破壞原始 Frames
+
+正式生成前建立：
+
+Revision
+
+如果中間原本已有 Frames：
+
+不要直接覆寫。
+
+建立：
+
+candidate version
+
+先 Preview。
+
+---
+
+30. Candidate Timeline
+
+生成結果先進：
+
+CandidateTimelineVersion
+
+不要立即成為 Active。
+
+使用者看到：
+
+Generated candidate
+
+然後：
+
+Accept
+Reject
+Regenerate
+
+---
+
+31. Accept
+
+使用者 Accept：
+
+才將 Candidate：
+
+promote to active timeline
+
+並保存 Revision。
+
+---
+
+32. Reject
+
+Reject：
+
+保留紀錄。
+
+不要刪除 Audit Metadata。
+
+生成 asset 可以依 retention policy 清理。
+
+---
+
+33. Seed
+
+Generative Provider 如果支援：
+
+保存：
+
+seed
+
+讓同一 Generation 可重現。
+
+---
+
+34. Generate Again
+
+使用者可：
+
+Regenerate
+
+建立新的 Candidate。
+
+不要覆蓋上一個 Candidate。
+
+---
+
+35. Candidate Comparison
+
+UI 至少支援：
+
+Candidate A
+Candidate B
+Original
+
+不用一開始做十個版本。
+
+最多可同時比較合理數量。
+
+---
+
+36. Consistency Evaluation
+
+生成完不能直接成功。
+
+必須自動跑：
+
+Motion
+Pose
+Tracking
+Contact
+Visual consistency
+
+至少使用 V0.2 已有能力。
+
+---
+
+37. Generated Consistency Score
+
+評估：
+
+Motion continuity
+Pose continuity
+Tracking continuity
+Contact continuity
+Character stability
+Object stability
+Background stability optional
+
+沒有真實 metric 就不要顯示。
+
+---
+
+38. Bad Generated Frame
+
+建立：
+
+GeneratedFrameIssue
+
+例如：
+
+F105
+
+HAND_CONTACT_BREAK
+severity = error
+
+---
+
+39. Minimal Regeneration
+
+這是核心。
+
+如果：
+
+F101 good
+F102 good
+F103 good
+F104 good
+F105 bad
+F106 bad
+F107 good
+F108 good
+F109 good
+
+不要全部重新生成。
+
+建立：
+
+RegenerationPlanner
+
+計算：
+
+safe boundary = F104 / F107
+
+只重算：
+
+F105–F106
+
+必要時擴大：
+
+F104–F107
+
+---
+
+40. Regeneration Rules
+
+優先：
+
+最近穩定 Frame
+最近 Keyframe / Breakdown
+Locked Frame
+Contact constraints
+
+作 boundary。
+
+---
+
+41. Never Modify Keyframes
+
+預設：
+
+KEY
+LOCKED
+
+Frames 絕對不能被 Inbetween regeneration 改。
+
+除非使用者明確 Unlock。
+
+---
+
+42. Onion Skin + Generated Frames
+
+Generated Frame 在 Canvas 可以開 Onion Skin：
+
+Prev
+Current Generated
+Next
+
+方便人工檢查。
+
+---
+
+43. Timeline Generated Marker
+
+清楚顯示：
+
+KEY       ★
+BREAKDOWN ◆
+GENERATED G
+REPAIRED  R
+
+使用圖標 / badge 要簡潔。
+
+---
+
+44. Motion Curve UI
+
+新增簡化 Motion Curve 控制。
+
+第一版可以：
+
+Motion
+
+○ Linear
+○ Ease In
+○ Ease Out
+● Ease In Out
+○ Hold
+
+不要一開始做完整 Graph Editor。
+
+---
+
+45. Advanced Motion Graph 預留
+
+資料模型要允許未來：
+
+Bezier
+Custom Curve
+Per-joint Curve
+Object Curve
+Camera Curve
+
+但 V0.3 不需要 UI。
+
+---
+
+46. Natural Language Animation Commands
+
+疊加 AI Conversation 開始真正參與動畫生成。
+
+例如：
+
+幫我補 8 幀。
+
+AI 應轉換成：
+
+{
+  "count": 8
+}
+
+---
+
+47. Natural Language Constraints
+
+例如：
+
+臉不要動
+
+轉：
+
+PRESERVE_FACE
+
+背景不要改
+
+轉：
+
+PRESERVE_BACKGROUND
+
+右手要一直抓著行李箱
+
+轉：
+
+MAINTAIN_CONTACT
+
+---
+
+48. Animation Intent Parser
+
+建立：
+
+AnimationIntentParser
+
+輸出：
+
+InbetweenIntent
+
+例如：
+
+{
+  "count": 9,
+  "curve": "EASE_IN_OUT",
+  "constraints": [
+    "PRESERVE_FACE",
+    "PRESERVE_BACKGROUND",
+    "MAINTAIN_CONTACT"
+  ]
+}
+
+---
+
+49. Intent Parser 不要完全相信 LLM
+
+所有：
+
+frame number
+count
+locked frame
+selected pair
+
+由 Context Engine / Timeline 驗證。
+
+LLM 只能建議。
+
+---
+
+50. ASSIST → GENERATE
+
+正式增加：
+
+GENERATE
+
+Permission。
+
+但仍然要求確認。
+
+流程：
+
+AI understands request
+↓
+Build generation plan
+↓
+Show confirmation
+↓
+User confirms
+↓
+Generation starts
+
+---
+
+51. Generate Confirmation Card
+
+例如：
+
+Generate Inbetweens
+
+F100 → F110
+
+Frames:
+9
+
+Motion:
+Ease In Out
+
+Constraints:
+✓ Preserve Character
+✓ Preserve Face
+✓ Preserve Background
+✓ Maintain hand ↔ suitcase contact
+
+Provider:
+Auto
+
+[Generate]
+[Cancel]
+
+---
+
+52. AI 不可以偷偷生成
+
+即使 Agent 有：
+
+GENERATE
+
+V0.3 Conversation 預設仍需 User confirmation。
+
+全自動留未來 Agent Mode。
+
+---
+
+53. MCP Tools
+
+新增：
+
+get_keyframe_pair
+
+create_keyframe_pair
+
+analyze_keyframe_transition
+
+create_motion_plan
+
+get_motion_plan
+
+suggest_breakdown_frames
+
+create_inbetween_plan
+
+generate_inbetweens
+
+get_generation_job
+
+evaluate_inbetweens
+
+get_generated_issues
+
+regenerate_inbetween_range
+
+accept_generated_frames
+
+reject_generated_frames
+
+---
+
+54. MCP Permissions
+
+區分：
+
+READ
+ANALYZE
+SUGGEST
+GENERATE
+EDIT
+RENDER
+
+例如：
+
+generate_inbetweens
+
+需要：
+
+GENERATE
+
+Accept：
+
+需要：
+
+EDIT
+
+---
+
+55. MCP Resources
+
+加入：
+
+framelab://keyframe-pairs/{id}
+
+framelab://motion-plans/{id}
+
+framelab://generation-jobs/{id}
+
+framelab://candidates/{id}
+
+framelab://generated-frames/{id}
+
+---
+
+56. Conversation Integration
+
+AI 可以說：
+
+F100 到 F110 的姿勢差距偏大，
+直接補 9 幀可能導致 F104–F106 身體旋轉不自然。
+
+建議先建立 F105 Breakdown。
+
+UI：
+
+[建立 Breakdown]
+
+[仍直接生成]
+
+---
+
+57. Breakdown Editing
+
+使用者可以：
+
+Generate Breakdown
+
+或者：
+
+Import / Replace Breakdown
+
+然後重新產生兩段：
+
+F100 → F105
+
+F105 → F110
+
+---
+
+58. Character Reference
+
+如果 FrameLab 已有 Character ID：
+
+Generative Provider 應取得：
+
+character reference
+
+但透過 Provider abstraction。
+
+核心不要知道 LoRA / IP-Adapter 等模型細節。
+
+---
+
+59. Object Reference
+
+同理：
+
+object reference
+
+可提供給支援的 Provider。
+
+---
+
+60. Background Lock
+
+若：
+
+PRESERVE_BACKGROUND
+
+Provider 支援 mask / conditioning：
+
+使用。
+
+如果 Provider 不支援：
+
+UI 必須顯示：
+
+This provider cannot guarantee background preservation.
+
+不要假裝可以。
+
+---
+
+61. Capability Warning
+
+如果使用者要求：
+
+Maintain Contact
+
+但 Provider 不支援 Guidance：
+
+顯示：
+
+Constraint will be evaluated after generation but cannot be enforced during generation.
+
+這很重要。
+
+---
+
+62. Pre-generation Validation
+
+開始前：
+
+檢查：
+
+Provider available
+Model available
+GPU available
+Memory estimate
+Input dimensions
+Supported frame count
+Supported resolution
+Constraint support
+
+---
+
+63. Resolution Strategy
+
+不要永遠拿 4K 直接生成。
+
+建立：
+
+GenerationResolutionPolicy
+
+例如：
+
+Preview
+Production
+Custom
+
+---
+
+64. Preview Mode
+
+第一版強烈建議：
+
+Preview Generation
+
+先低解析度快速生成。
+
+使用者滿意後：
+
+Render High Quality
+
+避免 GPU 浪費。
+
+---
+
+65. Preview / Production Metadata
+
+保存：
+
+quality = preview
+
+quality = production
+
+---
+
+66. Render
+
+V0.3 至少可以：
+
+render selected inbetween range
+
+成：
+
+MP4
+
+或圖片序列。
+
+不要要求完整影片編輯功能。
+
+---
+
+67. Image Sequence Export
+
+支援：
+
+PNG sequence
+
+對逐幀動畫非常重要。
+
+例如：
+
+frame_0100.png
+frame_0101.png
+...
+frame_0110.png
+
+---
+
+68. FPS
+
+Timeline Generation 必須知道：
+
+fps
+
+例如：
+
+12
+24
+30
+
+不要把 Frame Count 與 FPS 混為一談。
+
+---
+
+69. Hold Frames
+
+支援：
+
+HOLD
+
+例如角色停兩格。
+
+AI Inbetween 不能把 Hold 自動變成 Movement。
+
+---
+
+70. Animation on Twos 預留
+
+逐幀動畫可能：
+
+24fps playback
+12 unique drawings
+
+資料模型預留：
+
+exposure
+
+例如：
+
+frame exposure = 2
+
+V0.3 UI 可以簡單支援。
+
+---
+
+71. Timeline Exposure
+
+Frame Schema 可加入：
+
+exposure_count
+
+避免未來重構。
+
+---
+
+72. Drawing vs Video Frame
+
+必須區分：
+
+animation drawing
+
+和：
+
+rendered playback frame
+
+未來才能支援：
+
+ones
+twos
+threes
+
+---
+
+73. Database
+
+可能新增：
+
+keyframe_pairs
+
+motion_plans
+
+animation_constraints
+
+breakdown_frames
+
+generation_jobs
+
+generated_frames
+
+candidate_versions
+
+generation_evaluations
+
+generated_frame_issues
+
+如果既有 Schema 可擴充：
+
+不要重複建表。
+
+---
+
+74. Motion Plan Versioning
+
+Motion Plan 必須：
+
+versioned
+
+因為使用者可能：
+
+先 Linear
+→ 改 Ease In
+
+不要覆蓋舊 Plan。
+
+---
+
+75. API
+
+至少加入：
+
+POST /keyframe-pairs
+
+GET /keyframe-pairs/:id
+
+POST /keyframe-pairs/:id/analyze
+
+POST /motion-plans
+
+GET /motion-plans/:id
+
+POST /inbetweens/plan
+
+POST /inbetweens/generate
+
+GET /inbetweens/jobs/:id
+
+POST /inbetweens/:candidate/evaluate
+
+POST /inbetweens/:candidate/regenerate
+
+POST /inbetweens/:candidate/accept
+
+POST /inbetweens/:candidate/reject
+
+---
+
+76. SDK
+
+加入：
+
+createKeyframePair()
+
+analyzeTransition()
+
+createMotionPlan()
+
+suggestBreakdowns()
+
+generateInbetweens()
+
+getGenerationJob()
+
+evaluateInbetweens()
+
+regenerateRange()
+
+acceptCandidate()
+
+rejectCandidate()
+
+---
+
+77. UI Layout
+
+Animation Workspace 可以增加：
+
+Inbetween Panel
+
+不要建立全新 Dashboard。
+
+仍然在 Timeline 工作區。
+
+---
+
+78. Inbetween Panel
+
+例如：
+
+INBETWEEN
+
+Start
+F100 ★
+
+End
+F110 ★
+
+Frames
+9
+
+Motion
+Ease In Out
+
+Provider
+Auto
+
+Constraints
+☑ Character
+☑ Face
+☑ Background
+☑ Hand ↔ Suitcase
+
+[Analyze Transition]
+
+[Generate]
+
+---
+
+79. Motion Plan Inspector
+
+可以查看：
+
+Character movement
+Pose transition
+Object motion
+Contacts
+Camera
+Breakdowns
+Constraints
+
+不要全部藏在 JSON。
+
+---
+
+80. Evaluation UI
+
+生成後：
+
+9 Frames Generated
+
+Motion        92%
+Pose          88%
+Tracking      94%
+Contact       76% ⚠
+
+Problems:
+F105
+F106
+
+[View]
+[Regenerate problem frames]
+[Accept]
+
+只有真實 metric 才顯示。
+
+---
+
+81. Frame-by-Frame Review
+
+使用者可以：
+
+← F104
+← F105
+← F106
+
+逐幀檢查 Candidate。
+
+Onion Skin 正常可用。
+
+---
+
+82. Before / Candidate Toggle
+
+Canvas：
+
+Original
+Candidate
+
+如果原本中間 Frames 不存在：
+
+Original 顯示 Empty / Existing timeline context。
+
+---
+
+83. Error Handling
+
+至少：
+
+INVALID_KEYFRAME_PAIR
+
+PROVIDER_NOT_AVAILABLE
+
+MODEL_NOT_AVAILABLE
+
+UNSUPPORTED_CONSTRAINT
+
+GPU_OUT_OF_MEMORY
+
+GENERATION_FAILED
+
+EVALUATION_FAILED
+
+INVALID_MOTION_PLAN
+
+CANDIDATE_NOT_FOUND
+
+---
+
+84. Retry
+
+Generation failed：
+
+允許：
+
+retry
+
+但不要 infinite retry。
+
+保存 failure reason。
+
+---
+
+85. GPU OOM
+
+如果 GPU OOM：
+
+可以：
+
+1. 降低 batch
+2. 降 Preview resolution
+3. retry once
+
+仍失敗：
+
+GPU_OUT_OF_MEMORY
+
+---
+
+86. Generation Cache
+
+生成結果 cache key 至少考慮：
+
+start_frame_hash
+end_frame_hash
+provider
+model_version
+seed
+motion_plan_hash
+constraint_hash
+resolution
+frame_count
+
+---
+
+87. 不要錯誤重用 Cache
+
+只要：
+
+Motion Curve
+Constraint
+Seed
+Model
+
+任何不同：
+
+不能誤用舊結果。
+
+---
+
+88. Tests
+
+本輪必須增加：
+
+Keyframe Tests
+
+valid pair
+invalid pair
+same frame
+locked frames
+gap calculation
+
+Motion Plan Tests
+
+curve
+constraints
+contact
+versioning
+serialization
+
+Provider Routing Tests
+
+low movement
+large pose
+provider unavailable
+capability mismatch
+
+Generation Tests
+
+job creation
+candidate creation
+metadata
+failure
+retry
+
+Consistency Tests
+
+generated frame evaluation
+bad frame detection
+range merge
+
+Regeneration Tests
+
+minimal regeneration
+keyframe protection
+breakdown protection
+
+Permission Tests
+
+READ cannot generate
+ANALYZE cannot generate
+GENERATE can create candidate
+EDIT required to accept
+
+---
+
+89. E2E Smoke Scenario
+
+建立真正測試：
+
+Create Project
+↓
+Import / Create F100
+↓
+Create F110
+↓
+Mark both KEY
+↓
+Create Keyframe Pair
+↓
+Analyze Transition
+↓
+Create Motion Plan
+↓
+Generate 9 Inbetweens
+↓
+Candidate Timeline
+↓
+Evaluate
+↓
+Detect Problem Frame
+↓
+Regenerate only problem range
+↓
+Re-evaluate
+↓
+Accept Candidate
+↓
+Render frame sequence
+
+如果生成模型需要 GPU：
+
+標記：
+
+requires-gpu
+
+但非 GPU pipeline 還是必須測。
+
+---
+
+90. Provider Fixture 規則
+
+測試可以有 fixture Provider。
+
+但是：
+
+Production 不可以：
+
+random image
+solid color
+fake generation
+
+假裝正式生成成功。
+
+Test Provider 必須明確：
+
+TEST_ONLY
+
+---
+
+91. Performance Metrics
+
+記錄：
+
+generation time
+frames generated
+resolution
+GPU memory
+model
+provider
+evaluation time
+
+---
+
+92. Observability
+
+新增：
+
+motion plan duration
+provider selection
+generation duration
+frames/sec
+regeneration count
+candidate acceptance rate optional
+
+---
+
+93. MCP Audit
+
+對：
+
+generate_inbetweens
+regenerate_inbetween_range
+accept_generated_frames
+reject_generated_frames
+
+寫入 Audit Log。
+
+---
+
+94. Revision
+
+Accept Candidate 前：
+
+一定要：
+
+create revision
+
+確保可以 Restore。
+
+---
+
+95. Restore
+
+如果 Accept 之後覺得不好：
+
+可以：
+
+Restore Revision
+
+回到 Generation 前 Timeline。
+
+---
+
+96. AI Conversation Example 1
+
+User：
+
+F100 到 F110 幫我補 9 幀。
+
+AI：
+
+目前 F100 與 F110 已設定為 Keyframe。
+
+偵測到中等姿勢變化。
+
+建議：
+9 個 Inbetweens
+Ease In Out
+
+[生成]
+
+---
+
+97. AI Conversation Example 2
+
+User：
+
+右手要一直抓行李箱。
+
+AI：
+
+建立：
+
+MAINTAIN_CONTACT
+right_hand ↔ suitcase
+
+並顯示在 Generation Plan。
+
+---
+
+98. AI Conversation Example 3
+
+User：
+
+這段太機械了，柔和一點。
+
+AI 不應立即整段重生。
+
+應先提出：
+
+Motion Curve:
+Linear
+→ Ease In Out
+
+Regenerate:
+F101–F109
+
+[套用並重新生成]
+
+---
+
+99. AI Conversation Example 4
+
+生成後：
+
+F105 和 F106 手有問題。
+
+FrameLab 使用目前 Context：
+
+F105–F106
+
+重新檢查。
+
+如果確認：
+
+建議只重新生成 F105–F106，
+使用 F104 / F107 作為安全邊界。
+
+---
+
+100. Documentation
+
+新增 / 更新：
+
+docs/KEYFRAME_PAIR.md
+
+docs/MOTION_PLAN.md
+
+docs/INBETWEEN_ENGINE.md
+
+docs/GENERATION_PROVIDERS.md
+
+docs/ANIMATION_CONSTRAINTS.md
+
+docs/BREAKDOWN_FRAMES.md
+
+docs/CANDIDATE_VERSIONS.md
+
+docs/MCP.md
+
+docs/ROADMAP.md
+
+更新：
+
+README.md
+ARCHITECTURE.md
+
+---
+
+101. V0.3 Definition of Done
+
+本輪完成必須真的做到：
+
+1. 可以建立 Keyframe Pair
+2. Keyframe Pair 有 validation
+3. 可以分析 Transition
+4. 有 Transition Complexity
+5. 可以建立 Motion Plan
+6. Motion Curve 可設定
+7. Animation Constraints 可設定
+8. Contact Constraint 可設定
+9. 可以 Suggest Breakdown
+10. Inbetween Provider abstraction 完成
+11. 至少一個真實 Provider 可以工作，或清楚標記 unavailable
+12. 可以建立 Generation Job
+13. Job 有 Progress
+14. Generated Frames 有完整 Metadata
+15. Generated Frames 進入 Frame Graph
+16. Candidate Timeline 不覆蓋 Active
+17. Onion Skin 可以查看 Generated Frame
+18. Timeline 能區分 KEY / BREAKDOWN / GENERATED
+19. Generation 完成後跑 Consistency
+20. 能找到 Generated Problem Frames
+21. 能形成 Problem Range
+22. 可以 Minimal Regeneration
+23. 不會修改 Keyframes
+24. 不會修改 Locked Frames
+25. AI 對話可建立 Inbetween Plan
+26. AI 能理解簡單 Motion Language
+27. AI 能建立 Constraints
+28. Generate 前要求 Confirmation
+29. MCP Generate Tools 正常
+30. MCP Permissions 正常
+31. Accept Candidate 需要 Edit Permission
+32. Accept 前建立 Revision
+33. 可以 Reject Candidate
+34. 可以 Restore Revision
+35. 可以 Export Frame Sequence
+36. 可以 Render Preview
+37. Tests 通過
+38. Frontend Build 通過
+39. Docker 基本功能正常
+
+---
+
+102. 不准偷懶
+
+禁止：
+
+fake generated frames
+random consistency
+hardcoded candidate success
+fake motion plan
+fake pose
+fake contact tracking
+production mock provider
+
+如果模型沒有：
+
+清楚顯示：
+
+MODEL_NOT_AVAILABLE
+
+或：
+
+PROVIDER_NOT_CONFIGURED
+
+---
+
+103. 不准重新生成整段來掩蓋問題
+
+如果只有：
+
+F105–F106
+
+壞掉，
+
+不要預設：
+
+Regenerate F101–F109
+
+除非 Repair / Regeneration Planner 有實際理由。
+
+優先：
+
+Minimal Regeneration
+
+---
+
+104. FrameLab 動畫哲學
+
+FrameLab 不應該把動畫理解成：
+
+很多張 AI 圖片排列起來
+
+它應該理解：
+
+Key Pose
+↓
+Breakdown
+↓
+Inbetween
+↓
+Timing
+↓
+Spacing
+↓
+Motion Curve
+↓
+Contact
+↓
+Consistency
+
+---
+
+105. Timing 與 Spacing
+
+V0.3 至少開始區分：
+
+Timing
+
+和：
+
+Spacing
+
+Timing：
+
+多少 Frames 完成動作。
+
+Spacing：
+
+每一幀移動多少。
+
+例如：
+
+Linear spacing
+
+vs
+
+Ease In spacing
+
+這是動畫核心。
+
+---
+
+106. 不要把 Ease 只做 UI 名稱
+
+實際生成 Motion Plan 時：
+
+Ease 曲線必須轉換成：
+
+normalized progress per generated frame
+
+例如 9 Frames：
+
+t1
+t2
+t3
+...
+t9
+
+不同 Curve 產生不同 spacing。
+
+---
+
+107. Motion Progress
+
+每個 Generated Frame 可以保存：
+
+motion_progress
+
+範圍：
+
+0.0 → 1.0
+
+方便日後自己訓練模型。
+
+---
+
+108. 未來 Dataset
+
+Generation 結果保存：
+
+input keyframes
+motion plan
+constraints
+generated frames
+evaluation
+accepted / rejected
+human corrections
+
+這些未來都是 FrameLab 自有 Inbetween Model 的寶貴資料。
+
+---
+
+109. 不要現在訓練自己的大模型
+
+本輪：
+
+建立資料結構即可。
+
+不要消耗時間訓練。
+
+未來等資料量夠：
+
+再做：
+
+FrameLab Inbetween Model
+
+---
+
+110. 最後執行順序
+
+請按照：
+
+1. Audit V0.2
+
+2. Keyframe Pair
+
+3. Transition Analyzer
+
+4. Motion Plan
+
+5. Constraints
+
+6. Breakdown System
+
+7. Provider Architecture
+
+8. Real Inbetween Provider
+
+9. Generation Job
+
+10. Candidate Timeline
+
+11. Frame Graph Integration
+
+12. Consistency Evaluation
+
+13. Minimal Regeneration
+
+14. AI Conversation Integration
+
+15. MCP Integration
+
+16. Revision / Restore
+
+17. Export / Preview
+
+18. Tests
+
+19. Documentation
+
+20. Final Audit
+
+不要一次同時建立 15 個半成品。
+
+---
+
+111. Git 規則
+
+禁止：
+
+git add .
+git add -A
+
+只 stage 本輪相關檔案。
+
+提交前：
+
+git status
+git diff
+git diff --staged
+
+不要：
+
+- force push main
+- reset 使用者工作
+- 偷刪未知檔案
+- 亂改 unrelated modules
+- 偷偷修改 Repository visibility
+
+---
+
+112. 最終回報格式
+
+完成後請回報：
+
+Completed
+
+實際完成什麼。
+
+Keyframe System
+
+目前實作狀態。
+
+Motion Plan
+
+支援哪些 Curve / Constraint。
+
+Breakdown
+
+是否真的可用。
+
+Providers
+
+哪些 Provider 真正能生成。
+
+哪些只有 Adapter。
+
+Generation
+
+實測：
+
+input frames
+generated frames
+resolution
+provider
+model
+GPU
+duration
+VRAM
+
+Consistency
+
+生成後檢查哪些項目。
+
+Minimal Regeneration
+
+是否真正只重算問題區間。
+
+Conversation
+
+自然語言目前可以控制什麼。
+
+MCP
+
+新增哪些 Tools / Resources。
+
+Revision
+
+Accept / Reject / Restore 是否正常。
+
+Tests
+
+實際結果。
+
+Known Issues
+
+不要隱藏。
+
+Next 5 Priorities
+
+只列下一輪最重要五件事。
+
+---
+
+113. 最終最高原則
+
+如果必須在：
+
+做一個看起來很神奇的一鍵 AI 生動畫按鈕
+
+與：
+
+真正做到：
+
+Keyframe
+→ Motion Plan
+→ Breakdown
+→ Inbetween
+→ Consistency
+→ 找出壞幀
+→ 只重算必要幀
+→ Accept / Restore
+
+之間選擇，
+
+永遠選第二個。
+
+V0.3 成功的標準不是：
+
+«「可以生成影片。」»
+
+而是：
+
+«「FrameLab 開始真正理解逐幀動畫中的 Keyframe、Breakdown、Timing、Spacing、Inbetween 和一致性，並讓 AI 與動畫師一起控制這些東西。」»
+
+現在開始實際開發。

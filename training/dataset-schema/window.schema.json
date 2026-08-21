@@ -1,0 +1,27 @@
+{
+  "$id": "framelab.consistency.window",
+  "type": "object",
+  "required": ["project_id", "center_frame", "labels"],
+  "properties": {
+    "project_id": { "type": "string" },
+    "center_frame": { "type": "integer" },
+    "before": { "type": "integer" },
+    "after": { "type": "integer" },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "face_consistency": { "type": "number" },
+        "hand_consistency": { "type": "number" },
+        "motion_consistency": { "type": "number" },
+        "object_consistency": { "type": "number" },
+        "bad_region": { "type": "string" },
+        "repair_window": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    }
+  }
+}
