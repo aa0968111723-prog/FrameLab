@@ -8,6 +8,31 @@ export type HistoryRow = {
   previewData?: string | null;
 };
 
+function actionZh(action: string) {
+  switch (action) {
+    case "accept_generated_frames":
+      return "接受中間影格";
+    case "reject_generated_frames":
+      return "捨棄候選";
+    case "execute_repair_plan":
+      return "執行修復";
+    case "repair_frame":
+      return "修復影格";
+    case "repair_frame_range":
+      return "範圍修復";
+    case "regenerate_region":
+      return "區域混合";
+    case "generate_inbetweens":
+      return "產生中間影格";
+    case "create_keyframe":
+      return "標成關鍵影格";
+    case "mark_breakdown":
+      return "標成分解影格";
+    default:
+      return action.replaceAll("_", " ");
+  }
+}
+
 function jpegUrl(b64?: string | null) {
   if (!b64) return "";
   return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
@@ -45,7 +70,7 @@ export function VisualHistory({
               {r.previewData ? (
                 <img src={jpegUrl(r.previewData)} alt="" className="h-6 w-6 shrink-0 rounded-[2px] object-cover" />
               ) : null}
-              <span className="truncate text-[11px] text-muted">{r.action}</span>
+              <span className="truncate text-[11px] text-muted">{actionZh(r.action)}</span>
             </span>
             <span className="flex gap-1">
               <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => onPreview(r.id, r.previewData)}>

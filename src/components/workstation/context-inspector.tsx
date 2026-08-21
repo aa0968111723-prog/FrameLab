@@ -35,9 +35,11 @@ export function ContextInspector({ snapshot }: { snapshot: SerializedContext }) 
 
 function focusZh(focus: string) {
   if (focus === "current_frame") return "目前影格";
-  if (focus === "range") return "範圍";
-  if (focus === "region") return "選區";
+  if (focus === "selected_frame_range" || focus === "range") return "範圍";
+  if (focus === "selected_region" || focus === "region") return "選區";
   if (focus === "character") return "角色";
+  if (focus === "current_timeline") return "時間軸";
+  if (focus === "current_project") return "專案";
   return focus;
 }
 

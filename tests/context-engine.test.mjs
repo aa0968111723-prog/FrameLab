@@ -173,7 +173,7 @@ describe("context engine (live module)", () => {
 describe("lightweight visual analysis (live module)", () => {
   it("is labelled as lightweight, never pose", () => {
     assert.equal(LIGHTWEIGHT_KIND, "lightweight visual analysis");
-    assert.match(analysisSrc, /No pose \/ skeleton/);
+    assert.match(analysisSrc, /RTMPose/);
     assert.match(analysisSrc, /Do not report joint angles/);
   });
 

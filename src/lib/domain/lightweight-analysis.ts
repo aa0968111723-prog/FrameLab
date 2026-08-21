@@ -138,43 +138,43 @@ export function comparePair(
       kind: "mae",
       frames: [frameA, frameB],
       value: mae,
-      note: "mean absolute RGB difference in [0,1]",
+      note: "平均 RGB 差，範圍 0–1",
     },
     {
       kind: "histogram",
       frames: [frameA, frameB],
       value: hist,
-      note: "16-bin RGB histogram L1 / 6",
+      note: "16 桶 RGB 直方圖 L1 / 6",
     },
     {
       kind: "luma",
       frames: [frameA, frameB],
       value: luma,
-      note: "mean luma jump",
+      note: "平均亮度跳變",
     },
     {
       kind: "edge",
       frames: [frameA, frameB],
       value: edge,
-      note: "Sobel-less adjacent-pixel edge magnitude delta",
+      note: "相鄰像素邊緣量變化（非正式 Sobel）",
     },
     {
       kind: "ssim_like",
       frames: [frameA, frameB],
       value: ssim,
-      note: "luma covariance stand-in; not published SSIM",
+      note: "亮度協方差近似；不是公開 SSIM",
     },
     {
       kind: "centroid",
       frames: [frameA, frameB],
       value: disp,
-      note: "normalized luma-centroid displacement inside the crop",
+      note: "裁切內正規化亮度質心位移",
     },
     {
       kind: "motion_block",
       frames: [frameA, frameB],
       value: motion.magnitude,
-      note: `16×16 block match, direction ${motion.direction.toFixed(2)} rad — not SEA-RAFT`,
+      note: `16×16 區塊比對，方向 ${motion.direction.toFixed(2)} rad — 不是 SEA-RAFT`,
     },
   ];
 }
@@ -189,28 +189,28 @@ export function summarizeObservations(
   const meanMae =
     mae.length === 0 ? 0 : mae.reduce((s, o) => s + o.value, 0) / mae.length;
   const parts: string[] = [];
-  const where = region ? "selected region" : "full frame";
+  const where = region ? "已選區域" : "整格";
   if (frames.length) {
     parts.push(
-      `${where} across F${frames[0]}–F${frames[frames.length - 1]}.`,
+      `${where}：F${frames[0]}–F${frames[frames.length - 1]}。`,
     );
   }
   if (spike && mae.length > 1 && spike.value > meanMae * 1.4 && spike.value > 0.04) {
     parts.push(
-      `Largest pixel jump is F${spike.frames[0]}→F${spike.frames[1]} (MAE ${spike.value.toFixed(3)} vs mean ${meanMae.toFixed(3)}).`,
+      `最大像素跳變在 F${spike.frames[0]}→F${spike.frames[1]}（MAE ${spike.value.toFixed(3)}，平均 ${meanMae.toFixed(3)}）。`,
     );
   } else if (spike) {
     parts.push(
-      `Pixel change is relatively even (peak MAE ${spike.value.toFixed(3)}).`,
+      `像素變化相對平均（峰值 MAE ${spike.value.toFixed(3)}）。`,
     );
   } else {
-    parts.push("Not enough neighboring frames to compare.");
+    parts.push("鄰近影格不夠，無法比對。");
   }
   const centroid = observations.filter((o) => o.kind === "centroid");
   const maxDisp = [...centroid].sort((a, b) => b.value - a.value)[0];
   if (maxDisp && maxDisp.value > 0.08) {
     parts.push(
-      `Luma centroid in the ${where} shifts ${maxDisp.value.toFixed(3)} (normalized) between F${maxDisp.frames[0]} and F${maxDisp.frames[1]}.`,
+      `${where}亮度質心在 F${maxDisp.frames[0]} 與 F${maxDisp.frames[1]} 之間位移 ${maxDisp.value.toFixed(3)}（正規化）。`,
     );
   }
   const metrics: Record<string, number> = {};
@@ -224,10 +224,10 @@ export function summarizeObservations(
     observations,
     available_metrics: metrics,
     limitations: [
-      "This is lightweight visual analysis (pixel MAE, histogram, luma centroid, 16×16 block match).",
-      "No pose / skeleton / hand keypoints — RTMPose is not loaded.",
-      "No SAM mask. Region is a rectangle if provided.",
-      "Do not report joint angles or identity scores; those metrics do not exist.",
+      "這是輕量視覺分析（像素 MAE、直方圖、亮度質心、16×16 區塊比對）。",
+      "沒有骨架／pose／手部關鍵點 — RTMPose 未載入。",
+      "沒有 SAM 遮罩。選區若有，是矩形。",
+      "不要回報關節角度或身份分數；那些指標不存在。Do not report joint angles or identity scores.",
     ],
   };
 }

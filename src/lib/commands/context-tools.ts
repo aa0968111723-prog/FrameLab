@@ -317,11 +317,11 @@ export async function analyzeSelection(ctx: CommandContext, args: Record<string,
   if (!session.timeline_id) {
     return {
       kind: LIGHTWEIGHT_KIND,
-      summary: "No timeline in this workspace session.",
+      summary: "這個工作階段還沒有時間軸。",
       frames: [],
       observations: [],
       available_metrics: {},
-      limitations: ["Workspace session has no timeline."],
+      limitations: ["工作階段沒有時間軸。"],
     };
   }
   const types = Array.isArray(args.analysis_types)

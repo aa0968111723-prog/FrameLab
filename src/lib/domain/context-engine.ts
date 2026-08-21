@@ -328,6 +328,19 @@ export function serializeContext(ctx: FrameLabContext): SerializedContext {
   };
 }
 
+function coerceOnion(raw: unknown): OnionSkinContext {
+  const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const n = (v: unknown, fallback: number) =>
+    typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  return {
+    enabled: o.enabled !== false,
+    previousFrames: n(o.previousFrames ?? o.prev, DEFAULT_ONION_CONTEXT.previousFrames),
+    nextFrames: n(o.nextFrames ?? o.next, DEFAULT_ONION_CONTEXT.nextFrames),
+    previousOpacity: n(o.previousOpacity ?? o.opacityPrev, DEFAULT_ONION_CONTEXT.previousOpacity),
+    nextOpacity: n(o.nextOpacity ?? o.opacityNext, DEFAULT_ONION_CONTEXT.nextOpacity),
+  };
+}
+
 export function hydrateContext(
   snap: SerializedContext,
   extras: Partial<FrameLabContext> = {},
@@ -350,8 +363,17 @@ export function hydrateContext(
     selectedFrames: snap.selected_frames ?? [],
     selectedCharacterId: snap.selected_character,
     selectedObjectId: snap.selected_object,
-    selectedRegion: snap.selected_region,
-    onionSkin: { ...DEFAULT_ONION_CONTEXT, ...snap.onion_skin },
+    selectedRegion: snap.selected_region
+      ? {
+          ...snap.selected_region,
+          type: snap.selected_region.type === "mask" || snap.selected_region.selectionType === "mask" ? "mask" : "rectangle",
+          selectionType:
+            snap.selected_region.selectionType === "mask" || snap.selected_region.type === "mask"
+              ? "mask"
+              : "rectangle",
+        }
+      : null,
+    onionSkin: coerceOnion(snap.onion_skin),
     overlay: { ...DEFAULT_OVERLAY, ...snap.overlay },
     analysisResults: snap.analysis_available ?? [],
     conversationId: snap.conversation_id,

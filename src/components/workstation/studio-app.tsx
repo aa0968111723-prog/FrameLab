@@ -9,6 +9,7 @@ import {
   Keyboard,
   Loader2,
   MessageSquare,
+  PanelRight,
   Pause,
   Play,
   Repeat,
@@ -56,6 +57,7 @@ import { annotationsFromProblems, categoryLabel, type VisualAnnotation } from "@
 import { propagateMask } from "@/lib/domain/region-repair";
 import { parseAnimationIntent, intentToConstraintFlags, isInbetweenRequest, isCurveAdjustRequest } from "@/lib/domain/animation-intent";
 import type { InbetweenAskPayload } from "@/lib/domain/conversation";
+import { createEmptyContext, serializeContext, type SerializedContext } from "@/lib/domain/context-engine";
 import { curveCaption, curvePathD, spacingDots } from "@/lib/visual/motion-curve-visual";
 import { locateProblemBox } from "@/lib/visual/problem-locate";
 import { buildPresence } from "@/lib/visual/character-track";
@@ -145,6 +147,19 @@ const TOOL_DONE_ZH: Record<string, string> = {
   create_repair_plan: "修復計畫已建立",
 };
 
+function toolErrorZh(code: string, error: string) {
+  const e = error.toLowerCase();
+  if (e.includes("start and end cannot be the same")) return "起點與終點不能是同一格。請再點另一張關鍵影格，或 Shift 拖出範圍。";
+  if (e.includes("both ends must be key")) return "兩端都必須是關鍵影格。已嘗試自動升級；請再確認時間軸上的 ★。";
+  if (e.includes("does not fit")) return "補幀數量超過兩張關鍵格之間的空位。已改成填滿空位。";
+  if (e.includes("timeline not found")) return "找不到時間軸";
+  if (e.includes("keyframe")) return "關鍵影格對無效。請先點兩張 ★，或用中間影格面板設定起點／終點。";
+  if (e.includes("candidate")) return "找不到候選版本";
+  if (e.includes("not found")) return "找不到對象";
+  if (e.includes("required")) return "還少一個必要參數";
+  return error ? `${code}: ${error}` : code;
+}
+
 function jpegUrl(b64?: string) {
   if (!b64) return "";
   return b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
@@ -215,7 +230,7 @@ function StudioInner({ projectId }: { projectId: string }) {
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [contextVersion, setContextVersion] = useState(1);
   const [contextLocked, setContextLocked] = useState(false);
-  const [frozenContext, setFrozenContext] = useState<Record<string, unknown> | null>(null);
+  const [frozenContext, setFrozenContext] = useState<SerializedContext | null>(null);
   const [chat, setChat] = useState<ChatLine[]>([]);
   const [askBusy, setAskBusy] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(() => {
@@ -449,8 +464,14 @@ function StudioInner({ projectId }: { projectId: string }) {
     mutationFn: (input: { tool: string; args: Record<string, unknown> }) => runToolFn({ data: input }),
     onSuccess: (r: { ok: boolean; code: string; error: string; payload: string }, input) => {
       if (!r.ok) {
-        toast.error(`${r.code}: ${r.error}`);
+        toast.error(toolErrorZh(r.code, r.error));
         setInb((s) => ({ ...s, busy: false }));
+        return;
+      }
+      if (input.tool === "accept_generated_frames" || input.tool === "reject_generated_frames") {
+        setInb((s) => ({ ...s, busy: false, candidate: null, confirmation: null }));
+        toast.success(TOOL_DONE_ZH[input.tool] ?? "完成");
+        refresh();
         return;
       }
       if (input.tool === "create_inbetween_plan" && r.payload) {
@@ -741,75 +762,66 @@ function StudioInner({ projectId }: { projectId: string }) {
     queryFn: () => listRevisionsFn({ data: { projectId, frameId: current!.id } }),
   });
 
-  const liveContext = {
-    project_id: projectId,
-    timeline_id: timelineId ?? null,
-    current_frame: engine.currentFrame,
-    current_frame_id: current?.id ?? null,
-    selected_range:
-      inb.start != null && inb.end != null ? ([inb.start, inb.end] as [number, number]) : engine.selectedRange,
-    selected_frames: engine.selectedFrames,
-    selected_character: selectedCharacterId,
-    selected_object: selectedObjectId,
-    selected_region:
-      regionLive && current
-        ? {
-            frameId: current.id,
-            frameNumber: current.frameNumber,
-            x: regionBox.x / Math.max(1, current.width),
-            y: regionBox.y / Math.max(1, current.height),
-            width: regionBox.w / Math.max(1, current.width),
-            height: regionBox.h / Math.max(1, current.height),
-            selectionType: "rectangle",
-          }
+  const rangePair: [number, number] | null =
+    inb.start != null && inb.end != null && inb.start !== inb.end
+      ? ([Math.min(inb.start, inb.end), Math.max(inb.start, inb.end)] as [number, number])
+      : engine.selectedRange && engine.selectedRange[0] !== engine.selectedRange[1]
+        ? engine.selectedRange
+        : null;
+  const analysisAvailable: string[] = [];
+  if (frames.length) analysisAvailable.push("lightweight visual analysis");
+  if (poses.length) analysisAvailable.push("pose-lite silhouette extrema");
+  if (tracking.length) analysisAvailable.push("block-match-16 tracking");
+  if (consMap.size) analysisAvailable.push("pixel consistency");
+
+  const liveSnap = serializeContext(
+    createEmptyContext({
+      projectId,
+      videoId: null,
+      timelineId: timelineId ?? null,
+      currentFrame: current
+        ? { id: current.id, frameNumber: current.frameNumber, timestampMs: current.timestampMs }
         : null,
-    onion_skin: engine.onionSkin,
-    overlay: { pose: overlayStack.primary === "pose", tracking: overlayStack.primary === "track", motion: overlayStack.primary === "motion" },
-    viewport: { zoom: engine.zoom, panX: 0, panY: 0 },
-    conversation_id: conversationId,
-    session_id: sessionId,
-    context_version: contextVersion,
-  };
-
-  const activeLive = (frozenContext as typeof liveContext | null) ?? liveContext;
-
-  const effectiveSnap = {
-    project_id: projectId,
-    video_id: null,
-    timeline_id: timelineId ?? null,
-    current_frame: activeLive.current_frame,
-    current_frame_id: activeLive.current_frame_id,
-    timestamp_ms: current?.timestampMs ?? null,
-    selected_range: activeLive.selected_range,
-    selected_frames: activeLive.selected_frames,
-    selected_character: activeLive.selected_character,
-    selected_object: activeLive.selected_object,
-    selected_region: activeLive.selected_region
-      ? { type: "rectangle" as const, ...activeLive.selected_region, selectionType: "rectangle" as const }
-      : null,
-    onion_skin: {
-      enabled: engine.onionSkin.enabled,
-      previousFrames: engine.onionSkin.prev,
-      nextFrames: engine.onionSkin.next,
-      previousOpacity: engine.onionSkin.opacityPrev,
-      nextOpacity: engine.onionSkin.opacityNext,
-    },
-    overlay: {
-      pose: overlayStack.primary === "pose",
-      mask: overlayStack.primary === "mask",
-      tracking: overlayStack.primary === "track",
-      motion: overlayStack.primary === "motion",
-      depth: false,
-      consistency: overlayStack.primary === "problems",
-    },
-    neighbors_available: true,
-    analysis_available: [] as string[],
-    conversation_id: conversationId,
-    session_id: sessionId,
-    context_version: activeLive.context_version,
-    viewport: { zoom: engine.zoom },
-    focus: "current_frame" as const,
-  };
+      selectedRange: rangePair ? { startFrame: rangePair[0], endFrame: rangePair[1] } : null,
+      selectedFrames: engine.selectedFrames,
+      selectedCharacterId,
+      selectedObjectId,
+      selectedRegion:
+        regionLive && current
+          ? {
+              type: "rectangle",
+              selectionType: "rectangle",
+              frameId: current.id,
+              frameNumber: current.frameNumber,
+              x: regionBox.x / Math.max(1, current.width),
+              y: regionBox.y / Math.max(1, current.height),
+              width: regionBox.w / Math.max(1, current.width),
+              height: regionBox.h / Math.max(1, current.height),
+            }
+          : null,
+      onionSkin: {
+        enabled: engine.onionSkin.enabled,
+        previousFrames: engine.onionSkin.prev,
+        nextFrames: engine.onionSkin.next,
+        previousOpacity: engine.onionSkin.opacityPrev,
+        nextOpacity: engine.onionSkin.opacityNext,
+      },
+      overlay: {
+        pose: overlayStack.primary === "pose" || overlayStack.extras.includes("pose"),
+        mask: overlayStack.primary === "mask" || overlayStack.extras.includes("mask"),
+        tracking: overlayStack.primary === "track" || overlayStack.extras.includes("track"),
+        motion: overlayStack.primary === "motion" || overlayStack.extras.includes("motion"),
+        depth: false,
+        consistency: overlayStack.primary === "problems" || overlayStack.extras.includes("problems"),
+      },
+      viewport: { zoom: engine.zoom },
+      analysisResults: analysisAvailable,
+      conversationId,
+      sessionId,
+      contextVersion,
+    }),
+  );
+  const effectiveSnap = frozenContext ?? liveSnap;
 
   function applyInbetweenPlan(d: InbetweenAskPayload, text: string) {
     const confirmation = d.confirmation;
@@ -867,22 +879,19 @@ function StudioInner({ projectId }: { projectId: string }) {
     setAskBusy(true);
     setAiOpen(true);
     setAiState("analyzing");
-    setChat((c) => [...c, { id: `u-${Date.now()}`, role: "user", content: text }]);
+    setChat((c) => [...c, { id: `u-${Date.now()}`, role: "user", content: text, contextVersion }]);
     try {
-      await syncWorkspaceSessionFn({ data: { sessionId, projectId, context: activeLive } });
+      await syncWorkspaceSessionFn({ data: { sessionId, projectId, context: effectiveSnap } });
       const r = await sendAskFn({
         data: {
           sessionId,
           conversationId,
           providerId,
           userMessage: text,
-          liveContext: {
-            ...activeLive,
-            selected_range:
-              inb.start != null && inb.end != null
-                ? [inb.start, inb.end]
-                : engine.selectedRange ?? activeLive.selected_range,
-          },
+          liveContext: effectiveSnap,
+          lock: contextLocked
+            ? { locked: true, snapshot: effectiveSnap }
+            : { locked: false, snapshot: null },
           fps: engine.fps,
           frameCount: engine.frameCount,
           mode: askMode,
@@ -965,6 +974,8 @@ function StudioInner({ projectId }: { projectId: string }) {
           id: r.assistantMessageId,
           role: "assistant",
           content: r.text,
+          contextVersion: r.snapshot?.context_version ?? contextVersion,
+          stale: r.stale,
           suggestions: r.suggestions,
           assist: assist
             ? {
@@ -1107,6 +1118,7 @@ function StudioInner({ projectId }: { projectId: string }) {
             </button>
           ))}
         </div>
+        <div className="hidden 2xl:flex items-center gap-1">
         <Button variant={engine.onionSkin.enabled ? "secondary" : "ghost"} size="sm" onClick={() => setEngine((s) => setOnionSkin(s, { enabled: !s.onionSkin.enabled }))}>
           <FlipHorizontal className="size-3.5" />
           洋蔥皮
@@ -1137,6 +1149,16 @@ function StudioInner({ projectId }: { projectId: string }) {
         </Button>
         <Button variant={focusMode ? "secondary" : "ghost"} size="sm" onClick={() => setFocusMode((v) => !v)}>
           對焦
+        </Button>
+        </div>
+        <Button
+          variant={sheet ? "secondary" : "ghost"}
+          size="sm"
+          className="md:hidden"
+          onClick={() => setSheet((v) => !v)}
+        >
+          <PanelRight className="size-3.5" />
+          檢視
         </Button>
         <Button variant="ghost" size="icon" className="size-8" onClick={() => setHelp(true)} aria-label="快捷鍵">
           <Keyboard className="size-4" />
@@ -1189,8 +1211,8 @@ function StudioInner({ projectId }: { projectId: string }) {
               );
             })}
             {[
-              { id: "pose" as const, label: "姿態" },
-              { id: "motion" as const, label: "運動" },
+              { id: "pose" as const, label: "骨架" },
+              { id: "motion" as const, label: "動作" },
               { id: "problems" as const, label: "問題" },
             ].map((l) => {
               const on = overlayStack.primary === l.id || overlayStack.extras.includes(l.id);
@@ -1435,12 +1457,10 @@ function StudioInner({ projectId }: { projectId: string }) {
                 只會改 F{repairViz[0]}{repairViz[0] !== repairViz[1] ? `–F${repairViz[1]}` : ""}。
               </div>
             )}
-          </div>
           {aiOpen && chrome.ai ? (
-            <div className="fixed inset-x-0 bottom-0 z-30 flex h-[70vh] w-full flex-col md:relative md:h-full md:w-[320px] md:shrink-0">
             <ConversationPanel
               open
-              docked
+              docked={false}
               onClose={() => setAiOpen(false)}
               onMinimize={() => setAiOpen(false)}
               providers={llm.data ?? []}
@@ -1460,19 +1480,34 @@ function StudioInner({ projectId }: { projectId: string }) {
                     void setConversationLockFn({ data: { conversationId, locked: false } });
                   }
                 } else {
-                  setFrozenContext({ ...liveContext });
+                  setFrozenContext({ ...liveSnap });
                   setContextLocked(true);
                   if (conversationId) {
                     void setConversationLockFn({
-                      data: { conversationId, locked: true, snapshotJson: JSON.stringify(liveContext) },
+                      data: { conversationId, locked: true, snapshotJson: JSON.stringify(liveSnap) },
                     });
                   }
                 }
               }}
-              messages={chat}
+              messages={chat.map((m) => ({
+                ...m,
+                stale:
+                  m.stale ||
+                  (!contextLocked &&
+                    typeof m.contextVersion === "number" &&
+                    m.contextVersion < contextVersion),
+              }))}
               sending={askBusy}
               toolStatus={askBusy ? "正在看鄰近影格…" : null}
-              stale={false}
+              stale={
+                !contextLocked &&
+                chat.some(
+                  (m) =>
+                    m.role === "assistant" &&
+                    typeof m.contextVersion === "number" &&
+                    m.contextVersion < contextVersion,
+                )
+              }
               onSend={sendAsk}
               onViewRange={(a, b, peak) => viewProblem(peak, [a, b])}
               onSuggestion={(act) => {
@@ -1535,8 +1570,8 @@ function StudioInner({ projectId }: { projectId: string }) {
               mode={askMode}
               onMode={setAskMode}
             />
-            </div>
           ) : null}
+          </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-t border-border bg-surface px-2 py-1 scrollbar-thin">
@@ -1547,7 +1582,11 @@ function StudioInner({ projectId }: { projectId: string }) {
                 onClick={(e) => {
                   if (e.shiftKey) setOverlayStack((s) => toggleExtra(s, o.id));
                   else setOverlayStack((s) => setPrimary(s, o.id));
-                  if (o.id === "compare") setCompareFrame((n) => n ?? Math.max(0, engine.currentFrame - 1));
+                  if (o.id === "compare") {
+                    setCompareFrame((n) => n ?? Math.max(0, engine.currentFrame - 1));
+                    setFlicker(true);
+                    setCompareMode("flicker");
+                  }
                 }}
                 className={cn(
                   "rounded-[var(--radius-xs)] px-2 py-1 text-[11px]",
@@ -1557,6 +1596,16 @@ function StudioInner({ projectId }: { projectId: string }) {
                 {o.label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setCanvasTool((t) => (t === "region" ? "pan" : "region"))}
+              className={cn(
+                "rounded-[var(--radius-xs)] px-2 py-1 text-[11px] md:hidden",
+                canvasTool === "region" ? "bg-raised text-fg" : "text-muted hover:text-fg",
+              )}
+            >
+              選區
+            </button>
             <div className="ml-auto flex items-center gap-1">
               <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => setZoom(s, s.zoom / 1.2))} aria-label="縮小">
                 <ZoomOut className="size-4" />
@@ -1605,7 +1654,31 @@ function StudioInner({ projectId }: { projectId: string }) {
             dimFrames={dimFrames}
             conversationFrames={conversationFrames}
             onConversation={openConversationAtFrame}
-            onSeek={(n, shift) => setEngine((s) => (shift ? selectRange(s, s.currentFrame, n) : seek(s, n)))}
+            onSeek={(n, shift) => {
+              setEngine((s) => (shift ? selectRange(s, s.currentFrame, n) : seek(s, n)));
+              const hit = frames.find((f) => f.frameNumber === n);
+              if (shift) {
+                const a = Math.min(engine.currentFrame, n);
+                const b = Math.max(engine.currentFrame, n);
+                setInb((s) => ({ ...s, start: a, end: b, count: Math.min(s.count, Math.max(1, b - a - 1)) }));
+              } else if (hit?.frameType === "KEY") {
+                setInb((s) => {
+                  if (s.start == null) return { ...s, start: n };
+                  if (s.end == null && n !== s.start) {
+                    const a = Math.min(s.start, n);
+                    const b = Math.max(s.start, n);
+                    return { ...s, start: a, end: b, count: Math.min(s.count, Math.max(1, b - a - 1)) };
+                  }
+                  if (n !== s.start && n !== s.end) {
+                    const prev = s.end ?? s.start;
+                    const a = Math.min(prev, n);
+                    const b = Math.max(prev, n);
+                    return { ...s, start: a, end: b, count: Math.min(s.count, Math.max(1, b - a - 1)) };
+                  }
+                  return s;
+                });
+              }
+            }}
             onScrub={(n) => setEngine((s) => seek(s, n))}
             onZoomTimeline={setTimelineZoom}
           />
@@ -1762,7 +1835,12 @@ function StudioInner({ projectId }: { projectId: string }) {
                     onQuality={(q) => setInb((s) => ({ ...s, quality: q }))}
                     onConstraint={(k, v) => setInb((s) => ({ ...s, constraints: { ...s.constraints, [k]: v } }))}
                     onSetStart={() => {
-                      setInb((s) => ({ ...s, start: engine.currentFrame }));
+                      setInb((s) => {
+                        const start = engine.currentFrame;
+                        const end = s.end;
+                        const interior = end != null && end !== start ? Math.max(1, Math.abs(end - start) - 1) : s.count;
+                        return { ...s, start, count: Math.min(s.count, interior) };
+                      });
                       if (timelineId) {
                         tool.mutate({
                           tool: "set_frame_type",
@@ -1771,7 +1849,12 @@ function StudioInner({ projectId }: { projectId: string }) {
                       }
                     }}
                     onSetEnd={() => {
-                      setInb((s) => ({ ...s, end: engine.currentFrame }));
+                      setInb((s) => {
+                        const end = engine.currentFrame;
+                        const start = s.start;
+                        const interior = start != null && start !== end ? Math.max(1, Math.abs(end - start) - 1) : s.count;
+                        return { ...s, end, count: Math.min(s.count, interior) };
+                      });
                       if (timelineId) {
                         tool.mutate({
                           tool: "set_frame_type",
@@ -1780,7 +1863,11 @@ function StudioInner({ projectId }: { projectId: string }) {
                       }
                     }}
                     onUseRange={() =>
-                      engine.selectedRange && setInb((s) => ({ ...s, start: engine.selectedRange![0], end: engine.selectedRange![1] }))
+                      engine.selectedRange &&
+                      setInb((s) => {
+                        const [a, b] = engine.selectedRange!;
+                        return { ...s, start: a, end: b, count: Math.min(s.count, Math.max(1, Math.abs(b - a) - 1)) };
+                      })
                     }
                     onAnalyze={() => {
                       if (!timelineId || inb.start == null || inb.end == null) return toast.error("請先設定起點與終點關鍵影格");
@@ -1791,7 +1878,10 @@ function StudioInner({ projectId }: { projectId: string }) {
                       });
                     }}
                     onPlan={() => {
-                      if (!timelineId || inb.start == null || inb.end == null) return;
+                      if (!timelineId || inb.start == null || inb.end == null) {
+                        toast.error("請先設定起點與終點關鍵影格");
+                        return;
+                      }
                       setInb((s) => ({ ...s, busy: true }));
                       tool.mutate({
                         tool: "create_inbetween_plan",
@@ -1800,14 +1890,15 @@ function StudioInner({ projectId }: { projectId: string }) {
                     }}
                     onConfirmGenerate={() => {
                       if (!timelineId || inb.start == null || inb.end == null) return;
-                      setInb((s) => ({ ...s, busy: true }));
+                      const interior = Math.max(1, Math.abs(inb.end - inb.start) - 1);
+                      setInb((s) => ({ ...s, busy: true, count: Math.min(s.count, interior) }));
                       tool.mutate({
                         tool: "generate_inbetweens",
                         args: {
                           timelineId,
                           frameA: inb.start,
                           frameB: inb.end,
-                          count: inb.count,
+                          count: Math.min(inb.count, interior),
                           curve: inb.curve,
                           provider: "linear-blend",
                           confirmed: true,
@@ -1918,6 +2009,7 @@ function StudioInner({ projectId }: { projectId: string }) {
                   busy={tool.isPending}
                   regionBox={regionBox}
                   setRegionBox={setRegionBox}
+                  regionLive={regionLive}
                   regionKind={regionKind}
                   setRegionKind={setRegionKind}
                   onType={(frameType) => timelineId && tool.mutate({ tool: "set_frame_type", args: { timelineId, frameNumber: current.frameNumber, frameType } })}
@@ -2003,7 +2095,8 @@ function StudioInner({ projectId }: { projectId: string }) {
             <ul className="mt-3 space-y-1 text-muted">
               <li>空白鍵 — 播放／暫停 · ← → 或 , . — 翻頁</li>
               <li>K 關鍵影格 · B 分解影格 · O 洋蔥皮 · L 循環 · P 像素</li>
-              <li>A 開啟 AI · C 一致性掃描</li>
+              <li>A 開啟 AI · C 一致性掃描 · I 開啟檢視面板</li>
+              <li>點兩張 ★ 設為起點／終點 · Shift 點時間軸拉範圍</li>
               <li>U 復原 · Y 重做 · F 對焦 · ` 閃爍比對 · 按住 H</li>
               <li>1–5 工作模式 · Shift 點疊加層可堆疊</li>
               <li>選區工具 — 在畫布上拖出問題區域</li>

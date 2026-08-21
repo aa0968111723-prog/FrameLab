@@ -479,6 +479,8 @@ function constraintZh(kind: string) {
   if (k.includes("background")) return "背景";
   if (k.includes("contact")) return "接觸";
   if (k.includes("camera")) return "相機";
+  if (k.includes("pose")) return "姿態";
+  if (k.includes("track")) return "追蹤";
   if (k.includes("object")) return "物件";
   if (k.includes("hold")) return "跟隨";
   return kind.replaceAll("_", " ");
@@ -497,12 +499,16 @@ function directionZh(d: string) {
 }
 
 function scoreKeyZh(k: string) {
-  if (k.includes("character")) return "角色";
-  if (k.includes("face")) return "臉";
-  if (k.includes("background")) return "背景";
-  if (k.includes("flicker") || k.includes("temporal")) return "閃爍";
-  if (k.includes("motion")) return "運動";
-  if (k.includes("contact")) return "接觸";
-  if (k.includes("identity")) return "身份";
+  const x = k.toLowerCase();
+  if (x.includes("character")) return "角色";
+  if (x.includes("face")) return "臉";
+  if (x.includes("background")) return "背景";
+  if (x.includes("flicker") || x.includes("temporal")) return "閃爍";
+  if (x.includes("pose")) return "姿態";
+  if (x.includes("track")) return "追蹤";
+  if (x.includes("motion")) return "運動";
+  if (x.includes("contact")) return "接觸";
+  if (x.includes("identity")) return "身份";
+  if (x.includes("object")) return "物件";
   return k.replaceAll("_", " ");
 }

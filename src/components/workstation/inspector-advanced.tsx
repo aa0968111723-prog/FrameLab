@@ -10,6 +10,33 @@ import { jobStateZh, jobTypeZh } from "@/lib/domain/job-progress";
 import type { createTimelineState } from "@/lib/domain/timeline-engine";
 import { VisualHistory, type HistoryRow } from "./visual-history";
 
+function scoreKeyZh(k: string) {
+  const x = k.toLowerCase();
+  if (x.includes("character")) return "角色";
+  if (x.includes("face")) return "臉";
+  if (x.includes("hand")) return "手";
+  if (x.includes("background")) return "背景";
+  if (x.includes("flicker") || x.includes("temporal")) return "閃爍";
+  if (x.includes("pose")) return "姿態";
+  if (x.includes("track")) return "追蹤";
+  if (x.includes("motion")) return "運動";
+  if (x.includes("contact")) return "接觸";
+  if (x.includes("identity")) return "身份";
+  if (x.includes("object")) return "物件";
+  return k.replaceAll("_", " ");
+}
+
+function frameTypeZh(t: string) {
+  if (t === "KEY") return "關鍵 ★";
+  if (t === "BREAKDOWN") return "分解 ◆";
+  if (t === "INBETWEEN") return "中間 ●";
+  if (t === "HOLD") return "停留";
+  if (t === "GENERATED") return "生成 G";
+  if (t === "REPAIRED") return "已修復";
+  if (t === "GENERATED_BREAKDOWN") return "生成分解";
+  return t;
+}
+
 function typeTone(t: string): React.ComponentProps<typeof Badge>["tone"] {
   if (t === "KEY") return "key";
   if (t === "GENERATED") return "gen";
@@ -32,6 +59,7 @@ export function AdvancedInspector({
   busy,
   regionBox,
   setRegionBox,
+  regionLive,
   regionKind,
   setRegionKind,
   onType,
@@ -81,6 +109,7 @@ export function AdvancedInspector({
   busy: boolean;
   regionBox: { x: number; y: number; w: number; h: number };
   setRegionBox: (b: { x: number; y: number; w: number; h: number }) => void;
+  regionLive?: boolean;
   regionKind: string;
   setRegionKind: (k: string) => void;
   onType: (t: FrameType) => void;
@@ -114,7 +143,7 @@ export function AdvancedInspector({
   return (
     <div className="space-y-3">
       <p className="font-mono text-lg tabular-nums">{padFrame(current.frameNumber)}</p>
-      <Badge tone={typeTone(current.frameType)}>{current.frameType}</Badge>
+      <Badge tone={typeTone(current.frameType)}>{frameTypeZh(current.frameType)}</Badge>
       <label className="block text-xs text-muted">
         類型
         <select
@@ -147,7 +176,7 @@ export function AdvancedInspector({
       </label>
       {onExposure && (
         <label className="block text-xs text-muted">
-          曝光（ones / twos / threes）
+          曝光
           <select
             className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm"
             defaultValue="1"
@@ -186,7 +215,7 @@ export function AdvancedInspector({
           <ul className="mt-1 space-y-1 font-mono">
             {Object.entries(scores).map(([k, v]) => (
               <li key={k} className="flex justify-between text-faint">
-                <span>{k}</span>
+                <span>{scoreKeyZh(k)}</span>
                 <span title={String(v)}>{v.toFixed(2)}</span>
               </li>
             ))}
@@ -212,7 +241,7 @@ export function AdvancedInspector({
         <Button size="sm" variant="secondary" disabled={busy} onClick={onRepair}>
           混合修復
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy || regionBox.w < 8 || regionBox.h < 8} onClick={onRepairRegion}>
+        <Button size="sm" variant="ghost" disabled={busy || !regionLive || regionBox.w < 8 || regionBox.h < 8} onClick={onRepairRegion}>
           區域混合
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onDuplicate}>
@@ -227,13 +256,19 @@ export function AdvancedInspector({
         </Button>
       </div>
       <div className="grid grid-cols-4 gap-1">
-        {(["x", "y", "w", "h"] as const).map((k) => (
+        {([
+          ["x", "左"],
+          ["y", "上"],
+          ["w", "寬"],
+          ["h", "高"],
+        ] as const).map(([k, label]) => (
           <label key={k} className="block text-[10px] text-faint">
-            {k}
-            <Input type="number" className="mt-1 h-8" value={regionBox[k]} onChange={(e) => setRegionBox({ ...regionBox, [k]: Number(e.target.value) })} />
+            {label}
+            <Input type="number" className="mt-1 h-8" value={regionLive ? regionBox[k] : ""} placeholder="—" disabled={!regionLive} onChange={(e) => setRegionBox({ ...regionBox, [k]: Number(e.target.value) })} />
           </label>
         ))}
       </div>
+      {!regionLive && <p className="text-[10px] text-faint">畫布上拖出選區後才會填入座標。不會預設一塊 64×64。</p>}
       <select className="h-8 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-xs" value={regionKind} onChange={(e) => setRegionKind(e.target.value)}>
         <option value="custom">自訂</option>
         <option value="hand">手</option>

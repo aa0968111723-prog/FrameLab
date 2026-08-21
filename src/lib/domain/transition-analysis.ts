@@ -33,11 +33,11 @@ export function scoreTransition(f: TransitionFeatures): TransitionAnalysis {
     motion * 0.28 + pose * 0.28 + objects * 0.12 + appearance * 0.14 + camera * 0.1 + crowd * 0.08,
   );
   const reasons: string[] = [];
-  if (motion >= 0.45) reasons.push(`pixel motion ${f.mean_motion.toFixed(2)}`);
-  if (pose >= 0.45) reasons.push(`pose displacement ${f.pose_displacement.toFixed(2)}`);
-  if (appearance >= 0.4) reasons.push(`appearance change ${(appearance * 100).toFixed(0)}%`);
-  if (f.occlusion) reasons.push("occlusion likely");
-  if (f.contact_count > 0) reasons.push(`${f.contact_count} contact pair(s)`);
+  if (motion >= 0.45) reasons.push(`像素運動 ${f.mean_motion.toFixed(2)}`);
+  if (pose >= 0.45) reasons.push(`姿態位移 ${f.pose_displacement.toFixed(2)}`);
+  if (appearance >= 0.4) reasons.push(`外觀變化 ${(appearance * 100).toFixed(0)}%`);
+  if (f.occlusion) reasons.push("可能有遮擋");
+  if (f.contact_count > 0) reasons.push(`${f.contact_count} 組接觸`);
   let complexity: TransitionComplexity = "LOW";
   if (score >= 0.78 || (pose >= 0.85 && f.occlusion)) complexity = "VERY_HIGH";
   else if (score >= 0.55) complexity = "HIGH";

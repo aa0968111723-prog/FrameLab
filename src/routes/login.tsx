@@ -90,7 +90,7 @@ function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@studio.local"
+                  placeholder="name@mail.com"
                 />
               </label>
               <label className="block text-[11px] uppercase tracking-wide text-faint">

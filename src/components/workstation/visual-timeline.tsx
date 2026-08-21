@@ -171,7 +171,7 @@ export function VisualTimeline({
             <button
               key={`span-${s.start}-${s.end}`}
               type="button"
-              title={`Problem F${s.start}–F${s.end}`}
+              title={`問題 F${s.start}–F${s.end}`}
               onClick={() => onSeek(s.start, false)}
               className="absolute top-0 h-full rounded-[var(--radius-xs)] bg-warn/15 ring-1 ring-warn/40"
               style={{
@@ -257,7 +257,7 @@ export function VisualTimeline({
                     <Lock className="absolute right-0.5 top-0.5 size-2.5 text-muted" />
                   )}
                   {sev && sev !== "ok" && (
-                    <span className="absolute bottom-0.5 left-0.5 text-[9px] text-danger" title="Problem">
+                    <span className="absolute bottom-0.5 left-0.5 text-[9px] text-danger" title="問題">
                       ⚠
                     </span>
                   )}
@@ -279,7 +279,7 @@ export function VisualTimeline({
                         "absolute right-0.5 top-3 size-1.5 rounded-full",
                         mask === "ok" ? "bg-good" : mask === "warn" ? "bg-warn" : "bg-danger",
                       )}
-                      title={mask === "lost" ? "Mask lost" : "Mask"}
+                      title={mask === "lost" ? "遮罩遺失" : "遮罩"}
                     />
                   )}
                 </button>
@@ -356,7 +356,7 @@ function MiniOverview({
         const t = (e.clientX - r.left) / r.width;
         onJump(Math.round(t * (n - 1)));
       }}
-      aria-label="Mini timeline"
+      aria-label="迷你時間軸"
     >
       <canvas ref={ref} width={640} height={16} className="h-4 w-full" />
     </button>

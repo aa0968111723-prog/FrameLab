@@ -59,7 +59,7 @@ export const getProjectBundle = createServerFn({ method: "GET" })
   .handler(async ({ context, data }) => {
     const repo = await import("@/lib/framelab/repo");
     const project = await repo.getProject(context.userId, data.projectId);
-    if (!project) return { ok: false as const, error: "Project not found" };
+    if (!project) return { ok: false as const, error: "找不到這個專案" };
     const timelines = await repo.listTimelines(project.id);
     const timeline = timelines[0] ?? null;
     const frames = timeline ? await repo.listFramesMeta(timeline.id) : [];
@@ -333,7 +333,7 @@ export const ensureWorkspaceSessionFn = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const repo = await import("@/lib/framelab/repo");
     const project = await repo.getProject(context.userId, data.projectId);
-    if (!project) return { ok: false as const, error: "Project not found" };
+    if (!project) return { ok: false as const, error: "找不到這個專案" };
     const existing = await repo.getWorkspaceSession(context.userId, data.sessionId);
     if (existing && existing.project_id !== data.projectId) {
       return { ok: false as const, error: "Session belongs to another project" };
@@ -341,7 +341,7 @@ export const ensureWorkspaceSessionFn = createServerFn({ method: "POST" })
     if (data.timelineId) {
       const timeline = await repo.getTimeline(data.timelineId);
       if (!timeline || timeline.project_id !== data.projectId) {
-        return { ok: false as const, error: "Timeline does not belong to this project" };
+        return { ok: false as const, error: "時間軸不屬於這個專案" };
       }
     }
     if (!existing) {
@@ -371,7 +371,7 @@ export const syncWorkspaceSessionFn = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const repo = await import("@/lib/framelab/repo");
     const project = await repo.getProject(context.userId, data.projectId);
-    if (!project) return { ok: false as const, error: "Project not found" };
+    if (!project) return { ok: false as const, error: "找不到這個專案" };
     const snap = data.context as {
       project_id?: string | null;
       video_id?: string | null;
@@ -399,7 +399,7 @@ export const syncWorkspaceSessionFn = createServerFn({ method: "POST" })
     if (snap.timeline_id) {
       const timeline = await repo.getTimeline(snap.timeline_id);
       if (!timeline || timeline.project_id !== data.projectId) {
-        return { ok: false as const, error: "Timeline does not belong to this project" };
+        return { ok: false as const, error: "時間軸不屬於這個專案" };
       }
     }
     await repo.upsertWorkspaceSession({
@@ -551,10 +551,10 @@ export const sendAskFn = createServerFn({ method: "POST" })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (/workspace session|Invalid workspace/i.test(message)) {
-        return { ok: false as const, error: "Frame context could not be loaded." };
+        return { ok: false as const, error: "讀不到工作區上下文。" };
       }
       if (/no longer exists/i.test(message)) {
-        return { ok: false as const, error: "Selected frame no longer exists." };
+        return { ok: false as const, error: "選取的影格已經不存在。" };
       }
       return { ok: false as const, error: message };
     }

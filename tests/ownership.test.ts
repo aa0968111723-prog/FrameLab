@@ -106,7 +106,7 @@ describe("timeline binding", () => {
   it("binds a workspace session's timeline to its project", () => {
     // Session tools trust session.timeline_id, so an unvalidated id stored here
     // becomes a cross-tenant read downstream.
-    const occurrences = api.split("Timeline does not belong to this project").length - 1;
+    const occurrences = api.split("時間軸不屬於這個專案").length - 1;
     assert.equal(
       occurrences,
       2,

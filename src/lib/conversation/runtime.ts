@@ -180,22 +180,33 @@ function formatLightweight(data: unknown): string {
     observations?: { kind: string; frames: number[]; value: number; note: string }[];
   };
   const lines = [
-    d.kind ?? "lightweight visual analysis",
+    d.kind === "lightweight visual analysis" ? "輕量視覺分析（像素，不是骨架）" : (d.kind ?? "輕量視覺分析"),
     d.summary ?? "",
-    d.frames?.length ? `frames: ${d.frames.join(", ")}` : "",
+    d.frames?.length ? `影格：${d.frames.map((n) => `F${n}`).join("、")}` : "",
   ];
   if (d.observations) {
     for (const o of d.observations.slice(0, 12)) {
       lines.push(
-        `- ${o.kind} F${o.frames[0]}→F${o.frames[1]} = ${Number(o.value).toFixed(4)} (${o.note})`,
+        `- ${obsKindZh(o.kind)} F${o.frames[0]}→F${o.frames[1]} = ${Number(o.value).toFixed(4)}（${o.note}）`,
       );
     }
   }
   if (d.limitations) {
-    lines.push("limitations:");
+    lines.push("限制：");
     for (const l of d.limitations) lines.push(`- ${l}`);
   }
   return lines.filter(Boolean).join("\n");
+}
+
+function obsKindZh(kind: string) {
+  if (kind === "mae") return "像素差";
+  if (kind === "histogram") return "色直方圖";
+  if (kind === "luma") return "亮度";
+  if (kind === "centroid") return "質心";
+  if (kind === "edge") return "邊緣";
+  if (kind === "ssim_like") return "結構近似";
+  if (kind === "motion_block") return "區塊位移";
+  return kind;
 }
 
 function formatAssist(data: unknown): string {
@@ -206,18 +217,18 @@ function formatAssist(data: unknown): string {
     problem_ranges?: { start: number; end: number; peak_frame: number; severity: string; reason: string; category?: string }[];
     repair_plan?: { repair_range: [number, number]; protected_frames: number[]; reason: string } | null;
   };
-  const lines = [d.summary ?? "ASSIST analysis"];
+  const lines = [d.summary ?? "協助分析完成"];
   for (const r of d.problem_ranges ?? []) {
     lines.push(
-      `Range F${r.start}–F${r.end} peak F${r.peak_frame} (${r.category ?? "problem"} · ${r.severity}): ${r.reason}`,
+      `範圍 F${r.start}–F${r.end}，峰值 F${r.peak_frame}（${r.category ?? "問題"} · ${r.severity}）：${r.reason}`,
     );
   }
   for (const p of (d.problems ?? []).slice(0, 8)) {
-    lines.push(`- F${p.frame_number} ${p.category} ${p.severity}: ${p.reason}`);
+    lines.push(`- F${p.frame_number} ${p.category} ${p.severity}：${p.reason}`);
   }
   if (d.repair_plan) {
     lines.push(
-      `Suggested repair window F${d.repair_plan.repair_range[0]}–F${d.repair_plan.repair_range[1]} (protected ${d.repair_plan.protected_frames.join(", ") || "none"}). Not executed.`,
+      `建議修復 F${d.repair_plan.repair_range[0]}–F${d.repair_plan.repair_range[1]}（受保護：${d.repair_plan.protected_frames.join("、") || "無"}）。尚未執行。`,
     );
   }
   return lines.join("\n");
@@ -237,25 +248,33 @@ function formatInbetweenPlan(data: unknown): string {
   const start = d.confirmation?.start ?? d.pair?.start_frame_number;
   const end = d.confirmation?.end ?? d.pair?.end_frame_number;
   const count = d.confirmation?.frames ?? d.pair?.desired_inbetween_count;
+  if ((d as { needPair?: boolean }).needPair) {
+    const frame = (d as { frame?: number }).frame;
+    return [
+      frame != null ? `目前停在 F${frame}，只看到一格。` : "目前還沒有起點／終點關鍵影格。",
+      "請先在時間軸點兩張不同的 ★，或按住 Shift 拉出範圍，或在「中間影格」面板按設為起點／終點。",
+      "設好之後再說一次「幫我把這兩張中間補幀」。不會在只有一格的時候硬補。",
+    ].join("\n");
+  }
   const lines = [
     start != null && end != null
-      ? `F${start} 到 F${end} 已做成 Keyframe Pair。`
-      : "Inbetween plan",
+      ? `F${start} 到 F${end} 已做成關鍵影格對。`
+      : "中間影格計畫",
   ];
   if (d.transition?.complexity) {
-    lines.push(`Transition complexity: ${d.transition.complexity}.`);
+    lines.push(`轉場複雜度：${complexityZh(d.transition.complexity)}。`);
   }
   for (const r of d.transition?.reasons ?? []) lines.push(`- ${r}`);
-  if (count != null) lines.push(`Suggested inbetweens: ${count}`);
-  if (d.plan?.curve) lines.push(`Motion curve: ${d.plan.curve}`);
-  const cons = d.plan?.constraints?.map((c) => c.kind) ?? [];
-  if (cons.length) lines.push(`Constraints: ${cons.join(", ")}`);
+  if (count != null) lines.push(`建議補 ${count} 格中間影格`);
+  if (d.plan?.curve) lines.push(`運動曲線：${curveZh(d.plan.curve)}`);
+  const cons = d.plan?.constraints?.map((c) => constraintKindZh(c.kind)) ?? [];
+  if (cons.length) lines.push(`約束：${cons.join("、")}`);
   if (d.strategy?.reason) lines.push(d.strategy.reason);
   if (d.plan?.breakdowns?.length) {
-    lines.push(`Suggest a breakdown at F${d.plan.breakdowns[0]} before filling the gap. Not auto-created.`);
+    lines.push(`建議先在 F${d.plan.breakdowns[0]} 加分解影格，再補中間格。不會自動建立。`);
   }
   for (const w of d.warnings ?? []) lines.push(`⚠ ${w.message}`);
-  lines.push("Generation is a candidate. Confirm in the UI — ASSIST will not write the timeline.");
+  lines.push("產生結果只是候選。請在畫面確認 — 協助模式不會直接寫入時間軸。");
   return lines.join("\n");
 }
 
@@ -267,14 +286,42 @@ function formatCurveAdjust(data: unknown, intent: ReturnType<typeof parseAnimati
   const regenStart = start != null ? start + 1 : null;
   const regenEnd = end != null ? end - 1 : null;
   const lines = [
-    "Not regenerating the whole span.",
-    `Motion Curve: Linear → ${curve}`,
+    "不會重產整段。",
+    `運動曲線：線性 → ${curveZh(curve)}`,
   ];
   if (regenStart != null && regenEnd != null && regenEnd >= regenStart) {
-    lines.push(`Regenerate: F${regenStart}–F${regenEnd} (interior only; keys stay locked).`);
+    lines.push(`重產範圍：F${regenStart}–F${regenEnd}（只改中間格；關鍵影格鎖定）。`);
   }
-  lines.push("Confirm in the Inbetween panel to apply. ASSIST will not write the timeline.");
+  lines.push("請在中間影格面板確認後套用。協助模式不會直接寫入時間軸。");
   return lines.join("\n");
+}
+
+function complexityZh(c: string) {
+  if (c === "VERY_HIGH") return "非常高";
+  if (c === "HIGH") return "高";
+  if (c === "MEDIUM") return "中";
+  if (c === "LOW") return "低";
+  return c;
+}
+
+function curveZh(c: string) {
+  if (c === "ease_in") return "緩入";
+  if (c === "ease_out") return "緩出";
+  if (c === "ease_in_out") return "緩入緩出";
+  if (c === "hold") return "停留";
+  if (c === "linear") return "線性";
+  return c;
+}
+
+function constraintKindZh(kind: string) {
+  const k = kind.toLowerCase();
+  if (k.includes("character")) return "角色";
+  if (k.includes("face")) return "臉";
+  if (k.includes("background")) return "背景";
+  if (k.includes("contact")) return "接觸";
+  if (k.includes("camera")) return "相機";
+  if (k.includes("object")) return "物件";
+  return kind.replaceAll("_", " ");
 }
 
 function toInbetweenAsk(data: unknown): InbetweenAskPayload | null {
@@ -451,6 +498,9 @@ export async function runAskTurn(input: {
     start: snapshot.selected_range?.[0] ?? snapshot.current_frame ?? 0,
     end: snapshot.selected_range?.[1] ?? snapshot.current_frame ?? 0,
   });
+  const pairStart = parsedIntent.start_frame ?? snapshot.selected_range?.[0] ?? snapshot.current_frame ?? 0;
+  const pairEnd = parsedIntent.end_frame ?? snapshot.selected_range?.[1] ?? snapshot.current_frame ?? 0;
+  const needPair = inbetweenAsk && pairStart === pairEnd;
   const analysisResult = curveAsk
     ? {
         ok: true as const,
@@ -459,6 +509,11 @@ export async function runAskTurn(input: {
           start: parsedIntent.start_frame,
           end: parsedIntent.end_frame,
         },
+      }
+    : needPair
+    ? {
+        ok: true as const,
+        data: { needPair: true, frame: pairStart },
       }
     : await callAskTool(
     input.ctx,
@@ -478,6 +533,7 @@ export async function runAskTurn(input: {
           count: parsedIntent.count ?? undefined,
           curve: parsedIntent.curve ?? "ease_in_out",
           intent: input.userMessage,
+          promoteKeys: true,
         }
       : mode === "ASSIST"
       ? {
@@ -506,7 +562,7 @@ export async function runAskTurn(input: {
         : mode === "ASSIST"
         ? formatAssist(analysisResult.data)
         : formatLightweight(analysisResult.data)
-    : `analysis failed: ${"error" in analysisResult ? analysisResult.error : "unknown"}`;
+    : `分析失敗：${"error" in analysisResult ? analysisResult.error : "未知"}`;
 
   const built = buildConversationPrompt({
     ctx: resolved,
@@ -632,7 +688,7 @@ export async function runAskTurn(input: {
         action: "SUGGEST_BREAKDOWN",
         frame_range: range,
         frame: d.plan.breakdowns[0],
-        label: `建立 Breakdown F${d.plan.breakdowns[0]}`,
+        label: `建立分解影格 F${d.plan.breakdowns[0]}`,
       });
       suggestions.push({
         type: "suggestion",
@@ -645,7 +701,7 @@ export async function runAskTurn(input: {
         type: "suggestion",
         action: "GENERATE_INBETWEENS",
         frame_range: range,
-        label: "生成 Inbetweens（需確認）",
+        label: "產生中間影格（需確認）",
       });
     }
   }

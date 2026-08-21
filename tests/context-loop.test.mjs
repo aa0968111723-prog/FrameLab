@@ -45,7 +45,9 @@ describe("V0.1 core loop wiring", () => {
     assert.doesNotMatch(studio, /onPreview=\{onRestore\}/);
     assert.match(studio, /setRevisionPreview/);
     assert.match(studio, /CharacterBoard/);
+    assert.match(studio, /r\.stale/);
     assert.match(studio, /promoteKeys: true/);
+    assert.match(studio, /點兩張 ★/);
     assert.match(studio, /請先在畫布上拖出真實選區/);
     assert.match(tools, /thumbnailRef/);
     assert.match(tools, /Workspace session not found/);

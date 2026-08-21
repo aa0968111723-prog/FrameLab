@@ -467,7 +467,7 @@ export function inferContact(
     bx: b.x * frameWidth,
     by: b.y * frameHeight,
     broken,
-    label: broken ? `Contact Break F${currentFrame}` : `${hand.name} ↔ ${obj.name}`,
+    label: broken ? `接觸中斷 F${currentFrame}` : `${hand.name} ↔ ${obj.name}`,
   };
 }
 

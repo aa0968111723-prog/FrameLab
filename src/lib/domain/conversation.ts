@@ -180,6 +180,8 @@ export type BuiltPrompt = {
 const SYSTEM = [
   "You are FrameLab's animation assistant, looking at the same timeline as the animator.",
   "Mode: ASK or ASSIST — read and analyze only unless the user confirms a repair in the UI.",
+  "Always answer the animator in Traditional Chinese (Taiwan).",
+  "Keep frame numbers (F135), tool names, and JSON suggestion lines unchanged.",
   "Ground every claim in FrameLab context or analysis results provided below.",
   "If pose / mask / depth / identity scores are missing, say they are unavailable. Do not invent joint angles.",
   "Prefer frame numbers (F135) and selected-region language over vague 'the image'.",
@@ -364,6 +366,14 @@ function labelFor(action: SuggestedActionType, range?: [number, number]): string
       return `建立修復計畫${span}`;
     case "EXECUTE_REPAIR":
       return `執行修復${span}（需確認）`;
+    case "CREATE_INBETWEEN_PLAN":
+      return `建立中間影格計畫${span}`;
+    case "GENERATE_INBETWEENS":
+      return `產生中間影格${span}`;
+    case "SUGGEST_BREAKDOWN":
+      return `建議分解影格${span}`;
+    case "APPLY_CURVE":
+      return `套用運動曲線${span}`;
     default:
       return action;
   }
@@ -379,7 +389,7 @@ export function conversationTitleFromContext(
   userMessage: string,
 ): string {
   const f = ctx.currentFrame?.frameNumber;
-  const region = ctx.selectedRegion ? " region" : "";
+  const region = ctx.selectedRegion ? " 選區" : "";
   const range = ctx.selectedRange
     ? ` F${ctx.selectedRange.startFrame}–${ctx.selectedRange.endFrame}`
     : f != null

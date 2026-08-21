@@ -228,7 +228,7 @@ export function AnimationCanvas({
         ctx.fillRect(x, y, w, h);
         ctx.fillStyle = "#71717a";
         ctx.font = "11px sans-serif";
-        ctx.fillText("Empty", x + 8, y + 16);
+        ctx.fillText("空", x + 8, y + 16);
         ctx.restore();
         return;
       }
@@ -427,7 +427,7 @@ export function AnimationCanvas({
     drawAnnotations(ctx, vt, annotations, engine.currentFrame, pulse);
     const aiPoint = annotations.find((a) => a.frame_number === engine.currentFrame && a.type === "POINT" && a.source === "ai");
     if (aiPoint && aiPoint.coordinates.length >= 2 && overlay.primary !== "problems") {
-      drawAiPointer(ctx, vt, aiPoint.coordinates[0], aiPoint.coordinates[1], aiPoint.label || "Here", pulse);
+      drawAiPointer(ctx, vt, aiPoint.coordinates[0], aiPoint.coordinates[1], aiPoint.label || "這裡", pulse);
     }
 
     const pts = tracking.filter((p) => p.frame_number === engine.currentFrame);

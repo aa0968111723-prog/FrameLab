@@ -25,12 +25,12 @@ export type OverlayStack = {
 export const MODE_BAR: { id: OverlayId; label: string }[] = [
   { id: "original", label: "原圖" },
   { id: "onion", label: "洋蔥皮" },
-  { id: "pose", label: "姿態" },
-  { id: "motion", label: "運動" },
+  { id: "pose", label: "骨架" },
+  { id: "motion", label: "動作" },
   { id: "track", label: "追蹤" },
   { id: "mask", label: "遮罩" },
   { id: "problems", label: "問題" },
-  { id: "compare", label: "比對" },
+  { id: "compare", label: "比較" },
 ];
 
 export const COMPARE_MODES = ["flicker", "side", "overlay", "diff", "hold"] as const;
