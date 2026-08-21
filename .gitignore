@@ -3,3 +3,15 @@ node_modules/
 .github_repo
 .env
 .env.*
+
+# Build output — Vercel runs `npm run build` itself (AGENTS.md "Build & deploy
+# target"), so the emitted bundle must not be tracked: committing it made every
+# build dirty the tree and buried real diffs under regenerated artifacts.
+.vercel/output/
+
+# Runtime storage root for uploaded video, extracted frames and the PGLite db.
+data/
+!data/.gitkeep
+
+# Workspace scratch
+.node_modules.lock
