@@ -8,7 +8,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,8 @@ function HomeInner() {
   const [name, setName] = useState("");
   const [tokenPlain, setTokenPlain] = useState<string | null>(null);
 
+  const [bootstrapped, setBootstrapped] = useState(false);
+
   const projects = useQuery({
     queryKey: ["projects"],
     queryFn: () => listMyProjects(),
@@ -64,18 +66,38 @@ function HomeInner() {
   const sample = useMutation({
     mutationFn: () => createSample({ data: { name: "經典彈跳球" } }),
     onSuccess: (r) => {
+      const id = r.projectId ?? r.id;
       toast.success("範例時間軸已就緒");
-      void nav({ to: "/studio/$projectId", params: { projectId: r.projectId } });
+      if (!id) {
+        void qc.invalidateQueries({ queryKey: ["projects"] });
+        return;
+      }
+      void nav({ to: "/studio/$projectId", params: { projectId: id } });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(e.message || "無法建立範例"),
   });
+
+  useEffect(() => {
+    if (bootstrapped || sample.isPending || sample.isSuccess) return;
+    if (!projects.isSuccess) return;
+    const list = projects.data ?? [];
+    if (list.length === 1) {
+      setBootstrapped(true);
+      void nav({ to: "/studio/$projectId", params: { projectId: list[0].id } });
+      return;
+    }
+    if (list.length > 0) return;
+    setBootstrapped(true);
+    sample.mutate();
+  }, [bootstrapped, projects.isSuccess, projects.data, sample, nav]);
 
   const create = useMutation({
     mutationFn: () =>
       createProjectFn({ data: { name: name.trim() || "未命名", fps: 24 } }),
     onSuccess: (r) => {
       toast.success("專案已建立");
-      void nav({ to: "/studio/$projectId", params: { projectId: r.projectId } });
+      const id = r.projectId ?? r.id;
+      if (id) void nav({ to: "/studio/$projectId", params: { projectId: id } });
     },
   });
 
@@ -252,6 +274,12 @@ function HomeInner() {
             <p className="mt-4 text-sm text-muted">
               <Loader2 className="mr-2 inline size-4 animate-spin" />
               {busy}
+            </p>
+          )}
+          {sample.isPending && !busy && (
+            <p className="mt-4 text-sm text-muted">
+              <Loader2 className="mr-2 inline size-4 animate-spin" />
+              正在開啟經典彈跳球…
             </p>
           )}
 
