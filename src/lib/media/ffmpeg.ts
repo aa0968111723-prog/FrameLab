@@ -2,7 +2,12 @@ import { spawn } from "node:child_process";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fail } from "../domain/errors.ts";
-import { DEFAULT_PLAYBACK_FPS, parseFfmpegVideoMeta, type VideoProbeMeta } from "../domain/fps.ts";
+import {
+  DEFAULT_PLAYBACK_FPS,
+  inferFpsFromCount,
+  parseFfmpegVideoMeta,
+  type VideoProbeMeta,
+} from "../domain/fps.ts";
 import { assertInsideData, dataRoot, safeFilename } from "../storage/local.ts";
 
 const ALLOWED_EXT = new Set([".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi"]);
@@ -82,7 +87,10 @@ export async function probeVideoMeta(inputPath: string): Promise<VideoProbeMeta>
   const full = assertInsideData(inputPath);
   const result = await run("ffmpeg", ["-hide_banner", "-i", full]);
   const meta = parseFfmpegVideoMeta(`${result.stderr}\n${result.stdout}`);
-  if (meta.fps <= 0) meta.fps = DEFAULT_PLAYBACK_FPS;
+  if (meta.fps <= 0) {
+    meta.fps = DEFAULT_PLAYBACK_FPS;
+    meta.fpsFound = false;
+  }
   return meta;
 }
 
@@ -103,8 +111,9 @@ export async function extractFramesWithFfmpeg(cfg: ExtractConfig): Promise<{
     durationMs: 0,
     width: 0,
     height: 0,
+    fpsFound: false,
   }));
-  const extractFps = cfg.fps && cfg.fps > 0 ? cfg.fps : meta.fps;
+  const extractFps = cfg.fps && cfg.fps > 0 ? cfg.fps : 0;
   const args = ffmpegExtractArgs({
     ...cfg,
     fps: extractFps,
@@ -119,10 +128,15 @@ export async function extractFramesWithFfmpeg(cfg: ExtractConfig): Promise<{
     .filter((n) => n.startsWith("frame_") && n.endsWith(".jpg"))
     .sort();
   if (names.length === 0) fail("FFMPEG_FAILED", "ffmpeg produced no frames");
+  let sourceFps = meta.fps;
+  if (!meta.fpsFound && extractFps <= 0) {
+    const inferred = inferFpsFromCount(names.length, meta.durationMs);
+    if (inferred > 0) sourceFps = inferred;
+  }
   return {
     files: names.map((n) => path.join(outDir, n)),
     durationMs: meta.durationMs,
-    sourceFps: meta.fps,
+    sourceFps,
   };
 }
 

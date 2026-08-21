@@ -1068,6 +1068,11 @@ function StudioInner({ projectId }: { projectId: string }) {
         </Link>
         <span className="text-border">/</span>
         <span className="truncate text-sm">{project.name}</span>
+        {bundle.data.sourceFps ? (
+          <span className="hidden shrink-0 text-[10px] text-faint lg:inline" title="來源影片 FPS">
+            來源 {bundle.data.sourceFps}
+          </span>
+        ) : null}
         <select
           className="h-7 shrink-0 rounded-[var(--radius-xs)] border border-border bg-subtle px-1 text-[11px] text-fg"
           value={String(project.fps)}

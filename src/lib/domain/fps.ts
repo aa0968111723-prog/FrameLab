@@ -65,12 +65,45 @@ export function frameDurationMs(playbackFps: number, exposureCount = 1): number 
   return Math.max(1, Math.round((1000 / fps) * exp));
 }
 
+/** Native-extract fallback when the container did not advertise a rate. */
+export function inferFpsFromCount(frameCount: number, durationMs: number): number {
+  if (!Number.isFinite(frameCount) || frameCount <= 1) return 0;
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return 0;
+  return normalizeSourceFps(frameCount / (durationMs / 1000));
+}
+
 export type VideoProbeMeta = {
   fps: number;
   durationMs: number;
   width: number;
   height: number;
+  fpsFound: boolean;
 };
+
+function plausibleRate(n: number): boolean {
+  return Number.isFinite(n) && n > 0 && n <= MAX_FPS + 5;
+}
+
+function pickRawFps(videoLine: string, stderr: string): { raw: number; found: boolean } {
+  const ratio = videoLine.match(/(\d+)\s*\/\s*(\d+)\s*(?:fps|tbr)/i);
+  if (ratio) {
+    const a = Number(ratio[1]);
+    const b = Number(ratio[2]);
+    if (b > 0 && plausibleRate(a / b)) return { raw: a / b, found: true };
+  }
+  const fpsMatch =
+    videoLine.match(/(?<![/\d])([\d.]+)\s*fps/i) ?? stderr.match(/(?<![/\d])([\d.]+)\s*fps/i);
+  if (fpsMatch) {
+    const n = Number(fpsMatch[1]);
+    if (plausibleRate(n)) return { raw: n, found: true };
+  }
+  const tbr = videoLine.match(/([\d.]+)\s*tbr(?!\w)/i);
+  if (tbr) {
+    const n = Number(tbr[1]);
+    if (plausibleRate(n)) return { raw: n, found: true };
+  }
+  return { raw: 0, found: false };
+}
 
 export function parseFfmpegVideoMeta(stderr: string): VideoProbeMeta {
   const durationMatch = stderr.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/i);
@@ -79,28 +112,17 @@ export function parseFfmpegVideoMeta(stderr: string): VideoProbeMeta {
     const h = Number(durationMatch[1]);
     const m = Number(durationMatch[2]);
     const s = Number(durationMatch[3]);
-    durationMs = Math.round(((h * 3600) + (m * 60) + s) * 1000);
+    durationMs = Math.round((h * 3600 + m * 60 + s) * 1000);
   }
   const videoLine =
     stderr.split("\n").find((line) => /Stream #.*Video:/i.test(line)) ?? stderr;
   const dim = videoLine.match(/(\d{2,5})x(\d{2,5})/);
-  const fpsMatch =
-    videoLine.match(/([\d.]+)\s*fps/i) ??
-    videoLine.match(/([\d.]+)\s*tbr/i) ??
-    stderr.match(/([\d.]+)\s*fps/i);
-  const ratio = videoLine.match(/(\d+)\s*\/\s*(\d+)\s*fps/);
-  let fps = DEFAULT_PLAYBACK_FPS;
-  if (ratio) {
-    const a = Number(ratio[1]);
-    const b = Number(ratio[2]);
-    if (b > 0) fps = normalizeSourceFps(a / b);
-  } else if (fpsMatch) {
-    fps = normalizeSourceFps(Number(fpsMatch[1]));
-  }
+  const picked = pickRawFps(videoLine, stderr);
   return {
-    fps,
+    fps: picked.found ? normalizeSourceFps(picked.raw) : DEFAULT_PLAYBACK_FPS,
     durationMs,
     width: dim ? Number(dim[1]) : 0,
     height: dim ? Number(dim[2]) : 0,
+    fpsFound: picked.found,
   };
 }

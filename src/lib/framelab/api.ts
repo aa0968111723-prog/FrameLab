@@ -72,10 +72,16 @@ export const getProjectBundle = createServerFn({ method: "GET" })
     const motion = timeline ? await repo.listMotion(timeline.id) : [];
     const poses = timeline ? await repo.listPoses(timeline.id) : [];
     const problemRanges = timeline ? await repo.listProblemRanges(timeline.id) : [];
+    const videos = await repo.listVideos(project.id);
+    const sourceFps =
+      videos
+        .map((v: { source_fps?: number }) => Number(v.source_fps) || 0)
+        .find((n: number) => n > 0) ?? null;
     return {
       ok: true as const,
       project,
       timeline,
+      sourceFps,
       frames: frames.map((f) => ({
         id: f.id,
         timelineId: f.timeline_id,
