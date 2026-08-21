@@ -133,7 +133,13 @@ export const getTimelineImagesFn = createServerFn({ method: "GET" })
     if (!project) {
       return { ok: false as const, images: [] as { id: string; imageData: string }[] };
     }
-    const frames = await repo.listFramesFull(data.timelineId);
+    // The timeline must belong to the project we just proved ownership of --
+    // checking one id and querying by another is not a check at all.
+    const timeline = await repo.getTimeline(data.timelineId);
+    if (!timeline || timeline.project_id !== project.id) {
+      return { ok: false as const, images: [] as { id: string; imageData: string }[] };
+    }
+    const frames = await repo.listFramesFull(timeline.id);
     return {
       ok: true as const,
       images: frames.map((f) => ({ id: f.id, imageData: f.image_data })),
@@ -332,6 +338,12 @@ export const ensureWorkspaceSessionFn = createServerFn({ method: "POST" })
     if (existing && existing.project_id !== data.projectId) {
       return { ok: false as const, error: "Session belongs to another project" };
     }
+    if (data.timelineId) {
+      const timeline = await repo.getTimeline(data.timelineId);
+      if (!timeline || timeline.project_id !== data.projectId) {
+        return { ok: false as const, error: "Timeline does not belong to this project" };
+      }
+    }
     if (!existing) {
       await repo.upsertWorkspaceSession({
         id: data.sessionId,
@@ -384,6 +396,12 @@ export const syncWorkspaceSessionFn = createServerFn({ method: "POST" })
       conversation_id?: string | null;
       context_version?: number;
     };
+    if (snap.timeline_id) {
+      const timeline = await repo.getTimeline(snap.timeline_id);
+      if (!timeline || timeline.project_id !== data.projectId) {
+        return { ok: false as const, error: "Timeline does not belong to this project" };
+      }
+    }
     await repo.upsertWorkspaceSession({
       id: data.sessionId,
       userId: context.userId,

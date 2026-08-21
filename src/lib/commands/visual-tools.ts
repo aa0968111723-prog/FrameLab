@@ -11,12 +11,12 @@ import {
   type VisualAnnotation,
 } from "@/lib/domain/visual-annotation";
 import * as repo from "@/lib/framelab/repo";
+import { ownProject } from "./ownership.ts";
 
 async function ownTimeline(ctx: CommandContext, timelineId: string) {
   const t = await repo.getTimeline(timelineId);
   if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-  const p = await repo.getProject(ctx.userId, t.project_id);
-  if (!p) fail("PERMISSION_DENIED", "Not your timeline", 403);
+  await ownProject(ctx, t.project_id);
   return t;
 }
 
@@ -119,8 +119,7 @@ export async function highlightFrameRangeCmd(ctx: CommandContext, args: Record<s
 export async function getMotionPathCmd(ctx: CommandContext, args: Record<string, unknown>) {
   const projectId = str(args.projectId);
   if (projectId) {
-    const p = await repo.getProject(ctx.userId, projectId);
-    if (!p) fail("PERMISSION_DENIED", "Not your project", 403);
+    await ownProject(ctx, projectId);
   }
   const name = str(args.name);
   const rows = projectId ? await repo.listTrackingPoints(projectId) : [];
@@ -157,8 +156,7 @@ export async function getPoseOverlayCmd(ctx: CommandContext, args: Record<string
 
 export async function getTrackingOverlayCmd(ctx: CommandContext, args: Record<string, unknown>) {
   const projectId = str(args.projectId);
-  const p = await repo.getProject(ctx.userId, projectId);
-  if (!p) fail("PERMISSION_DENIED", "Not your project", 403);
+  await ownProject(ctx, projectId);
   const rows = await repo.listTrackingPoints(projectId);
   return { tracks: rows, provider: "framelab-ncc" };
 }

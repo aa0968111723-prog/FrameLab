@@ -27,6 +27,7 @@ import {
 import type { FrameType, MotionCurve } from "@/lib/domain/types";
 import { nid } from "@/lib/domain/ids";
 import * as repo from "@/lib/framelab/repo";
+import { ownProject } from "./ownership.ts";
 import { putBytes, putJpeg } from "@/lib/storage/local";
 import { withJob } from "@/lib/jobs/queue";
 import type { CommandContext } from "./execute.ts";
@@ -48,8 +49,7 @@ type CandidateFrame = {
 async function ownTimeline(ctx: CommandContext, timelineId: string) {
   const t = await repo.getTimeline(timelineId);
   if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-  const project = await repo.getProject(ctx.userId, t.project_id);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+  await ownProject(ctx, t.project_id);
   return t;
 }
 

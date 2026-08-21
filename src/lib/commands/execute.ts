@@ -27,7 +27,6 @@ import {
   type RegionBox,
 } from "@/lib/domain/pixel-metrics";
 import {
-  assertProjectScope,
   assertToolAllowed,
   isHighRisk,
   parseScopes,
@@ -39,6 +38,7 @@ import { generateBouncingBall } from "@/lib/domain/sample-ball";
 import { canonicalTrackStatus } from "@/lib/domain/track-continuity";
 import { FRAME_TYPES, isFrameType, type FrameType } from "@/lib/domain/types";
 import * as repo from "@/lib/framelab/repo";
+import { ownCharacter, ownObject, ownProject, ownTimeline } from "./ownership.ts";
 import { withJob } from "@/lib/jobs/queue";
 import {
   concatJpegSequence,
@@ -76,21 +76,8 @@ function num(v: unknown, fallback = 0): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
-async function ownTimeline(ctx: CommandContext, timelineId: string) {
-  const t = await repo.getTimeline(timelineId);
-  if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-  const project = await repo.getProject(ctx.userId, t.project_id);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
-  assertProjectScope(ctx.projectScope, t.project_id);
-  return t;
-}
-
-async function ownProject(ctx: CommandContext, projectId: string) {
-  const p = await repo.getProject(ctx.userId, projectId);
-  if (!p) fail("PROJECT_NOT_FOUND", "Project not found", 404);
-  assertProjectScope(ctx.projectScope, projectId);
-  return p;
-}
+// ownProject / ownTimeline now live in ./ownership.ts so every command module
+// shares one gate — see that file for why the pair must not be re-inlined.
 
 async function loadOwnedFrame(ctx: CommandContext, args: Record<string, unknown>) {
   if (typeof args.frameId === "string" && args.frameId) {
@@ -262,20 +249,18 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       const frames = await repo.listFramesMeta(t.id);
       return frames.filter((f) => f.frame_type === "KEY" || f.frame_type === "BREAKDOWN");
     }
-    case "get_character": {
-      const c = await repo.getCharacter(str(args.characterId));
-      if (!c) fail("FRAME_NOT_FOUND", "Character not found", 404);
-      return c;
+    case "get_character":
+      return ownCharacter(ctx, str(args.characterId));
+    case "get_character_track": {
+      const c = await ownCharacter(ctx, str(args.characterId));
+      return repo.characterTrack(c.id);
     }
-    case "get_character_track":
-      return repo.characterTrack(str(args.characterId));
-    case "get_object": {
-      const o = await repo.getObject(str(args.objectId));
-      if (!o) fail("FRAME_NOT_FOUND", "Object not found", 404);
-      return o;
+    case "get_object":
+      return ownObject(ctx, str(args.objectId));
+    case "get_object_track": {
+      const o = await ownObject(ctx, str(args.objectId));
+      return repo.objectTrack(o.id);
     }
-    case "get_object_track":
-      return repo.objectTrack(str(args.objectId));
     case "get_consistency_results": {
       const t = await ownTimeline(ctx, str(args.timelineId));
       return repo.listConsistency(t.id);
@@ -358,8 +343,9 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     }
     case "assign_character": {
       const frame = await loadOwnedFrame(ctx, args);
-      await repo.assignCharacter(frame.id, str(args.characterId));
-      return { frameId: frame.id, characterId: str(args.characterId) };
+      const character = await ownCharacter(ctx, str(args.characterId));
+      await repo.assignCharacter(frame.id, character.id);
+      return { frameId: frame.id, characterId: character.id };
     }
     case "assign_character_range": {
       const t = await ownTimeline(ctx, str(args.timelineId));

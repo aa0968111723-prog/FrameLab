@@ -19,6 +19,7 @@ import {
 } from "@/lib/domain/lightweight-analysis";
 import type { RgbaFrame } from "@/lib/domain/pixel-metrics";
 import * as repo from "@/lib/framelab/repo";
+import { ownProject } from "./ownership.ts";
 import type { CommandContext } from "./execute.ts";
 
 function sessionIdOf(args: Record<string, unknown>): string {
@@ -31,8 +32,7 @@ async function loadOwnedSession(ctx: CommandContext, args: Record<string, unknow
   const sessionId = sessionIdOf(args);
   const session = await repo.getWorkspaceSession(ctx.userId, sessionId);
   if (!session) fail("FRAME_NOT_FOUND", "Workspace session not found", 404);
-  const project = await repo.getProject(ctx.userId, session.project_id);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+  const project = await ownProject(ctx, session.project_id);
   const { assertProjectScope } = await import("@/lib/domain/permissions");
   assertProjectScope(ctx.projectScope, project.id);
   return session;
@@ -364,8 +364,7 @@ export async function analyzeMotionContext(ctx: CommandContext, args: Record<str
   if (!timelineId) fail("VALIDATION_ERROR", "timelineId or sessionId required");
   const t = await repo.getTimeline(timelineId);
   if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-  const project = await repo.getProject(ctx.userId, t.project_id);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+  await ownProject(ctx, t.project_id);
   const fl = session
     ? contextFromSession(session)
     : hydrateContext({

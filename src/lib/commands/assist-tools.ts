@@ -21,6 +21,7 @@ import { interiorRepairFrames, planRepairWindow } from "@/lib/domain/repair-plan
 import { detectTrackBreaks, canonicalTrackStatus } from "@/lib/domain/track-continuity";
 import { analysisCacheKey, cacheGet, cacheSet } from "@/lib/domain/analysis-cache";
 import * as repo from "@/lib/framelab/repo";
+import { ownProject } from "./ownership.ts";
 import { putBytes, putJpeg } from "@/lib/storage/local";
 import { withJob } from "@/lib/jobs/queue";
 import type { CommandContext } from "./execute.ts";
@@ -140,8 +141,7 @@ export async function analyzeMotionAssist(ctx: CommandContext, args: Record<stri
     if (!timelineId) fail("VALIDATION_ERROR", "timelineId required");
     const row = await repo.getTimeline(timelineId);
     if (!row) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-    const project = await repo.getProject(ctx.userId, row.project_id);
-    if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+    await ownProject(ctx, row.project_id);
     return row;
   })();
   const providerName = typeof args.provider === "string" ? args.provider : "block-match-16";
@@ -229,8 +229,7 @@ export async function analyzePoseAssist(ctx: CommandContext, args: Record<string
   if (!timelineId) fail("VALIDATION_ERROR", "timelineId required");
   const t = await repo.getTimeline(timelineId);
   if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-  const project = await repo.getProject(ctx.userId, t.project_id);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+  await ownProject(ctx, t.project_id);
   const providerName = typeof args.provider === "string" ? args.provider : "framelab-pose-lite";
   const pose = getPose(providerName);
   if (!pose.available()) {
@@ -301,8 +300,7 @@ export async function suggestRepair(ctx: CommandContext, args: Record<string, un
   if (!timelineId) fail("VALIDATION_ERROR", "timelineId required");
   const t = await repo.getTimeline(timelineId);
   if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-  const project = await repo.getProject(ctx.userId, t.project_id);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+  await ownProject(ctx, t.project_id);
   if (args.skipJob !== true) {
     const wrapped = await withJob({
       userId: ctx.userId,
@@ -582,7 +580,7 @@ export async function getProblemRangesCmd(ctx: CommandContext, args: Record<stri
   if (!timelineId) fail("VALIDATION_ERROR", "timelineId required");
   const t = await repo.getTimeline(timelineId);
   if (!t) fail("FRAME_NOT_FOUND", "Timeline not found", 404);
-  await repo.getProject(ctx.userId, t.project_id);
+  await ownProject(ctx, t.project_id);
   const rows = await repo.listProblemRanges(t.id);
   return {
     ranges: rows.map((r) => ({
@@ -639,8 +637,7 @@ export async function executeRepairPlanCmd(ctx: CommandContext, args: Record<str
   if (!planId) fail("VALIDATION_ERROR", "planId required");
   const row = await repo.getRepairPlan(planId);
   if (!row) fail("FRAME_NOT_FOUND", "Repair plan not found", 404);
-  const project = await repo.getProject(ctx.userId, row.project_id);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+  await ownProject(ctx, row.project_id);
   const providerName = typeof args.provider === "string" ? args.provider : row.provider;
   const interpolator = getInterpolation(providerName);
   if (!interpolator.available()) {
@@ -826,7 +823,7 @@ export async function compareBeforeAfter(ctx: CommandContext, args: Record<strin
   if (!revisionId) fail("VALIDATION_ERROR", "revisionId required");
   const rev = await repo.getRevision(revisionId);
   if (!rev) fail("FRAME_NOT_FOUND", "Revision not found", 404);
-  await repo.getProject(ctx.userId, rev.project_id);
+  await ownProject(ctx, rev.project_id);
   const prev = JSON.parse(rev.previous_json || "{}") as {
     imageData?: string;
     contentHash?: string;
@@ -890,8 +887,7 @@ export async function getTrackCmd(ctx: CommandContext, args: Record<string, unkn
   const projectId = String(args.projectId ?? "");
   const name = String(args.name ?? "");
   if (!projectId || !name) fail("VALIDATION_ERROR", "projectId and name required");
-  const project = await repo.getProject(ctx.userId, projectId);
-  if (!project) fail("PROJECT_NOT_FOUND", "Project not found", 404);
+  await ownProject(ctx, projectId);
   const pts = (await repo.listTrackingPoints(projectId)).filter((p) => p.name === name);
   return {
     name,
@@ -911,7 +907,7 @@ export async function getRepairPlanCmd(ctx: CommandContext, args: Record<string,
   if (!planId) fail("VALIDATION_ERROR", "planId required");
   const row = await repo.getRepairPlan(planId);
   if (!row) fail("FRAME_NOT_FOUND", "Repair plan not found", 404);
-  await repo.getProject(ctx.userId, row.project_id);
+  await ownProject(ctx, row.project_id);
   return {
     id: row.id,
     problem_range: [row.problem_start, row.problem_end],
@@ -929,7 +925,7 @@ export async function acceptRevisionCmd(ctx: CommandContext, args: Record<string
   if (!revisionId) fail("VALIDATION_ERROR", "revisionId required");
   const rev = await repo.getRevision(revisionId);
   if (!rev) fail("FRAME_NOT_FOUND", "Revision not found", 404);
-  await repo.getProject(ctx.userId, rev.project_id);
+  await ownProject(ctx, rev.project_id);
   await repo.updateRevisionStatus(revisionId, "accepted");
   return { id: revisionId, status: "accepted" };
 }
