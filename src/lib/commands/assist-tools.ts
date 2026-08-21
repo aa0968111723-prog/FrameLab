@@ -27,6 +27,7 @@ import { withJob } from "@/lib/jobs/queue";
 import type { CommandContext } from "./execute.ts";
 import { blendRgba } from "@/lib/domain/pixel-metrics";
 import { runRtmposeBatch, toPoseEstimate } from "@/lib/ai/rtmpose-worker";
+import { runSeaRaft } from "@/lib/ai/sea-raft-worker";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -98,7 +99,8 @@ async function persistMotionPairs(
       dominant_direction: p.dominant_direction,
       motion_bbox: p.motion_bbox,
       confidence: p.confidence,
-      grid: p.grid.slice(0, 64),
+      grid: p.grid.slice(0, 96),
+      paths: p.paths ?? [],
     });
     await putBytes(projectId, "flow", `F${p.frame_a}-F${p.frame_b}.json`, Buffer.from(asset)).catch(
       () => undefined,
@@ -149,10 +151,15 @@ export async function analyzeMotionAssist(ctx: CommandContext, args: Record<stri
     await ownProject(ctx, row.project_id);
     return row;
   })();
-  const providerName = typeof args.provider === "string" ? args.provider : "block-match-16";
+  const providerName = typeof args.provider === "string" ? args.provider : "sea-raft";
   const flow = getOpticalFlow(providerName);
   if (!flow.available()) {
-    fail("MODEL_NOT_AVAILABLE", `${flow.id} is not loaded. Use provider=block-match-16.`);
+    fail(
+      "MODEL_NOT_AVAILABLE",
+      flow.id === "sea-raft"
+        ? "SEA-RAFT worker is not loaded. Use provider=block-match-16 for CPU fallback."
+        : `${flow.id} is not loaded. Use provider=block-match-16.`,
+    );
   }
   const frames = await repo.listFramesFull(t.id);
   const start = typeof args.startFrame === "number" ? args.startFrame : (typeof args.frame_a === "number" ? args.frame_a : 0);
@@ -198,12 +205,85 @@ export async function analyzeMotionAssist(ctx: CommandContext, args: Record<stri
       let pairs = cached;
       if (!pairs) {
         await progress(10, { current: 0, total: slice.length, label: "分析運動" });
-        const decoded = slice.map((f) => ({
-          number: f.frame_number,
-          rgba: decodeJpegBase64(f.image_data),
-        }));
-        await progress(40, { current: Math.floor(slice.length / 2), total: slice.length, label: "分析運動" });
-        pairs = analyzeMotionSequence(decoded, { region, regionFor, provider: flow.id });
+        if (flow.id === "sea-raft") {
+          const dir = path.join(tmpdir(), "framelab-searaft", String(Date.now()));
+          await mkdir(dir, { recursive: true });
+          try {
+            const files: { number: number; path: string; width: number; height: number }[] = [];
+            for (const f of slice) {
+              let file = "";
+              const rel = f.full_asset;
+              if (rel && !rel.startsWith("/api") && !rel.startsWith("data:")) {
+                const abs = path.join(projectRoot(t.project_id), rel);
+                if (existsSync(abs)) file = abs;
+              }
+              if (!file) {
+                if (!f.image_data) continue;
+                file = path.join(dir, `${f.id}.jpg`);
+                await writeFile(file, Buffer.from(f.image_data, "base64"));
+              }
+              files.push({ number: f.frame_number, path: file, width: f.width, height: f.height });
+            }
+            const pairIns = [];
+            for (let i = 1; i < files.length && pairIns.length < 16; i += 1) {
+              pairIns.push({
+                pathA: files[i - 1]!.path,
+                pathB: files[i]!.path,
+                frameA: files[i - 1]!.number,
+                frameB: files[i]!.number,
+                width: files[i]!.width,
+                height: files[i]!.height,
+              });
+            }
+            await progress(30, { current: 0, total: pairIns.length, label: "SEA-RAFT 推論" });
+            const batch = await runSeaRaft({ pairs: pairIns });
+            let prevMean: number | null = null;
+            let prevDir: { x: number; y: number } | null = null;
+            pairs = batch.pairs.map((p) => {
+              const velocity_ratio =
+                prevMean != null && prevMean > 0.15 ? p.mean_motion / prevMean : null;
+              let direction_change_deg: number | null = null;
+              if (prevDir) {
+                const dot = Math.max(
+                  -1,
+                  Math.min(1, p.dominant_direction.x * prevDir.x + p.dominant_direction.y * prevDir.y),
+                );
+                direction_change_deg = (Math.acos(dot) * 180) / Math.PI;
+              }
+              const spike =
+                (velocity_ratio != null && velocity_ratio >= 2) ||
+                (direction_change_deg != null && direction_change_deg >= 55 && p.mean_motion > 0.8);
+              const summary = {
+                frame_a: p.frameA,
+                frame_b: p.frameB,
+                mean_motion: p.mean_motion,
+                median_motion: p.median_motion,
+                dominant_direction: p.dominant_direction,
+                velocity_ratio,
+                direction_change_deg,
+                region: Boolean(region),
+                provider: flow.id,
+                spike,
+                grid: p.grid,
+                motion_bbox: null,
+                confidence: p.confidence,
+                paths: p.paths,
+              };
+              prevMean = p.mean_motion;
+              prevDir = p.dominant_direction;
+              return summary;
+            });
+          } finally {
+            await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+          }
+        } else {
+          const decoded = slice.map((f) => ({
+            number: f.frame_number,
+            rgba: decodeJpegBase64(f.image_data),
+          }));
+          await progress(40, { current: Math.floor(slice.length / 2), total: slice.length, label: "分析運動" });
+          pairs = analyzeMotionSequence(decoded, { region, regionFor, provider: flow.id });
+        }
         cacheSet(cacheKey, pairs);
       }
       await progress(80, { current: slice.length, total: slice.length, label: "分析運動" });
@@ -225,7 +305,10 @@ export async function analyzeMotionAssist(ctx: CommandContext, args: Record<stri
       velocity_ratio: p.velocity_ratio,
       direction_change_deg: p.direction_change_deg,
     })),
-    note: "block-match-16 real inference. Not SEA-RAFT. Flow grids stored as JSON assets, not in DB.",
+    note:
+      flow.id === "sea-raft"
+        ? "SEA-RAFT-S real inference. Sampled vectors stored as JSON assets."
+        : "block-match-16 CPU fallback. Not SEA-RAFT. Flow grids stored as JSON assets, not in DB.",
   };
 }
 

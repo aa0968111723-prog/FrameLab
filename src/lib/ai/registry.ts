@@ -1,5 +1,6 @@
 import { rtmposeHealth } from "@/lib/ai/rtmpose-worker";
 import { locotrackHealth } from "@/lib/ai/locotrack-worker";
+import { seaRaftHealth } from "@/lib/ai/sea-raft-worker";
 
 export type ProviderStatus =
   | "ready"
@@ -184,17 +185,17 @@ export function listModels(): ModelInfo[] {
     },
     {
       id: "sea-raft",
-      provider: "sea-raft",
-      modelName: "sea-raft",
-      modelVersion: "unwired",
-      checkpoint: "none",
-      license: "check checkpoint",
-      commercialUse: false,
-      device: "cuda",
-      precision: "fp16",
-      status: "unavailable",
+      provider: "princeton-vl",
+      modelName: "sea-raft-s",
+      modelVersion: "eccv2024",
+      checkpoint: "MemorySlices/Tartan-C368x496-S",
+      license: "BSD-3-Clause",
+      commercialUse: true,
+      device: seaRaftHealth().device,
+      precision: "fp32",
+      status: seaRaftHealth().ok ? "ready" : "unavailable",
       role: "optical_flow",
-      notes: "Adapter reserved. Use block-match-16. Not a fake SEA-RAFT result.",
+      notes: "Real SEA-RAFT-S via Python worker. Two-frame inference. block-match-16 is CPU fallback only.",
     },
     {
       id: "locotrack",

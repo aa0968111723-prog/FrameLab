@@ -69,7 +69,7 @@ export const MCP_TOOLS = [
   tool("analyze_frame", "LEVEL_1 pixel analysis; set vlm=true for Grok vision (selected frames only)", { timelineId: str, frameNumber: num, frameId: str, vlm: bool, prompt: str, level: str }),
   tool("analyze_frame_range", "Pixel consistency over a range (creates a job)", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),
   tool("analyze_consistency", "Alias of analyze_frame_range", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),
-  tool("analyze_motion", "16x16 block matching between consecutive frames", { timelineId: str }, ["timelineId"]),
+  tool("analyze_motion", "SEA-RAFT-S optical flow between frames. provider=block-match-16 for CPU fallback.", { timelineId: str, startFrame: num, endFrame: num, provider: str }, ["timelineId"]),
   tool("analyze_pose", "RTMPose (YOLOX-tiny + RTMPose-s ONNX). provider=framelab-pose-lite for basic silhouette mode.", { timelineId: str, startFrame: num, endFrame: num, provider: str, sessionId: str }, ["timelineId"]),
   tool("analyze_tracking", "LocoTrack-S across the timeline from canvas seeds. provider=framelab-ncc for template fallback.", { timelineId: str, name: str, provider: str }, ["timelineId"]),
   tool("detect_problem_frames", "Run consistency and return warning/error frames", { timelineId: str, startFrame: num, endFrame: num }, ["timelineId"]),

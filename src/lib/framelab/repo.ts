@@ -935,7 +935,10 @@ export async function listMotion(timelineId: string) {
     direction: number;
     diff: number;
     provider: string;
-  }>`select frame_number, magnitude, direction, diff, provider from motion_data where timeline_id = ${timelineId} order by frame_number`;
+    frame_a: number | null;
+    frame_b: number | null;
+    flow_asset: string | null;
+  }>`select frame_number, magnitude, direction, diff, provider, frame_a, frame_b, flow_asset from motion_data where timeline_id = ${timelineId} order by frame_number`;
 }
 
 export async function replaceMotionData(

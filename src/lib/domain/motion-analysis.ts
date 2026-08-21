@@ -21,6 +21,7 @@ export type MotionPairSummary = {
   provider: string;
   spike: boolean;
   grid: MotionVector[];
+  paths?: { x: number; y: number }[][];
   motion_bbox: { x: number; y: number; w: number; h: number } | null;
   confidence: number;
 };

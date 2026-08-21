@@ -331,6 +331,10 @@ function StudioInner({ projectId }: { projectId: string }) {
     () => (bundle.data?.ok ? (bundle.data.tracking ?? []) : []),
     [bundle.data],
   );
+  const motionRows = useMemo(
+    () => (bundle.data?.ok ? (bundle.data.motion ?? []) : []),
+    [bundle.data],
+  );
   const jobs = useMemo(
     () => (bundle.data?.ok ? (bundle.data.jobs ?? []) : []),
     [bundle.data],
@@ -605,6 +609,9 @@ function StudioInner({ projectId }: { projectId: string }) {
       } else if (input.tool === "replace_frame") {
         refresh();
         return;
+      } else if (input.tool === "analyze_motion") {
+        toast.success("SEA-RAFT 光流已寫入");
+        setOverlayStack({ primary: "motion", extras: [] });
       } else if (input.tool === "analyze_pose") {
         toast.success("RTMPose 骨架已寫入");
         setOverlayStack({ primary: "pose", extras: [] });
@@ -1367,6 +1374,25 @@ function StudioInner({ projectId }: { projectId: string }) {
               consMap={consMap}
               tracking={tracking}
               poses={poses}
+              flowGrid={(() => {
+                const n = engine.currentFrame;
+                const row = motionRows.find(
+                  (m: {
+                    frame_number?: number;
+                    frame_b?: number | null;
+                    grid?: { x: number; y: number; dx: number; dy: number; mag: number }[];
+                  }) => m.frame_b === n || m.frame_number === n,
+                );
+                return row?.grid ?? [];
+              })()}
+              flowPaths={(() => {
+                const n = engine.currentFrame;
+                const row = motionRows.find(
+                  (m: { frame_number?: number; frame_b?: number | null; paths?: { x: number; y: number }[][] }) =>
+                    m.frame_b === n || m.frame_number === n,
+                );
+                return row?.paths ?? [];
+              })()}
               annotations={annotations}
               pixelView={pixelView}
               regionBox={regionBox}
@@ -2269,7 +2295,17 @@ function StudioInner({ projectId }: { projectId: string }) {
                   }}
                   onNotes={async (notes) => updateNotesFn({ data: { frameId: current.id, notes } })}
                   onAnalyze={() => timelineId && tool.mutate({ tool: "analyze_frame", args: { timelineId, frameNumber: current.frameNumber, vlm: true } })}
-                  onMotion={() => timelineId && tool.mutate({ tool: "analyze_motion", args: { timelineId } })}
+                  onMotion={() => {
+                    if (!timelineId) return;
+                    const b = engine.currentFrame;
+                    const a = Math.max(0, b === 0 ? 1 : b - 1);
+                    const start = Math.min(a, b);
+                    const end = Math.max(a, b === 0 ? 1 : b);
+                    tool.mutate({
+                      tool: "analyze_motion",
+                      args: { timelineId, provider: "sea-raft", startFrame: start, endFrame: end },
+                    });
+                  }}
                   onTrack={() => timelineId && tool.mutate({ tool: "analyze_tracking", args: { timelineId, provider: "locotrack" } })}
                   onPose={() =>
                     timelineId &&

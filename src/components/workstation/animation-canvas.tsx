@@ -8,6 +8,8 @@ import {
   drawMotionPath,
   drawOnionTrail,
   drawPoseSkeleton,
+  drawSampledFlow,
+  drawFlowPaths,
   drawProblemBubble,
   drawRegionOutline,
   hitAnnotation,
@@ -66,6 +68,8 @@ export function AnimationCanvas({
   consMap,
   tracking,
   poses,
+  flowGrid,
+  flowPaths,
   annotations,
   pixelView,
   regionBox,
@@ -105,6 +109,8 @@ export function AnimationCanvas({
   consMap: Map<number, { severity: string }>;
   tracking: TrackSample[];
   poses: { frame_number: number; joints_json: string }[];
+  flowGrid?: { x: number; y: number; dx: number; dy: number; mag: number }[];
+  flowPaths?: { x: number; y: number }[][];
   annotations: VisualAnnotation[];
   pixelView: boolean;
   regionBox: { x: number; y: number; w: number; h: number };
@@ -526,9 +532,14 @@ export function AnimationCanvas({
         paintDiff(ctx, load(prev.id, imageMap.get(prev.id)!), img, dx, dy, current.width * scale, current.height * scale, "motion");
       }
     }
-    if (img?.complete && (layers.has("flow") || overlay.primary === "motion")) {
-      if (prev && imageMap.get(prev.id)) {
+    if (layers.has("flow") || overlay.primary === "motion") {
+      if (flowGrid && flowGrid.length) {
+        drawSampledFlow(ctx, vt, flowGrid);
+      } else if (prev && imageMap.get(prev.id) && img?.complete) {
         paintFlow(ctx, load(prev.id, imageMap.get(prev.id)!), img, dx, dy, current.width * scale, current.height * scale);
+      }
+      if (flowPaths && flowPaths.length) {
+        drawFlowPaths(ctx, vt, flowPaths);
       }
     }
 
@@ -622,6 +633,8 @@ export function AnimationCanvas({
     consMap,
     tracking,
     poses,
+    flowGrid,
+    flowPaths,
     annotations,
     panState,
     fitTick,

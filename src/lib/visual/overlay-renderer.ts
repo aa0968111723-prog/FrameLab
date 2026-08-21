@@ -219,6 +219,66 @@ export function drawMotionPath(
   ctx.restore();
 }
 
+export type FlowCell = { x: number; y: number; dx: number; dy: number; mag: number };
+
+export function drawSampledFlow(
+  ctx: CanvasRenderingContext2D,
+  vt: ViewportTransform,
+  grid: FlowCell[],
+) {
+  if (!grid.length) return;
+  ctx.save();
+  ctx.lineWidth = 1.15;
+  ctx.lineCap = "round";
+  for (const c of grid) {
+    const a = frameToView(vt, c.x, c.y);
+    const b = frameToView(vt, c.x + c.dx, c.y + c.dy);
+    const t = Math.min(1, c.mag / 18);
+    ctx.strokeStyle = `rgba(180, 210, 230, ${0.45 + 0.5 * t})`;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - 5 * Math.cos(ang - 0.45), b.y - 5 * Math.sin(ang - 0.45));
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x - 5 * Math.cos(ang + 0.45), b.y - 5 * Math.sin(ang + 0.45));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+export function drawFlowPaths(
+  ctx: CanvasRenderingContext2D,
+  vt: ViewportTransform,
+  paths: { x: number; y: number }[][],
+) {
+  if (!paths.length) return;
+  ctx.save();
+  ctx.lineWidth = 1.6;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(232, 196, 120, 0.9)";
+  ctx.fillStyle = "rgba(244, 244, 245, 0.95)";
+  for (const path of paths) {
+    if (path.length < 2) continue;
+    ctx.beginPath();
+    const first = frameToView(vt, path[0]!.x, path[0]!.y);
+    ctx.moveTo(first.x, first.y);
+    for (let i = 1; i < path.length; i += 1) {
+      const p = frameToView(vt, path[i]!.x, path[i]!.y);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+    const last = frameToView(vt, path[path.length - 1]!.x, path[path.length - 1]!.y);
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 /** Onion motion trail: only nearby frames, fading. */
 export function drawOnionTrail(
   ctx: CanvasRenderingContext2D,

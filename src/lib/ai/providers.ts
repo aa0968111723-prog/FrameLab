@@ -8,6 +8,7 @@ import { estimatePoseLite, type PoseEstimate } from "@/lib/domain/pose-lite";
 import { encodeJpegBuffer } from "@/lib/domain/image-codec";
 import { rtmposeAvailable, rtmposeHealth, runRtmposeBatch, toPoseEstimate } from "@/lib/ai/rtmpose-worker";
 import { locotrackAvailable, locotrackHealth, runLocotrack } from "@/lib/ai/locotrack-worker";
+import { seaRaftAvailable, seaRaftHealth, runSeaRaft } from "@/lib/ai/sea-raft-worker";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -222,7 +223,6 @@ export class RifeInterpolation implements InterpolationProvider {
 }
 
 export const sam2: SegmentationProvider = new Reserved("sam2");
-export const seaRaft: OpticalFlowProvider = new Reserved("sea-raft");
 export const videoDepthAnything: DepthProvider = new Reserved("video-depth-anything");
 export const rife = new RifeInterpolation();
 export const wan: GenerativeRepairProvider = new Reserved("wan", "PROVIDER_NOT_AVAILABLE");
@@ -380,6 +380,79 @@ export class LocotrackProvider implements PointTrackingProvider {
 
 export const locotrack = new LocotrackProvider();
 export const blockMatchFlow = new BlockMatchFlow();
+
+export class SeaRaftProvider implements OpticalFlowProvider {
+  readonly id = "sea-raft";
+  available() {
+    return seaRaftAvailable();
+  }
+  health_check() {
+    const h = seaRaftHealth();
+    return Promise.resolve({
+      name: this.id,
+      version: "sea-raft-s",
+      status: h.ok ? "ready" : "MODEL_NOT_AVAILABLE",
+      device: h.device,
+      capabilities: h.ok ? ["optical_flow", "sampled_vectors"] : [],
+    } satisfies ProviderMeta);
+  }
+  async flow(
+    a: RgbaFrame,
+    b: RgbaFrame,
+    region?: RegionBox | null,
+  ): Promise<
+    ProviderRun<{
+      magnitude: number;
+      direction: number;
+      grid: { x: number; y: number; dx: number; dy: number; mag: number }[];
+      region?: RegionBox | null;
+    }>
+  > {
+    if (!this.available()) {
+      return {
+        ok: false,
+        code: "MODEL_NOT_AVAILABLE",
+        error: "SEA-RAFT worker is not loaded. Use provider=block-match-16.",
+        provider: this.id,
+      };
+    }
+    const fa = region ? cropRgba(a, region) : a;
+    const fb = region ? cropRgba(b, region) : b;
+    const dir = path.join(tmpdir(), "framelab-searaft", `one-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    try {
+      const pathA = path.join(dir, "a.jpg");
+      const pathB = path.join(dir, "b.jpg");
+      writeFileSync(pathA, encodeJpegBuffer(fa, 90));
+      writeFileSync(pathB, encodeJpegBuffer(fb, 90));
+      const { pairs } = await runSeaRaft({
+        pairs: [{ pathA, pathB, frameA: 0, frameB: 1, width: fa.width, height: fa.height }],
+      });
+      const p = pairs[0];
+      if (!p) {
+        return { ok: false, code: "MODEL_NOT_AVAILABLE", error: "SEA-RAFT returned no pair", provider: this.id };
+      }
+      return {
+        ok: true,
+        data: {
+          magnitude: p.mean_motion,
+          direction: Math.atan2(p.dominant_direction.y, p.dominant_direction.x),
+          grid: p.grid,
+          region: region ?? null,
+        },
+        provider: this.id,
+      };
+    } finally {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+export const seaRaft = new SeaRaftProvider();
 
 export class PoseLiteProvider implements PoseProvider {
   readonly id = "framelab-pose-lite";

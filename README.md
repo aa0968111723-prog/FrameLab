@@ -50,7 +50,7 @@ Pixel metrics, linear-blend inbetweens, neighborhood repair, timeline, onion ski
 
 ## GPU mode
 
-CUDA adapters (SAM 2, SEA-RAFT, RIFE, Wan, Video Depth Anything) are reserved. **RTMPose** and **LocoTrack-S** run through Python workers on CUDA when present, otherwise CPU.
+CUDA adapters (SAM 2, RIFE, Wan, Video Depth Anything) are reserved. **RTMPose**, **LocoTrack-S**, and **SEA-RAFT-S** run through Python workers on CUDA when present, otherwise CPU.
 
 ## Web UI
 
@@ -100,7 +100,8 @@ TypeScript client: `packages/sdk`.
 | xAI grok-4.5 vision (user-initiated frames only) | **ready** if `XAI_API_KEY` |
 | RTMPose-s + YOLOX-tiny (Python worker) | **ready** (CUDA or CPU) |
 | LocoTrack-S (Python worker) | **ready** (CUDA or CPU) |
-| SAM 2, SEA-RAFT, Depth Anything, RIFE, Wan | adapter only — `MODEL_NOT_AVAILABLE` |
+| SEA-RAFT-S (Python worker) | **ready** (CUDA or CPU) |
+| SAM 2, Depth Anything, RIFE, Wan | adapter only — `MODEL_NOT_AVAILABLE` |
 
 No random poses. No fake depth. No hardcoded consistency.
 

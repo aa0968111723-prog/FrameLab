@@ -70,6 +70,30 @@ export const getProjectBundle = createServerFn({ method: "GET" })
     const assignments = await repo.listProjectAssignments(project.id);
     const jobs = await repo.listJobs(context.userId, project.id);
     const motion = timeline ? await repo.listMotion(timeline.id) : [];
+    const { projectRoot } = await import("@/lib/storage/local");
+    const { readFile } = await import("node:fs/promises");
+    const path = await import("node:path");
+    const motionHydrated = await Promise.all(
+      motion.map(async (m) => {
+        let grid: { x: number; y: number; dx: number; dy: number; mag: number }[] = [];
+        let paths: { x: number; y: number }[][] = [];
+        const rel = m.flow_asset;
+        if (rel) {
+          const abs = path.join(projectRoot(project.id), rel);
+          try {
+            const raw = JSON.parse((await readFile(abs)).toString("utf8")) as {
+              grid?: typeof grid;
+              paths?: typeof paths;
+            };
+            grid = Array.isArray(raw.grid) ? raw.grid : [];
+            paths = Array.isArray(raw.paths) ? raw.paths : [];
+          } catch {
+            /* missing asset */
+          }
+        }
+        return { ...m, grid, paths };
+      }),
+    );
     const poses = timeline ? await repo.listPoses(timeline.id) : [];
     const problemRanges = timeline ? await repo.listProblemRanges(timeline.id) : [];
     const videos = await repo.listVideos(project.id);
@@ -101,7 +125,7 @@ export const getProjectBundle = createServerFn({ method: "GET" })
       objects,
       consistency,
       tracking,
-      motion,
+      motion: motionHydrated,
       poses: poses.map((p) => ({
         frame_id: p.frame_id,
         frame_number: p.frame_number,

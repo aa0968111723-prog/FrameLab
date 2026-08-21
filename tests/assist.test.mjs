@@ -34,12 +34,12 @@ function solid(w, h, r, g, b, shiftX = 0) {
 }
 
 describe("motion provider", () => {
-  it("block-match is available; sea-raft is not", () => {
+  it("block-match is CPU fallback; sea-raft is a real worker", () => {
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
     assert.match(src, /class BlockMatchFlow/);
     assert.match(src, /readonly id = "block-match-16"/);
-    assert.match(src, /id = "sea-raft"|new Reserved\("sea-raft"\)/);
-    assert.match(src, /MODEL_NOT_AVAILABLE/);
+    assert.match(src, /class SeaRaftProvider/);
+    assert.doesNotMatch(src, /new Reserved\("sea-raft"\)/);
   });
 
   it("detects a velocity spike on a jumping blob", () => {
@@ -54,12 +54,14 @@ describe("motion provider", () => {
     assert.ok(pairs.some((p) => p.mean_motion >= 0));
   });
 
-  it("sea-raft / rife stay unavailable; rtmpose and locotrack are real workers", () => {
+  it("rife stays unavailable; rtmpose, locotrack and sea-raft are real workers", () => {
     const src = readFileSync(new URL("../src/lib/ai/providers.ts", import.meta.url), "utf8");
     assert.match(src, /class RtmposeProvider/);
     assert.match(src, /class LocotrackProvider/);
+    assert.match(src, /class SeaRaftProvider/);
     assert.doesNotMatch(src, /new Reserved\("rtmpose"\)/);
     assert.doesNotMatch(src, /new Reserved\("locotrack"\)/);
+    assert.doesNotMatch(src, /new Reserved\("sea-raft"\)/);
     assert.match(src, /class RifeInterpolation/);
     assert.match(src, /RIFE is not loaded/);
     assert.doesNotMatch(src, /fake (SEA-RAFT|RTMPose|LocoTrack|RIFE)/i);

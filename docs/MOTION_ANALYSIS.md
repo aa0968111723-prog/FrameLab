@@ -1,7 +1,9 @@
 # Motion Analysis
 
-Provider: `block-match-16` (real 16×16 SAD). `sea-raft` stays `MODEL_NOT_AVAILABLE`.
+**SEA-RAFT-S** is the real optical-flow provider:
 
-`analyze_motion` / `analyzeMotionSequence` compare consecutive frames (or a selected region crop). Summaries stored in `motion_data`; sampled grids go to `data/projects/{id}/flow/*.json`, not the DB.
+`UI → analyze_motion → OPTICAL_FLOW job → sea_raft_worker.py → SEA-RAFT-S → flow/*.json → canvas sampled vectors + motion path`
 
-Output: mean/median magnitude, dominant direction, velocity ratio, direction change. Spikes when ratio ≥ 2× or direction jumps ≥ 55°.
+Two frames actually run inference. `block-match-16` is the CPU fallback only (`provider=block-match-16`).
+
+Output: mean/median magnitude, dominant direction, sampled grid, short advection paths. Spikes when ratio ≥ 2× or direction jumps ≥ 55°.

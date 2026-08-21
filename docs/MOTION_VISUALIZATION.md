@@ -12,7 +12,7 @@ The selected trail (e.g. right wrist) is drawn across nearby frames as a fading 
 
 ## Motion path
 
-Full-path polyline for one target: Head, Left/Right Hand, Hip, Foot, Object, Custom. Current frame is a brighter node. Lost / low-confidence samples mark `!`.
+Tracking trail polyline for one target: Head, Left/Right Hand, Hip, Foot, Object, Custom. SEA-RAFT also advects the strongest flow samples as short two-point paths on the motion overlay.
 
 ## Pose ghost
 
@@ -20,7 +20,7 @@ Previous / current / next skeletons. Selecting a joint (right wrist) highlights 
 
 ## Motion arrows
 
-Sampled block-match vectors (not a full optical-flow field). Sparse on purpose.
+Sampled **SEA-RAFT** vectors (sparse on purpose). Live block-match arrows appear only when no SEA-RAFT grid has been written yet (CPU fallback).
 
 ## Heatmap
 
