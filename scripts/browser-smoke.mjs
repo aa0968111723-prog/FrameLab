@@ -21,10 +21,15 @@ if (args.error) {
 }
 
 const url = checkedUrl(args.url);
-const outPng = checkedOutputPath(args.outPng, ["/workspace"]);
+const ALLOWED_ROOTS = ["/workspace", process.cwd()];
+// The guard exists to stop screenshots escaping the project (never /tmp), but
+// hardcoding the Grok container root made the whole E2E harness unrunnable on a
+// normal checkout or in CI -- it rejected every path outside /workspace. Allow
+// the repo root as well so the same guard holds wherever the repo lives.
+const outPng = checkedOutputPath(args.outPng, ALLOWED_ROOTS);
 const derived = derivedPaths(outPng);
-const mobilePng = checkedOutputPath(derived.mobilePng, ["/workspace"]);
-const outJson = checkedOutputPath(derived.verdictJson, ["/workspace"], "verdict JSON");
+const mobilePng = checkedOutputPath(derived.mobilePng, ALLOWED_ROOTS);
+const outJson = checkedOutputPath(derived.verdictJson, ALLOWED_ROOTS, "verdict JSON");
 
 const MAX_BASELINE_BYTES = 1024 * 1024;
 const baselineRequested = Boolean(args.baseline);
@@ -32,7 +37,7 @@ let baselinePath = null;
 let baselineResolveError = null;
 if (baselineRequested) {
   try {
-    baselinePath = checkedOutputPath(realpathSync(args.baseline), ["/workspace"], "baseline");
+    baselinePath = checkedOutputPath(realpathSync(args.baseline), ALLOWED_ROOTS, "baseline");
   } catch (err) {
     baselineResolveError = err?.code ?? "unresolvable path";
   }
