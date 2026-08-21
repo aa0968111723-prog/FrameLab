@@ -4,6 +4,7 @@ import { getInbetween, getInterpolation } from "@/lib/ai/providers";
 import { constraintWarnings, type AnimationConstraint } from "@/lib/domain/animation-constraints";
 import { parseAnimationIntent } from "@/lib/domain/animation-intent";
 import { fail, FrameLabError } from "@/lib/domain/errors";
+import { frameDurationMs } from "@/lib/domain/fps";
 import { decodeJpegBase64, encodeJpegBase64, encodePng, hashBytes, makeThumbnail } from "@/lib/domain/image-codec";
 import { generatedFrameNumbers, validateKeyframePair } from "@/lib/domain/keyframe-pair";
 import { buildMotionPlan, hashMotionPlan, type MotionPlan } from "@/lib/domain/motion-plan";
@@ -1187,7 +1188,7 @@ export async function setFrameExposureCmd(ctx: CommandContext, args: Record<stri
   if (!frame) fail("FRAME_NOT_FOUND", "Frame not found", 404);
   await ownTimeline(ctx, frame.timeline_id);
   const t = await repo.getTimeline(frame.timeline_id);
-  const duration = Math.round((1000 / Math.max(1, t?.fps ?? 24)) * exposure);
+  const duration = frameDurationMs(t?.fps ?? 24, exposure);
   await repo.updateFrame(frame.id, { duration_ms: duration, exposure_count: exposure });
   return { frameId: frame.id, exposure_count: exposure, duration_ms: duration, note: "exposure_count=2 plays on twos. AI inbetween will not fill a hold." };
 }

@@ -52,6 +52,7 @@ import {
   setZoom,
 } from "@/lib/domain/timeline-engine";
 import { padFrame } from "@/lib/domain/types";
+import { frameDurationMs, PRESET_FPS, clampFps } from "@/lib/domain/fps";
 import { jobStageLabel, parseJobStage } from "@/lib/domain/job-progress";
 import { annotationsFromProblems, categoryLabel, type VisualAnnotation } from "@/lib/domain/visual-annotation";
 import { propagateMask } from "@/lib/domain/region-repair";
@@ -143,6 +144,7 @@ const TOOL_DONE_ZH: Record<string, string> = {
   set_frame_type: "影格類型已更新",
   set_frame_duration: "時長已更新",
   set_frame_exposure: "曝光已更新",
+  set_playback_fps: "播放 FPS 已更新",
   execute_repair_plan: "修復已執行",
   create_repair_plan: "修復計畫已建立",
 };
@@ -615,7 +617,7 @@ function StudioInner({ projectId }: { projectId: string }) {
       const dt = (now - lastRef.current) * playbackSpeed;
       lastRef.current = now;
       const frame = frames.find((f) => f.frameNumber === engine.currentFrame);
-      const dur = frame?.durationMs ?? Math.round(1000 / Math.max(1, engine.fps));
+      const dur = frameDurationMs(engine.fps, frame?.exposureCount ?? 1);
       accRef.current += dt;
       if (accRef.current >= dur) {
         accRef.current -= dur;
@@ -1066,7 +1068,37 @@ function StudioInner({ projectId }: { projectId: string }) {
         </Link>
         <span className="text-border">/</span>
         <span className="truncate text-sm">{project.name}</span>
-        <span className="text-[11px] text-faint">{project.fps} fps</span>
+        <select
+          className="h-7 shrink-0 rounded-[var(--radius-xs)] border border-border bg-subtle px-1 text-[11px] text-fg"
+          value={String(project.fps)}
+          aria-label="播放 FPS"
+          title="播放 FPS（與曝光分開）"
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "__custom") {
+              const typed = window.prompt("播放 FPS（1–60）", String(project.fps));
+              if (typed == null) return;
+              const n = clampFps(Number(typed));
+              if (n !== project.fps) {
+                tool.mutate({ tool: "set_playback_fps", args: { projectId, fps: n } });
+              }
+              return;
+            }
+            const n = Number(v);
+            if (n !== project.fps) {
+              tool.mutate({ tool: "set_playback_fps", args: { projectId, fps: n } });
+            }
+          }}
+        >
+          {Array.from(new Set<number>([...PRESET_FPS, project.fps]))
+            .sort((a, b) => a - b)
+            .map((n) => (
+              <option key={n} value={n}>
+                {n} fps
+              </option>
+            ))}
+          <option value="__custom">自訂…</option>
+        </select>
         <div className="mx-auto flex items-center gap-1">
           <Button variant="ghost" size="icon" className="size-8" onClick={() => setEngine((s) => seek(s, 0))} aria-label="第一格">
             <SkipBack className="size-4" />
@@ -1994,7 +2026,11 @@ function StudioInner({ projectId }: { projectId: string }) {
               )}
               {rightTab === "advanced" && current && (
                 <AdvancedInspector
-                  current={current}
+                  current={{
+                    ...current,
+                    exposureCount: current.exposureCount ?? 1,
+                  }}
+                  playbackFps={project.fps}
                   onion={engine.onionSkin}
                   setOnion={(p) => setEngine((s) => setOnionSkin(s, p))}
                   cons={consMap.get(current.frameNumber)}
@@ -2110,7 +2146,7 @@ function StudioInner({ projectId }: { projectId: string }) {
 }
 
 async function exportWebm(
-  frames: { id: string; durationMs: number; width: number; height: number }[],
+  frames: { id: string; durationMs: number; width: number; height: number; exposureCount?: number }[],
   imageMap: Map<string, string>,
   fps: number,
 ) {
@@ -2149,7 +2185,7 @@ async function exportWebm(
       img.onerror = res;
     });
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    await new Promise((r) => setTimeout(r, f.durationMs || 1000 / fps));
+    await new Promise((r) => setTimeout(r, frameDurationMs(fps, f.exposureCount ?? 1)));
   }
   rec.stop();
 }

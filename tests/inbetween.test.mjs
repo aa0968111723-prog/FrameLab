@@ -416,6 +416,7 @@ describe("mcp / rest surface", () => {
       "get_candidate",
       "generate_breakdown_frame",
       "set_frame_exposure",
+      "set_playback_fps",
     ]) {
       assert.ok(names.has(t), t);
     }

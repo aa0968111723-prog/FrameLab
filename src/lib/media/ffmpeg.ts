@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fail } from "../domain/errors.ts";
+import { DEFAULT_PLAYBACK_FPS, parseFfmpegVideoMeta, type VideoProbeMeta } from "../domain/fps.ts";
 import { assertInsideData, dataRoot, safeFilename } from "../storage/local.ts";
 
 const ALLOWED_EXT = new Set([".mp4", ".webm", ".mov", ".mkv", ".m4v", ".avi"]);
@@ -18,9 +19,9 @@ export type ExtractConfig = {
 };
 
 export function clampExtractNumbers(fps: number, maxWidth: number, maxFrames: number) {
-  const f = Math.max(1, Math.min(30, Math.round(fps)));
+  // fps 0 = keep source timing (no fps= resample). Cap 60 for 60fps sources / custom.
+  const f = !Number.isFinite(fps) || fps <= 0 ? 0 : Math.max(1, Math.min(60, Math.round(fps)));
   const w = Math.max(32, Math.min(640, Math.round(maxWidth) & ~1));
-  // 0 = no frame cap (thousands of frames). Positive values are honored as-is.
   const n =
     !Number.isFinite(maxFrames) || maxFrames <= 0 ? 0 : Math.max(1, Math.round(maxFrames));
   return { fps: f, maxWidth: w, maxFrames: n };
@@ -33,6 +34,8 @@ export function ffmpegExtractArgs(cfg: ExtractConfig): string[] {
     cfg.maxFrames ?? 0,
   );
   const pattern = path.join(cfg.outputDir, FRAME_FILE_PATTERN);
+  const scale = `scale=${maxWidth}:-2:flags=lanczos`;
+  const vf = fps > 0 ? `fps=${fps},${scale}` : scale;
   const args = [
     "-hide_banner",
     "-nostdin",
@@ -42,7 +45,7 @@ export function ffmpegExtractArgs(cfg: ExtractConfig): string[] {
     "-i",
     cfg.inputPath,
     "-vf",
-    `fps=${fps},scale=${maxWidth}:-2:flags=lanczos`,
+    vf,
     "-q:v",
     "4",
   ];
@@ -72,25 +75,21 @@ function run(cmd: string, args: string[]): Promise<{ code: number; stderr: strin
 }
 
 export async function probeDurationMs(inputPath: string): Promise<number> {
+  return (await probeVideoMeta(inputPath)).durationMs;
+}
+
+export async function probeVideoMeta(inputPath: string): Promise<VideoProbeMeta> {
   const full = assertInsideData(inputPath);
-  const result = await run("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    full,
-  ]);
-  if (result.code !== 0) fail("FFMPEG_FAILED", result.stderr.slice(0, 400) || "ffprobe failed");
-  const sec = Number.parseFloat(result.stdout.trim());
-  if (!Number.isFinite(sec) || sec <= 0) return 0;
-  return Math.round(sec * 1000);
+  const result = await run("ffmpeg", ["-hide_banner", "-i", full]);
+  const meta = parseFfmpegVideoMeta(`${result.stderr}\n${result.stdout}`);
+  if (meta.fps <= 0) meta.fps = DEFAULT_PLAYBACK_FPS;
+  return meta;
 }
 
 export async function extractFramesWithFfmpeg(cfg: ExtractConfig): Promise<{
   files: string[];
   durationMs: number;
+  sourceFps: number;
 }> {
   const input = assertInsideData(cfg.inputPath);
   const ext = path.extname(input).toLowerCase();
@@ -99,8 +98,19 @@ export async function extractFramesWithFfmpeg(cfg: ExtractConfig): Promise<{
   if (info.size > MAX_BYTES) fail("VALIDATION_ERROR", "影片超過 512MB");
   const outDir = assertInsideData(cfg.outputDir);
   await mkdir(outDir, { recursive: true });
-  const durationMs = await probeDurationMs(input).catch(() => 0);
-  const args = ffmpegExtractArgs({ ...cfg, inputPath: input, outputDir: outDir });
+  const meta = await probeVideoMeta(input).catch(() => ({
+    fps: DEFAULT_PLAYBACK_FPS,
+    durationMs: 0,
+    width: 0,
+    height: 0,
+  }));
+  const extractFps = cfg.fps && cfg.fps > 0 ? cfg.fps : meta.fps;
+  const args = ffmpegExtractArgs({
+    ...cfg,
+    fps: extractFps,
+    inputPath: input,
+    outputDir: outDir,
+  });
   const result = await run("ffmpeg", args);
   if (result.code !== 0) {
     fail("FFMPEG_FAILED", result.stderr.slice(0, 500) || "ffmpeg failed");
@@ -111,7 +121,8 @@ export async function extractFramesWithFfmpeg(cfg: ExtractConfig): Promise<{
   if (names.length === 0) fail("FFMPEG_FAILED", "ffmpeg produced no frames");
   return {
     files: names.map((n) => path.join(outDir, n)),
-    durationMs,
+    durationMs: meta.durationMs,
+    sourceFps: meta.fps,
   };
 }
 
@@ -153,7 +164,7 @@ export async function concatJpegSequence(input: {
     path.join(projectRoot(input.projectId), "renders", "preview.mp4"),
   );
   const pattern = path.join(seqDir, FRAME_FILE_PATTERN);
-  const fps = Math.max(1, Math.min(30, Math.round(input.fps || 12)));
+  const fps = Math.max(1, Math.min(60, Math.round(input.fps || DEFAULT_PLAYBACK_FPS)));
   const result = await run("ffmpeg", [
     "-hide_banner",
     "-nostdin",

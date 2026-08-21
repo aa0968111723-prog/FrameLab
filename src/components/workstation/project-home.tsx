@@ -30,6 +30,7 @@ import {
   extractImageSequenceBatches,
   INGEST_HTTP_BATCH,
 } from "@/lib/extract-frames";
+import { DEFAULT_PLAYBACK_FPS, PRESET_FPS, clampFps } from "@/lib/domain/fps";
 
 export function ProjectHome() {
   const { user, isPending } = useCurrentUserState();
@@ -48,6 +49,10 @@ function HomeInner() {
   const [busy, setBusy] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [tokenPlain, setTokenPlain] = useState<string | null>(null);
+  const [extractChoice, setExtractChoice] = useState<"auto" | "12" | "24" | "30" | "custom">("auto");
+  const [extractCustom, setExtractCustom] = useState("18");
+  const [playChoice, setPlayChoice] = useState<"same" | "12" | "24" | "30" | "custom">("same");
+  const [playCustom, setPlayCustom] = useState(String(DEFAULT_PLAYBACK_FPS));
 
   const [bootstrapped, setBootstrapped] = useState(false);
 
@@ -94,7 +99,7 @@ function HomeInner() {
 
   const create = useMutation({
     mutationFn: () =>
-      createProjectFn({ data: { name: name.trim() || "未命名", fps: 24 } }),
+      createProjectFn({ data: { name: name.trim() || "未命名", fps: DEFAULT_PLAYBACK_FPS } }),
     onSuccess: (r) => {
       toast.success("專案已建立");
       const id = r.projectId ?? r.id;
@@ -151,6 +156,24 @@ function HomeInner() {
     }
   }
 
+  function extractField(): string {
+    if (extractChoice === "custom") return String(clampFps(Number(extractCustom)));
+    return extractChoice;
+  }
+
+  function playbackField(): string {
+    if (playChoice === "custom") return String(clampFps(Number(playCustom)));
+    return playChoice;
+  }
+
+  function sequenceFps(): number {
+    const play = playbackField();
+    if (play !== "same") return clampFps(Number(play));
+    const ext = extractField();
+    if (ext === "auto") return DEFAULT_PLAYBACK_FPS;
+    return clampFps(Number(ext));
+  }
+
   async function onFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     const files = [...list];
@@ -175,7 +198,7 @@ function HomeInner() {
           const result = await ingestSequenceFn({
             data: {
               name: "影像序列",
-              fps: 12,
+              fps: sequenceFps(),
               projectId,
               replace: !projectId,
               frames: batch.map((f) => ({
@@ -212,7 +235,8 @@ function HomeInner() {
     try {
       const body = new FormData();
       body.set("file", file);
-      body.set("fps", "12");
+      body.set("fps", extractField());
+      body.set("playbackFps", playbackField());
       body.set("name", file.name);
       const res = await fetch("/api/videos", { method: "POST", body });
       const json = (await res.json()) as {
@@ -315,6 +339,68 @@ function HomeInner() {
                 onChange={(e) => void onFfmpeg(e.target.files)}
               />
             </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-end gap-3 text-xs text-muted">
+            <label className="block">
+              拆幀 FPS
+              <select
+                className="mt-1 h-9 rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm text-fg"
+                value={extractChoice}
+                onChange={(e) =>
+                  setExtractChoice(e.target.value as typeof extractChoice)
+                }
+              >
+                <option value="auto">來源自動</option>
+                {PRESET_FPS.map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+                <option value="custom">自訂</option>
+              </select>
+            </label>
+            {extractChoice === "custom" && (
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                className="h-9 w-20"
+                value={extractCustom}
+                onChange={(e) => setExtractCustom(e.target.value)}
+                aria-label="自訂拆幀 FPS"
+              />
+            )}
+            <label className="block">
+              播放 FPS
+              <select
+                className="mt-1 h-9 rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm text-fg"
+                value={playChoice}
+                onChange={(e) => setPlayChoice(e.target.value as typeof playChoice)}
+              >
+                <option value="same">同拆幀</option>
+                {PRESET_FPS.map((n) => (
+                  <option key={`p-${n}`} value={String(n)}>
+                    {n}
+                  </option>
+                ))}
+                <option value="custom">自訂</option>
+              </select>
+            </label>
+            {playChoice === "custom" && (
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                className="h-9 w-20"
+                value={playCustom}
+                onChange={(e) => setPlayCustom(e.target.value)}
+                aria-label="自訂播放 FPS"
+              />
+            )}
+            <p className="max-w-xs pb-2 text-[11px] leading-snug text-faint">
+              拆幀讀來源速率；播放時鐘與曝光（一／二／三拍）分開。預設不是 12fps。
+            </p>
           </div>
 
           {busy && (

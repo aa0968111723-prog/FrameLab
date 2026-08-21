@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import path from "node:path";
 import { ALL_SCOPES, startUploadedVideoIngest } from "@/lib/commands/execute";
 import { getSessionUser } from "@/lib/auth/verify.server";
+import { parseFpsField } from "@/lib/domain/fps";
 import { ALLOWED_EXT, MAX_BYTES } from "@/lib/media/ffmpeg";
 
 export const Route = createFileRoute("/api/videos")({
@@ -34,7 +35,11 @@ export const Route = createFileRoute("/api/videos")({
             { status: 400 },
           );
         }
-        const fps = Number(form.get("fps") || 12);
+        const extracted = parseFpsField(form.get("fps") as string | null);
+        const fps = extracted === "auto" ? 0 : extracted;
+        const playbackRaw = form.get("playbackFps");
+        const playbackFps =
+          playbackRaw == null || String(playbackRaw).trim() === "" ? "same" : String(playbackRaw);
         const name = String(form.get("name") || file.name);
         const buf = Buffer.from(await file.arrayBuffer());
         try {
@@ -45,7 +50,7 @@ export const Route = createFileRoute("/api/videos")({
               caller: `user:${user.id}`,
               scopes: ALL_SCOPES,
             },
-            { filename: file.name, mimeType: file.type || "video/mp4", bytes: buf, fps, name },
+            { filename: file.name, mimeType: file.type || "video/mp4", bytes: buf, fps, playbackFps, name },
           );
           // Don't await the extract — the client polls the job. Never return
           // thousands of JPEG base64 blobs in this response.

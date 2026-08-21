@@ -89,6 +89,7 @@ export const getProjectBundle = createServerFn({ method: "GET" })
         isLocked: f.is_locked,
         notes: f.notes,
         contentHash: f.content_hash,
+        exposureCount: f.exposure_count ?? 1,
       })),
       characters,
       objects,

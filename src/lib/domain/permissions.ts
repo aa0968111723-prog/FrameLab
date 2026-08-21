@@ -135,6 +135,7 @@ export const TOOL_SCOPES: Record<string, Scope> = {
   generate_breakdown_frame: "GENERATE",
   get_generated_frame: "READ",
   set_frame_exposure: "EDIT",
+  set_playback_fps: "EDIT",
   get_visual_context: "READ",
   annotate_frame: "SUGGEST",
   highlight_region: "SUGGEST",

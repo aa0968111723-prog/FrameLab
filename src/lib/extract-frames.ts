@@ -103,7 +103,7 @@ export async function extractVideoFrameBatches(
       video.onerror = () => reject(new Error("無法讀取這支影片"));
     });
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
-    const fps = Math.max(1, Math.min(30, opts.fps));
+    const fps = opts.fps > 0 ? Math.max(1, Math.min(60, Math.round(opts.fps))) : 24;
     const natural = Math.max(1, Math.floor(duration * fps));
     const total =
       opts.maxFrames && opts.maxFrames > 0 ? Math.min(natural, opts.maxFrames) : natural;

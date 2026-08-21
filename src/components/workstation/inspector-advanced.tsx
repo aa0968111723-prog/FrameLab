@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { padFrame, type FrameType } from "@/lib/domain/types";
+import { frameDurationMs } from "@/lib/domain/fps";
 import { jobStateZh, jobTypeZh } from "@/lib/domain/job-progress";
 import type { createTimelineState } from "@/lib/domain/timeline-engine";
 import { VisualHistory, type HistoryRow } from "./visual-history";
@@ -48,6 +49,7 @@ function typeTone(t: string): React.ComponentProps<typeof Badge>["tone"] {
 
 export function AdvancedInspector({
   current,
+  playbackFps,
   onion,
   setOnion,
   cons,
@@ -63,7 +65,7 @@ export function AdvancedInspector({
   regionKind,
   setRegionKind,
   onType,
-  onDuration,
+  onDuration: _onDuration,
   onExposure,
   onLock,
   onNotes,
@@ -97,7 +99,9 @@ export function AdvancedInspector({
     isLocked: boolean;
     notes: string;
     contentHash: string;
+    exposureCount?: number;
   };
+  playbackFps: number;
   onion: ReturnType<typeof createTimelineState>["onionSkin"];
   setOnion: (p: Partial<ReturnType<typeof createTimelineState>["onionSkin"]>) => void;
   cons?: { severity: string; scores_json: string; repair_start: number | null; repair_end: number | null };
@@ -140,6 +144,8 @@ export function AdvancedInspector({
   const [charName, setCharName] = useState("");
   useEffect(() => setNotes(current.notes), [current.id, current.notes]);
   const scores = cons ? (JSON.parse(cons.scores_json) as Record<string, number>) : null;
+  const exposure = current.exposureCount ?? 1;
+  const holdMs = frameDurationMs(playbackFps, exposure);
   return (
     <div className="space-y-3">
       <p className="font-mono text-lg tabular-nums">{padFrame(current.frameNumber)}</p>
@@ -171,20 +177,24 @@ export function AdvancedInspector({
         </select>
       </label>
       <label className="block text-xs text-muted">
-        時長（毫秒）
-        <Input type="number" className="mt-1" value={current.durationMs} onChange={(e) => onDuration(Number(e.target.value))} />
+        播放時長
+        <p className="mt-1 text-sm tabular-nums text-fg">{holdMs} ms</p>
+        <p className="mt-0.5 text-[10px] text-faint">
+          {playbackFps} fps × {exposure === 1 ? "一格一拍" : exposure === 2 ? "兩格一拍" : exposure === 3 ? "三格一拍" : "四格一拍"}
+        </p>
       </label>
       {onExposure && (
         <label className="block text-xs text-muted">
-          曝光
+          曝光（繪製停留，與播放 FPS 分開）
           <select
             className="mt-1 h-9 w-full rounded-[var(--radius-sm)] border border-border bg-subtle px-2 text-sm"
-            defaultValue="1"
+            value={String(exposure)}
             onChange={(e) => onExposure(Number(e.target.value))}
           >
             <option value="1">一格一拍</option>
             <option value="2">兩格一拍</option>
             <option value="3">三格一拍</option>
+            <option value="4">四格一拍</option>
           </select>
         </label>
       )}

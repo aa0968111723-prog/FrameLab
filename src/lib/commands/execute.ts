@@ -14,6 +14,13 @@ import { sequentialEdges } from "@/lib/domain/frame-graph";
 import { nid } from "@/lib/domain/ids";
 import { decodeJpegBase64, encodeJpegBase64, hashBytes, makeThumbnail } from "@/lib/domain/image-codec";
 import {
+  DEFAULT_PLAYBACK_FPS,
+  frameDurationMs,
+  parseFpsField,
+  resolveExtractFps,
+  resolvePlaybackFps,
+} from "@/lib/domain/fps";
+import {
   cropRgba,
   edgeMagnitude,
   lumaCentroid,
@@ -204,7 +211,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       return { ...p, timelines };
     }
     case "create_project":
-      return createBlankProject(ctx, { name: str(args.name, "Untitled"), fps: num(args.fps, 24) });
+      return createBlankProject(ctx, { name: str(args.name, "Untitled"), fps: num(args.fps, DEFAULT_PLAYBACK_FPS) });
     case "get_video": {
       const v = await repo.getVideo(str(args.videoId));
       if (!v) fail("FRAME_NOT_FOUND", "Video not found", 404);
@@ -417,7 +424,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     case "ingest_frames":
       return ingestFrames(ctx, {
         name: str(args.name),
-        fps: num(args.fps, 12),
+        fps: num(args.fps, DEFAULT_PLAYBACK_FPS),
         frames: (Array.isArray(args.frames) ? args.frames : []) as {
           imageData: string;
           frameNumber: number;
@@ -570,6 +577,11 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       const { setFrameExposureCmd } = await import("./inbetween-tools");
       return setFrameExposureCmd(ctx, args);
     }
+    case "set_playback_fps":
+      return setPlaybackFps(ctx, {
+        projectId: str(args.projectId),
+        fps: num(args.fps, DEFAULT_PLAYBACK_FPS),
+      });
     default:
       fail("MCP_TOOL_ERROR", `Unknown tool: ${tool}`);
   }
@@ -1368,11 +1380,18 @@ async function extractVideo(ctx: CommandContext, args: Record<string, unknown>) 
   const video = await repo.getVideo(str(args.videoId));
   if (!video) fail("FRAME_NOT_FOUND", "Video not found", 404);
   await ownProject(ctx, video.project_id);
+  const extract = parseFpsField(
+    typeof args.fps === "number" || typeof args.fps === "string" ? args.fps : "auto",
+  );
   return extractAndIngestUploadedVideo(ctx, {
     filename: video.filename,
     mimeType: video.mime_type,
     bytes: null,
-    fps: num(args.fps, 12),
+    fps: extract === "auto" ? 0 : extract,
+    playbackFps:
+      typeof args.playbackFps === "string" || typeof args.playbackFps === "number"
+        ? args.playbackFps
+        : "same",
     name: video.filename,
     existingVideoId: video.id,
     sourcePath: video.source_path,
@@ -1391,7 +1410,7 @@ export async function createBlankProject(
     user_id: ctx.userId,
     name: data.name || "Untitled",
     description: "",
-    fps: data.fps ?? 24,
+    fps: data.fps ?? DEFAULT_PLAYBACK_FPS,
     width: 480,
     height: 270,
     created_at: now,
@@ -1402,12 +1421,32 @@ export async function createBlankProject(
     project_id: id,
     video_id: null,
     name: "Timeline",
-    fps: data.fps ?? 24,
+    fps: data.fps ?? DEFAULT_PLAYBACK_FPS,
     frame_count: 0,
     created_at: now,
   });
   await ensureProjectLayout(id);
   return { id, timelineId, name: data.name, projectId: id };
+}
+
+export async function setPlaybackFps(
+  ctx: CommandContext,
+  data: { projectId: string; fps: number },
+) {
+  const project = await ownProject(ctx, data.projectId);
+  const fps = resolvePlaybackFps(data.fps, DEFAULT_PLAYBACK_FPS);
+  await repo.updateProjectFps(project.id, fps);
+  const timelines = await repo.listTimelines(project.id);
+  for (const t of timelines) {
+    await repo.updateTimelineFps(t.id, fps);
+    const frames = await repo.listFramesMeta(t.id);
+    for (const f of frames) {
+      await repo.updateFrame(f.id, {
+        duration_ms: frameDurationMs(fps, f.exposure_count ?? 1),
+      });
+    }
+  }
+  return { projectId: project.id, fps };
 }
 
 export async function createSampleProject(ctx: CommandContext, name?: string) {
@@ -1505,7 +1544,7 @@ export async function ingestFrames(
       timeline_id: created.timelineId,
       frame_number: f.frameNumber,
       timestamp_ms: Math.round((f.frameNumber / Math.max(1, data.fps)) * 1000),
-      duration_ms: Math.round(1000 / Math.max(1, data.fps)),
+      duration_ms: frameDurationMs(data.fps, 1),
       frame_type: "INBETWEEN",
       image_data: f.imageData,
       thumbnail_data: makeThumbnail(rgba),
@@ -1530,6 +1569,7 @@ export async function ingestJpegFiles(
   data: {
     projectId: string;
     fps: number;
+    extractFps?: number;
     files: string[];
     onProgress?: (done: number, total: number) => Promise<void> | void;
   },
@@ -1541,6 +1581,7 @@ export async function ingestJpegFiles(
   if (!created.timelineId) fail("FRAME_NOT_FOUND", "Timeline missing", 404);
   const existing = await repo.listFramesMeta(created.timelineId);
   for (const f of existing) await repo.deleteFrameRow(f.id);
+  const stampFps = data.extractFps && data.extractFps > 0 ? data.extractFps : data.fps;
   let count = 0;
   for (const file of data.files) {
     const imageData = await readJpegFileAsBase64(file);
@@ -1549,8 +1590,8 @@ export async function ingestJpegFiles(
       id: nid("frm"),
       timeline_id: created.timelineId,
       frame_number: count,
-      timestamp_ms: Math.round((count / Math.max(1, data.fps)) * 1000),
-      duration_ms: Math.round(1000 / Math.max(1, data.fps)),
+      timestamp_ms: Math.round((count / Math.max(1, stampFps)) * 1000),
+      duration_ms: frameDurationMs(data.fps, 1),
       frame_type: "INBETWEEN",
       image_data: imageData,
       thumbnail_data: makeThumbnail(rgba),
@@ -1572,12 +1613,13 @@ export async function startUploadedVideoIngest(
     mimeType: string;
     bytes: Buffer | null;
     fps: number;
+    playbackFps?: number | string;
     name: string;
     existingVideoId?: string;
     sourcePath?: string;
   },
 ) {
-  const created = await createBlankProject(ctx, { name: opts.name, fps: opts.fps });
+  const created = await createBlankProject(ctx, { name: opts.name, fps: DEFAULT_PLAYBACK_FPS });
   await ensureProjectLayout(created.id);
   const videoId = opts.existingVideoId ?? nid("vid");
   const sourceName = opts.filename.replace(/[^a-zA-Z0-9._-]+/g, "_") || "upload.mp4";
@@ -1600,15 +1642,20 @@ export async function startUploadedVideoIngest(
       const extracted = await extractFramesWithFfmpeg({
         inputPath: sourcePath,
         outputDir: outDir,
-        fps: opts.fps,
+        fps: opts.fps > 0 ? opts.fps : 0,
         maxWidth: 640,
         maxFrames: 0,
       });
+      const extractFps = resolveExtractFps(opts.fps, extracted.sourceFps);
+      const playbackFps = resolvePlaybackFps(opts.playbackFps, extractFps);
+      await repo.updateProjectFps(created.id, playbackFps);
+      if (created.timelineId) await repo.updateTimelineFps(created.timelineId, playbackFps);
       const total = extracted.files.length;
       await progress(8, { label: "正在寫入時間軸…", current: 0, total });
       const ingested = await ingestJpegFiles(ctx, {
         projectId: created.id,
-        fps: opts.fps,
+        fps: playbackFps,
+        extractFps,
         files: extracted.files,
         onProgress: async (done, tot) => {
           await progress(8 + Math.round((done / Math.max(1, tot)) * 90), {
@@ -1628,16 +1675,25 @@ export async function startUploadedVideoIngest(
           frame_count: ingested.frameCount,
           source_path: sourcePath,
           status: "extracted",
+          source_fps: extracted.sourceFps,
         });
       }
       await removeDir(outDir).catch(() => undefined);
-      return ingested;
+      return {
+        ...ingested,
+        sourceFps: extracted.sourceFps,
+        extractFps,
+        playbackFps,
+      };
     },
     summarize: (r) => ({
       ok: true,
       frameCount: r.frameCount,
       projectId: r.projectId,
       timelineId: r.timelineId,
+      sourceFps: r.sourceFps,
+      extractFps: r.extractFps,
+      playbackFps: r.playbackFps,
     }),
   });
   return {
@@ -1656,6 +1712,7 @@ export async function extractAndIngestUploadedVideo(
     mimeType: string;
     bytes: Buffer | null;
     fps: number;
+    playbackFps?: number | string;
     name: string;
     existingVideoId?: string;
     sourcePath?: string;

@@ -165,11 +165,25 @@ describe("ffmpeg argv", () => {
   });
   it("clamps fps/width", () => {
     const c = clampExtractNumbers(99, 4000, 9999);
-    assert.equal(c.fps, 30);
+    assert.equal(c.fps, 60);
     assert.equal(c.maxWidth, 640);
     assert.equal(c.maxFrames, 9999);
     const uncapped = clampExtractNumbers(12, 640, 0);
     assert.equal(uncapped.maxFrames, 0);
+    const auto = clampExtractNumbers(0, 640, 0);
+    assert.equal(auto.fps, 0);
+  });
+  it("omits fps= resample when extract fps is 0", () => {
+    const args = ffmpegExtractArgs({
+      inputPath: "/workspace/data/projects/p/source/clip.mp4",
+      outputDir: "/workspace/data/projects/p/frames",
+      fps: 0,
+      maxWidth: 640,
+      maxFrames: 0,
+    });
+    const vf = args[args.indexOf("-vf") + 1];
+    assert.equal(vf.startsWith("fps="), false);
+    assert.match(vf, /^scale=640:-2/);
   });
   it("omits -frames:v when maxFrames is 0", () => {
     const args = ffmpegExtractArgs({

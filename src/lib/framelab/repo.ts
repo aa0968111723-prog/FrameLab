@@ -98,6 +98,16 @@ export async function getProject(userId: string, projectId: string) {
   return rows[0] ?? null;
 }
 
+export async function updateProjectFps(id: string, fps: number) {
+  const sql = await getSql();
+  await sql`update projects set fps = ${fps}, updated_at = ${new Date().toISOString()} where id = ${id}`;
+}
+
+export async function updateTimelineFps(id: string, fps: number) {
+  const sql = await getSql();
+  await sql`update timelines set fps = ${fps} where id = ${id}`;
+}
+
 export async function insertProject(row: ProjectRow) {
   const sql = await getSql();
   await sql`
@@ -894,14 +904,15 @@ export async function insertVideo(row: {
   source_path?: string;
   user_id?: string;
   status?: string;
+  source_fps?: number;
 }) {
   const sql = await getSql();
   await sql`
-    insert into videos (id, project_id, filename, mime_type, duration_ms, width, height, frame_count, content_hash, source_path, user_id, status)
+    insert into videos (id, project_id, filename, mime_type, duration_ms, width, height, frame_count, content_hash, source_path, user_id, status, source_fps)
     values (
       ${row.id}, ${row.project_id}, ${row.filename}, ${row.mime_type}, ${row.duration_ms ?? 0},
       ${row.width ?? 0}, ${row.height ?? 0}, ${row.frame_count ?? 0}, ${row.content_hash ?? ""},
-      ${row.source_path ?? ""}, ${row.user_id ?? null}, ${row.status ?? "ready"}
+      ${row.source_path ?? ""}, ${row.user_id ?? null}, ${row.status ?? "ready"}, ${row.source_fps ?? 0}
     )
   `;
 }
