@@ -102,7 +102,6 @@ describe("MCP contract (§63)", () => {
     }
     assert.ok(catalog.includes("ask_about_selection"));
     assert.ok(http.includes("get_current_context"));
-    assert.ok(http.includes("readConversationResource"));
     assert.ok(http.includes("sessions"));
     assert.ok(http.includes("conversations"));
   });

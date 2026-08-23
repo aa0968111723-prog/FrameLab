@@ -234,7 +234,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       return allowed ? all.filter((p) => allowed.includes(p.id)) : all;
     }
     case "get_conversation": {
-      const { readConversationResource } = await import("./context-tools");
+      const { readConversationResource } = await import("./context-tools.ts");
       return readConversationResource(ctx, str(args.conversationId));
     }
     case "get_project": {
