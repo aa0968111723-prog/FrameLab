@@ -940,6 +940,16 @@ export async function acceptGeneratedFramesCmd(ctx: CommandContext, args: Record
     notes: string;
     contentHash: string;
   }> = [];
+  const afterSnaps: Array<{
+    frameId: string;
+    frameNumber: number;
+    imageData: string;
+    thumbnailData: string;
+    frameType: string;
+    durationMs: number;
+    notes: string;
+    contentHash: string;
+  }> = [];
   const accepted: number[] = [];
   const skipped_protected: number[] = [];
   const isProtected = (row: repo.FrameRow | null | undefined) =>
@@ -962,6 +972,16 @@ export async function acceptGeneratedFramesCmd(ctx: CommandContext, args: Record
         notes: existing.notes,
         contentHash: existing.content_hash,
       });
+      afterSnaps.push({
+        frameId: existing.id,
+        frameNumber: existing.frame_number,
+        imageData: f.imageData,
+        thumbnailData: f.thumbnailData,
+        frameType: "GENERATED",
+        durationMs: existing.duration_ms,
+        notes: existing.notes,
+        contentHash: f.contentHash,
+      });
     }
   }
   const revisionId = await repo.insertRevision({
@@ -975,7 +995,7 @@ export async function acceptGeneratedFramesCmd(ctx: CommandContext, args: Record
     endFrame: endN ?? frames.at(-1)?.frameNumber ?? null,
     status: "open",
     previous: { frames: snapshots },
-    next: { candidateId, count: frames.length },
+    next: { candidateId, count: frames.length, frames: afterSnaps },
   });
   const acceptedIds: string[] = [];
   for (const f of frames) {

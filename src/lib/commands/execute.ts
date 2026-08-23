@@ -244,6 +244,8 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     }
     case "create_project":
       return createBlankProject(ctx, { name: str(args.name, "未命名動畫"), fps: num(args.fps, DEFAULT_PLAYBACK_FPS) });
+    case "create_timeline":
+      return createTimelineCmd(ctx, args);
     case "get_video": {
       const v = await repo.getVideo(str(args.videoId));
       if (!v) fail("FRAME_NOT_FOUND", "Video not found", 404);
@@ -331,20 +333,20 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     case "rerun_consistency":
       return analyzeRange(ctx, args);
     case "analyze_pose": {
-      const { analyzePoseAssist } = await import("./assist-tools");
+      const { analyzePoseAssist } = await import("./assist-tools.ts");
       return analyzePoseAssist(ctx, args);
     }
     case "segment_object":
     case "analyze_mask": {
-      const { segmentObjectCmd } = await import("./sam2-tools");
+      const { segmentObjectCmd } = await import("./sam2-tools.ts");
       return segmentObjectCmd(ctx, args);
     }
     case "list_segmentations": {
-      const { listSegmentationsCmd } = await import("./sam2-tools");
+      const { listSegmentationsCmd } = await import("./sam2-tools.ts");
       return listSegmentationsCmd(ctx, args);
     }
     case "analyze_motion": {
-      const { analyzeMotionAssist } = await import("./assist-tools");
+      const { analyzeMotionAssist } = await import("./assist-tools.ts");
       return analyzeMotionAssist(ctx, args);
     }
     case "analyze_tracking":
@@ -368,49 +370,49 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     case "mark_inbetween":
       return setType(ctx, args, "INBETWEEN");
     case "duplicate_frame": {
-      const { duplicateFrameCmd } = await import("./timeline-edit");
+      const { duplicateFrameCmd } = await import("./timeline-edit.ts");
       return duplicateFrameCmd(ctx, args);
     }
     case "add_frame": {
-      const { addFrameCmd } = await import("./timeline-edit");
+      const { addFrameCmd } = await import("./timeline-edit.ts");
       return addFrameCmd(ctx, args);
     }
     case "insert_frame": {
-      const { insertFrameCmd } = await import("./timeline-edit");
+      const { insertFrameCmd } = await import("./timeline-edit.ts");
       return insertFrameCmd(ctx, args);
     }
     case "clear_frame": {
-      const { clearFrameCmd } = await import("./timeline-edit");
+      const { clearFrameCmd } = await import("./timeline-edit.ts");
       return clearFrameCmd(ctx, args);
     }
     case "hold_frame": {
-      const { holdFrameCmd } = await import("./timeline-edit");
+      const { holdFrameCmd } = await import("./timeline-edit.ts");
       return holdFrameCmd(ctx, args);
     }
     case "create_breakdown": {
-      const { createBreakdownCmd } = await import("./timeline-edit");
+      const { createBreakdownCmd } = await import("./timeline-edit.ts");
       return createBreakdownCmd(ctx, args);
     }
     case "edit_pose": {
-      const { editPoseCmd } = await import("./pose-edit-tools");
+      const { editPoseCmd } = await import("./pose-edit-tools.ts");
       return editPoseCmd(ctx, args);
     }
     case "list_pose_constraints": {
-      const { listPoseConstraintsCmd } = await import("./pose-edit-tools");
+      const { listPoseConstraintsCmd } = await import("./pose-edit-tools.ts");
       return listPoseConstraintsCmd(ctx, args);
     }
     case "edit_motion_path": {
-      const { editMotionPathCmd } = await import("./motion-path-tools");
+      const { editMotionPathCmd } = await import("./motion-path-tools.ts");
       return editMotionPathCmd(ctx, args);
     }
     case "list_motion_constraints": {
-      const { listMotionConstraintsCmd } = await import("./motion-path-tools");
+      const { listMotionConstraintsCmd } = await import("./motion-path-tools.ts");
       return listMotionConstraintsCmd(ctx, args);
     }
     case "replace_frame":
       return replaceFrame(ctx, args);
     case "delete_frame": {
-      const { deleteFrameCmd } = await import("./timeline-edit");
+      const { deleteFrameCmd } = await import("./timeline-edit.ts");
       return deleteFrameCmd(ctx, args);
     }
     case "set_frame_duration":
@@ -522,7 +524,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       });
     case "generate_inbetweens": {
       requireConfirmedEdit("generate_inbetweens", args);
-      const { generateInbetweensCmd } = await import("./inbetween-tools");
+      const { generateInbetweensCmd } = await import("./inbetween-tools.ts");
       return generateInbetweensCmd(ctx, args);
     }
     case "interpolate_frames":
@@ -532,12 +534,12 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     case "repair_frame_range":
       return repairFrameRange(ctx, args);
     case "regenerate_region": {
-      const { repairRegionCmd } = await import("./region-repair-tools");
+      const { repairRegionCmd } = await import("./region-repair-tools.ts");
       return repairRegionCmd(ctx, args);
     }
     case "rerun_motion":
     case "recalculate_motion": {
-      const { analyzeMotionAssist } = await import("./assist-tools");
+      const { analyzeMotionAssist } = await import("./assist-tools.ts");
       return analyzeMotionAssist(ctx, args);
     }
     case "extract_video":
@@ -555,115 +557,115 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     case "list_mcp_clients":
       return repo.listMcpClients(ctx.userId);
     case "get_problem_ranges": {
-      const { getProblemRangesCmd } = await import("./assist-tools");
+      const { getProblemRangesCmd } = await import("./assist-tools.ts");
       return getProblemRangesCmd(ctx, args);
     }
     case "create_repair_plan": {
-      const { createRepairPlanCmd } = await import("./assist-tools");
+      const { createRepairPlanCmd } = await import("./assist-tools.ts");
       return createRepairPlanCmd(ctx, args);
     }
     case "suggest_repair": {
-      const { suggestRepair } = await import("./assist-tools");
+      const { suggestRepair } = await import("./assist-tools.ts");
       return suggestRepair(ctx, args);
     }
     case "compare_before_after": {
-      const { compareBeforeAfter } = await import("./assist-tools");
+      const { compareBeforeAfter } = await import("./assist-tools.ts");
       return compareBeforeAfter(ctx, args);
     }
     case "execute_repair_plan": {
       requireConfirmedEdit("execute_repair_plan", args);
-      const { executeRepairPlanCmd } = await import("./assist-tools");
+      const { executeRepairPlanCmd } = await import("./assist-tools.ts");
       return executeRepairPlanCmd(ctx, args);
     }
     case "get_repair_plan": {
-      const { getRepairPlanCmd } = await import("./assist-tools");
+      const { getRepairPlanCmd } = await import("./assist-tools.ts");
       return getRepairPlanCmd(ctx, args);
     }
     case "accept_revision": {
-      const { acceptRevisionCmd } = await import("./assist-tools");
+      const { acceptRevisionCmd } = await import("./assist-tools.ts");
       return acceptRevisionCmd(ctx, args);
     }
     case "get_track": {
-      const { getTrackCmd } = await import("./assist-tools");
+      const { getTrackCmd } = await import("./assist-tools.ts");
       return getTrackCmd(ctx, args);
     }
     case "create_keyframe_pair": {
-      const { createKeyframePairCmd } = await import("./inbetween-tools");
+      const { createKeyframePairCmd } = await import("./inbetween-tools.ts");
       return createKeyframePairCmd(ctx, args);
     }
     case "get_keyframe_pair": {
-      const { getKeyframePairCmd } = await import("./inbetween-tools");
+      const { getKeyframePairCmd } = await import("./inbetween-tools.ts");
       return getKeyframePairCmd(ctx, args);
     }
     case "analyze_keyframe_transition": {
-      const { analyzeKeyframeTransition } = await import("./inbetween-tools");
+      const { analyzeKeyframeTransition } = await import("./inbetween-tools.ts");
       return analyzeKeyframeTransition(ctx, args);
     }
     case "create_motion_plan": {
-      const { createMotionPlanCmd } = await import("./inbetween-tools");
+      const { createMotionPlanCmd } = await import("./inbetween-tools.ts");
       return createMotionPlanCmd(ctx, args);
     }
     case "get_motion_plan": {
-      const { getMotionPlanCmd } = await import("./inbetween-tools");
+      const { getMotionPlanCmd } = await import("./inbetween-tools.ts");
       return getMotionPlanCmd(ctx, args);
     }
     case "suggest_breakdown_frames": {
-      const { suggestBreakdownFrames } = await import("./inbetween-tools");
+      const { suggestBreakdownFrames } = await import("./inbetween-tools.ts");
       return suggestBreakdownFrames(ctx, args);
     }
     case "create_inbetween_plan": {
-      const { createInbetweenPlanCmd } = await import("./inbetween-tools");
+      const { createInbetweenPlanCmd } = await import("./inbetween-tools.ts");
       return createInbetweenPlanCmd(ctx, args);
     }
     case "get_generation_job": {
-      const { getGenerationJobCmd } = await import("./inbetween-tools");
+      const { getGenerationJobCmd } = await import("./inbetween-tools.ts");
       return getGenerationJobCmd(ctx, args);
     }
     case "get_candidate": {
-      const { getCandidateCmd } = await import("./inbetween-tools");
+      const { getCandidateCmd } = await import("./inbetween-tools.ts");
       return getCandidateCmd(ctx, args);
     }
     case "list_candidates": {
-      const { listCandidatesCmd } = await import("./inbetween-tools");
+      const { listCandidatesCmd } = await import("./inbetween-tools.ts");
       return listCandidatesCmd(ctx, args);
     }
     case "evaluate_inbetweens": {
-      const { evaluateInbetweensCmd } = await import("./inbetween-tools");
+      const { evaluateInbetweensCmd } = await import("./inbetween-tools.ts");
       return evaluateInbetweensCmd(ctx, args);
     }
     case "get_generated_issues": {
-      const { getGeneratedIssuesCmd } = await import("./inbetween-tools");
+      const { getGeneratedIssuesCmd } = await import("./inbetween-tools.ts");
       return getGeneratedIssuesCmd(ctx, args);
     }
     case "regenerate_inbetween_range": {
       requireConfirmedEdit("regenerate_inbetween_range", args);
-      const { regenerateInbetweenRangeCmd } = await import("./inbetween-tools");
+      const { regenerateInbetweenRangeCmd } = await import("./inbetween-tools.ts");
       return regenerateInbetweenRangeCmd(ctx, args);
     }
     case "accept_generated_frames": {
       requireConfirmedEdit("accept_generated_frames", args);
-      const { acceptGeneratedFramesCmd } = await import("./inbetween-tools");
+      const { acceptGeneratedFramesCmd } = await import("./inbetween-tools.ts");
       return acceptGeneratedFramesCmd(ctx, args);
     }
     case "reject_generated_frames": {
-      const { rejectGeneratedFramesCmd } = await import("./inbetween-tools");
+      const { rejectGeneratedFramesCmd } = await import("./inbetween-tools.ts");
       return rejectGeneratedFramesCmd(ctx, args);
     }
     case "export_frame_sequence": {
-      const { exportFrameSequenceCmd } = await import("./inbetween-tools");
+      const { exportFrameSequenceCmd } = await import("./inbetween-tools.ts");
       return exportFrameSequenceCmd(ctx, args);
     }
     case "generate_breakdown_frame": {
       requireConfirmedEdit("generate_breakdown_frame", args);
-      const { generateBreakdownFrameCmd } = await import("./inbetween-tools");
+      const { generateBreakdownFrameCmd } = await import("./inbetween-tools.ts");
       return generateBreakdownFrameCmd(ctx, args);
     }
     case "get_generated_frame": {
-      const { getGeneratedFrameCmd } = await import("./inbetween-tools");
+      const { getGeneratedFrameCmd } = await import("./inbetween-tools.ts");
       return getGeneratedFrameCmd(ctx, args);
     }
     case "set_frame_exposure": {
-      const { setFrameExposureCmd } = await import("./inbetween-tools");
+      const { setFrameExposureCmd } = await import("./inbetween-tools.ts");
       return setFrameExposureCmd(ctx, args);
     }
     case "set_playback_fps":
@@ -725,7 +727,7 @@ async function analyzeRange(ctx: CommandContext, args: Record<string, unknown>) 
       }));
       await progress(20, { current: 0, total: slice.length, label: "評估一致性" });
       const pixel = scoreWindow(decoded);
-      const { suggestRepair } = await import("./assist-tools");
+      const { suggestRepair } = await import("./assist-tools.ts");
       const assist = await suggestRepair(ctx, {
         timelineId: t.id,
         startFrame: start,
@@ -1325,21 +1327,41 @@ async function redoFrame(ctx: CommandContext, args: Record<string, unknown>) {
   const undone = revs.find((r) => r.status === "reverted");
   if (!undone) fail("FRAME_NOT_FOUND", "No undone revision to redo", 404);
   const next = JSON.parse(undone.new_json || "{}") as Record<string, unknown>;
-  const { isTimelineEdit, applyTimelineEdit } = await import("./timeline-edit");
+  const { isTimelineEdit, applyTimelineEdit } = await import("./timeline-edit.ts");
   if (isTimelineEdit(next)) {
     await applyTimelineEdit(ctx, next, "redo");
     await repo.updateRevisionStatus(undone.id, "open");
     return { id: undone.id, status: "open" };
   }
-  const { isPoseEdit, applyPoseEditSnap } = await import("./pose-edit-tools");
+  const { isPoseEdit, applyPoseEditSnap } = await import("./pose-edit-tools.ts");
   if (isPoseEdit(next)) {
     await applyPoseEditSnap(next);
     await repo.updateRevisionStatus(undone.id, "open");
     return { id: undone.id, status: "open" };
   }
-  const { isMotionEdit, applyMotionEditSnap } = await import("./motion-path-tools");
+  const { isMotionEdit, applyMotionEditSnap } = await import("./motion-path-tools.ts");
   if (isMotionEdit(next)) {
     await applyMotionEditSnap(next);
+    await repo.updateRevisionStatus(undone.id, "open");
+    return { id: undone.id, status: "open" };
+  }
+  const nextFrames = (next as { frames?: Array<{
+    frameId: string;
+    imageData?: string;
+    thumbnailData?: string;
+    contentHash?: string;
+    frameType?: string;
+  }> }).frames;
+  if (Array.isArray(nextFrames) && nextFrames.length) {
+    for (const f of nextFrames) {
+      if (!f.imageData) continue;
+      await repo.updateFrame(f.frameId, {
+        image_data: f.imageData,
+        thumbnail_data: f.thumbnailData ?? "",
+        content_hash: f.contentHash ?? hashBytes(f.imageData),
+        frame_type: f.frameType,
+      });
+    }
     await repo.updateRevisionStatus(undone.id, "open");
     return { id: undone.id, status: "open" };
   }
@@ -1361,19 +1383,19 @@ export async function restoreRevision(ctx: CommandContext, revisionId: string) {
   if (!rev) fail("FRAME_NOT_FOUND", "Revision not found", 404);
   await ownProject(ctx, rev.project_id);
   const prev = JSON.parse(rev.previous_json || "{}") as Record<string, unknown>;
-  const { isTimelineEdit, applyTimelineEdit } = await import("./timeline-edit");
+  const { isTimelineEdit, applyTimelineEdit } = await import("./timeline-edit.ts");
   if (isTimelineEdit(prev)) {
     await applyTimelineEdit(ctx, prev, "undo");
     await repo.updateRevisionStatus(revisionId, "reverted");
     return { id: revisionId, status: "reverted" };
   }
-  const { isPoseEdit, applyPoseEditSnap } = await import("./pose-edit-tools");
+  const { isPoseEdit, applyPoseEditSnap } = await import("./pose-edit-tools.ts");
   if (isPoseEdit(prev)) {
     await applyPoseEditSnap(prev);
     await repo.updateRevisionStatus(revisionId, "reverted");
     return { id: revisionId, status: "reverted" };
   }
-  const { isMotionEdit, applyMotionEditSnap } = await import("./motion-path-tools");
+  const { isMotionEdit, applyMotionEditSnap } = await import("./motion-path-tools.ts");
   if (isMotionEdit(prev)) {
     await applyMotionEditSnap(prev);
     await repo.updateRevisionStatus(revisionId, "reverted");
@@ -1537,6 +1559,23 @@ export async function createBlankProject(
   });
   await ensureProjectLayout(id);
   return { id, timelineId, name: data.name, projectId: id };
+}
+
+export async function createTimelineCmd(ctx: CommandContext, args: Record<string, unknown>) {
+  const project = await ownProject(ctx, str(args.projectId));
+  const id = nid("tl");
+  const fps = num(args.fps, project.fps);
+  const name = str(args.name, "時間軸");
+  await repo.insertTimeline({
+    id,
+    project_id: project.id,
+    video_id: typeof args.videoId === "string" ? args.videoId : null,
+    name,
+    fps,
+    frame_count: 0,
+    created_at: new Date().toISOString(),
+  });
+  return { id, projectId: project.id, name, fps };
 }
 
 export async function setPlaybackFps(

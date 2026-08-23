@@ -47,6 +47,7 @@ export const MCP_TOOLS = [
   tool("list_projects", "List projects for the authenticated client", {}),
   tool("get_project", "Get a project", { projectId: str }, ["projectId"]),
   tool("create_project", "Create an empty project + timeline. Default playback fps is 24.", { name: str, fps: num }),
+  tool("create_timeline", "Create a timeline on an owned project.", { projectId: str, name: str, fps: num, videoId: str }, ["projectId"]),
   tool("get_video", "Get a video record", { videoId: str }, ["videoId"]),
   tool("list_videos", "List videos in a project", { projectId: str }, ["projectId"]),
   tool("get_timeline", "Get a timeline and frame metadata", { timelineId: str }, ["timelineId"]),

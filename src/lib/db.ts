@@ -232,6 +232,19 @@ export function getSql(): Promise<Sql> {
   return sqlPromise;
 }
 
+/** Test harness only: point getSql() at an in-memory PGLite. */
+export function installSqlForTests(sql: Sql): void {
+  sqlPromise = Promise.resolve(sql);
+}
+
+/** Test harness only: drop the process-wide memo so the next getSql() rebuilds. */
+export function resetSqlSingletonForTests(): void {
+  sqlPromise = null;
+  globalRef.__pgSqlPromise__ = undefined;
+  globalRef.__pgliteInstance__ = undefined;
+  globalRef.__pgliteMigrateChain__ = undefined;
+}
+
 /**
  * The shared PGLite instance (preview only), with `migrations/*.sql` applied.
  * Lets Better Auth persist to the SAME embedded DB as app data in preview (via a

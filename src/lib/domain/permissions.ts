@@ -22,6 +22,7 @@ export const TOOL_SCOPES: Record<string, Scope> = {
   list_projects: "READ",
   get_project: "READ",
   create_project: "EDIT",
+  create_timeline: "EDIT",
   get_video: "READ",
   list_videos: "READ",
   get_timeline: "READ",
