@@ -27,6 +27,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { analysisDoneToast } from "@/lib/domain/analysis-toast";
 import { UserButton, RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
@@ -756,10 +757,10 @@ function StudioInner({ projectId }: { projectId: string }) {
           toast.error("區域修復結果無法讀取，未假裝成功");
         }
       } else if (input.tool === "analyze_motion") {
-        toast.success("SEA-RAFT 光流已寫入");
+        toast.success(analysisDoneToast("analyze_motion", r.payload));
         setOverlayStack({ primary: "motion", extras: [] });
       } else if (input.tool === "analyze_pose") {
-        toast.success("RTMPose 骨架已寫入");
+        toast.success(analysisDoneToast("analyze_pose", r.payload));
         setOverlayStack({ primary: "pose", extras: [] });
       } else if (input.tool === "segment_object" || input.tool === "analyze_mask") {
         try {
