@@ -13,6 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { TOOL_SCOPES } from "../src/lib/domain/permissions.ts";
 import { mapRestPath } from "../src/lib/framelab/rest-map.ts";
+import { assertSameSiteHeaders, CrossSiteRequestError } from "../src/lib/auth/isolation.server.ts";
 
 const restMapSrc = fs.readFileSync(
   path.join(process.cwd(), "src", "lib", "framelab", "rest-map.ts"),
@@ -82,6 +83,70 @@ describe("REST method safety", () => {
     assert.ok(
       assertIdx > bearerIdx,
       "the isolation check belongs on the cookie branch, not ahead of bearer auth",
+    );
+  });
+});
+
+function readRoute(name: string): string {
+  return fs.readFileSync(path.join(process.cwd(), "src", "routes", "api", name), "utf8");
+}
+
+function siblingMultipart(url: string, method = "POST"): Request {
+  return new Request(url, {
+    method,
+    headers: {
+      origin: "https://evil.grok.me",
+      referer: "https://evil.grok.me/steal",
+      "content-type": "multipart/form-data; boundary=----FrameLabAttack",
+    },
+  });
+}
+
+describe("cookie routes outside /api/v1", () => {
+  it("POST /api/videos asserts same-site after getSessionUser and answers 403", () => {
+    const src = readRoute("videos.ts");
+    const sessionIdx = src.indexOf("getSessionUser()");
+    const assertIdx = src.indexOf("assertSameSiteRequest()");
+    assert.ok(sessionIdx >= 0, "videos POST must look up the session");
+    assert.ok(
+      assertIdx > sessionIdx,
+      "assertSameSiteRequest() must run after getSessionUser() — a Lax cookie " +
+        "is already on the request; isolation has to reject the sibling before ingest",
+    );
+    assert.match(src, /status:\s*403/, "cross-site cookie POSTs must return 403");
+  });
+
+  it("GET /api/frame-assets asserts same-site after getSessionUser and answers 403", () => {
+    const src = readRoute("frame-assets.ts");
+    const sessionIdx = src.indexOf("getSessionUser()");
+    const assertIdx = src.indexOf("assertSameSiteRequest()");
+    assert.ok(sessionIdx >= 0, "frame-assets GET must look up the session");
+    assert.ok(
+      assertIdx > sessionIdx,
+      "assertSameSiteRequest() must run after getSessionUser() — an <img> on a " +
+        "sibling grok.me origin rides the Lax cookie and would otherwise fork JPEGs",
+    );
+    assert.match(src, /status:\s*403/, "cross-site cookie GETs must return 403");
+  });
+
+  it("rejects a CORS-simple sibling POST that only sends Origin/Referer (403)", () => {
+    // multipart/form-data is CORS-simple: no preflight, no Sec-Fetch-Site required.
+    // Older browsers and some embeds omit Fetch-Metadata; Origin/Referer still fire.
+    const req = siblingMultipart("https://app.grok.me/api/videos");
+    assert.equal(req.headers.get("sec-fetch-site"), null);
+    assert.throws(
+      () => assertSameSiteHeaders(req),
+      (err: unknown) =>
+        err instanceof CrossSiteRequestError && (err as CrossSiteRequestError).status === 403,
+    );
+  });
+
+  it("rejects a sibling frame-asset fetch that only sends Origin/Referer (403)", () => {
+    const req = siblingMultipart("https://app.grok.me/api/frame-assets?frameId=frm_x", "GET");
+    assert.throws(
+      () => assertSameSiteHeaders(req),
+      (err: unknown) =>
+        err instanceof CrossSiteRequestError && (err as CrossSiteRequestError).status === 403,
     );
   });
 });

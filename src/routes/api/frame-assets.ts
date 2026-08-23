@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSessionUser } from "@/lib/auth/verify.server";
+import { assertSameSiteRequest, CrossSiteRequestError } from "@/lib/auth/isolation.server";
 import { getFrameMeta, getProject, getTimeline } from "@/lib/framelab/repo";
 import { isInlineJpeg, readProjectRel, type AssetTier } from "@/lib/storage/frame-assets";
 
@@ -12,6 +13,14 @@ export const Route = createFileRoute("/api/frame-assets")({
         const user = await getSessionUser();
         if (!user) {
           return new Response("未登入", { status: 401 });
+        }
+        try {
+          assertSameSiteRequest();
+        } catch (err) {
+          if (err instanceof CrossSiteRequestError) {
+            return new Response("Forbidden", { status: 403 });
+          }
+          throw err;
         }
         const url = new URL(request.url);
         const frameId = url.searchParams.get("frameId") || "";

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import path from "node:path";
 import { ALL_SCOPES, startUploadedVideoIngest } from "@/lib/commands/execute";
 import { getSessionUser } from "@/lib/auth/verify.server";
+import { assertSameSiteRequest, CrossSiteRequestError } from "@/lib/auth/isolation.server";
 import { parseFpsField } from "@/lib/domain/fps";
 import { ALLOWED_EXT, MAX_BYTES } from "@/lib/media/ffmpeg";
 
@@ -12,6 +13,14 @@ export const Route = createFileRoute("/api/videos")({
         const user = await getSessionUser();
         if (!user) {
           return Response.json({ ok: false, code: "UNAUTHORIZED", error: "未登入" }, { status: 401 });
+        }
+        try {
+          assertSameSiteRequest();
+        } catch (err) {
+          if (err instanceof CrossSiteRequestError) {
+            return Response.json({ ok: false, code: "PERMISSION_DENIED", error: "Forbidden" }, { status: 403 });
+          }
+          throw err;
         }
         const ct = request.headers.get("content-type") || "";
         if (!ct.includes("multipart/form-data")) {
