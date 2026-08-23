@@ -413,24 +413,25 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     }
     case "assign_character_range": {
       const t = await ownTimeline(ctx, str(args.timelineId));
+      const character = await ownCharacter(ctx, str(args.characterId));
       const frames = await repo.listFramesMeta(t.id);
       const start = num(args.startFrame);
       const end = num(args.endFrame);
-      const characterId = str(args.characterId);
       for (const f of frames) {
         if (f.frame_number >= start && f.frame_number <= end) {
-          await repo.assignCharacter(f.id, characterId);
+          await repo.assignCharacter(f.id, character.id);
         }
       }
-      return { characterId, start, end };
+      return { characterId: character.id, start, end };
     }
     case "set_character_visibility": {
       const frame = await loadOwnedFrame(ctx, args);
-      await repo.setCharacterVisibility(frame.id, str(args.characterId), {
+      const character = await ownCharacter(ctx, str(args.characterId));
+      await repo.setCharacterVisibility(frame.id, character.id, {
         visible: args.visible !== false,
         occluded: Boolean(args.occluded),
       });
-      return { frameId: frame.id, characterId: str(args.characterId) };
+      return { frameId: frame.id, characterId: character.id };
     }
     case "list_characters":
       await ownProject(ctx, str(args.projectId));
@@ -446,8 +447,9 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     }
     case "assign_object": {
       const frame = await loadOwnedFrame(ctx, args);
-      await repo.assignObject(frame.id, str(args.objectId));
-      return { frameId: frame.id, objectId: str(args.objectId) };
+      const object = await ownObject(ctx, str(args.objectId));
+      await repo.assignObject(frame.id, object.id);
+      return { frameId: frame.id, objectId: object.id };
     }
     case "create_tracking_point":
     case "create_track":

@@ -85,6 +85,61 @@ describe("ownership gate", () => {
         "characters(id), so another tenant's id is a valid target and pollutes their track",
     );
   });
+
+  function caseBody(exec: string, tool: string, until: string): string {
+    const idx = exec.indexOf(`case "${tool}"`);
+    assert.ok(idx > 0, `${tool} case not found`);
+    const end = exec.indexOf(`case "${until}"`, idx + 1);
+    assert.ok(end > idx, `${tool} case end (${until}) not found`);
+    return exec.slice(idx, end);
+  }
+
+  it("assign_character_range rejects another tenant's characterId with NOT_FOUND", () => {
+    const body = caseBody(read("execute.ts"), "assign_character_range", "set_character_visibility");
+    assert.match(
+      body,
+      /ownCharacter\(ctx,\s*str\(args\.characterId\)\)/,
+      "assign_character_range must call ownCharacter() on the caller-supplied id. " +
+        "Without it, another tenant's characterId is a legal FK insert; listProjectAssignments " +
+        "then joins characters.name across accounts. ownCharacter throws NOT_FOUND for a foreign id.",
+    );
+    assert.match(
+      body,
+      /assignCharacter\([^,]+,\s*character\.id\)/,
+      "the write must use the owned character.id, not str(args.characterId)",
+    );
+  });
+
+  it("set_character_visibility rejects another tenant's characterId with NOT_FOUND", () => {
+    const body = caseBody(read("execute.ts"), "set_character_visibility", "list_characters");
+    assert.match(
+      body,
+      /ownCharacter\(ctx,\s*str\(args\.characterId\)\)/,
+      "set_character_visibility must call ownCharacter() on the caller-supplied id. " +
+        "A foreign characterId would write visibility onto someone else's character via the " +
+        "frame_characters FK. ownCharacter throws NOT_FOUND for a foreign id.",
+    );
+    assert.match(
+      body,
+      /setCharacterVisibility\([^,]+,\s*character\.id,/,
+      "the write must use the owned character.id, not str(args.characterId)",
+    );
+  });
+
+  it("assign_object rejects another tenant's objectId with NOT_FOUND", () => {
+    const body = caseBody(read("execute.ts"), "assign_object", "create_tracking_point");
+    assert.match(
+      body,
+      /ownObject\(ctx,\s*str\(args\.objectId\)\)/,
+      "assign_object must call ownObject() on the caller-supplied id, matching assign_character. " +
+        "A foreign objectId is a legal FK target. ownObject throws NOT_FOUND for a foreign id.",
+    );
+    assert.match(
+      body,
+      /assignObject\([^,]+,\s*object\.id\)/,
+      "the write must use the owned object.id, not str(args.objectId)",
+    );
+  });
 });
 
 describe("timeline binding", () => {
