@@ -142,6 +142,64 @@ describe("ownership gate", () => {
   });
 });
 
+describe("visual annotation writes", () => {
+  function fnBody(src: string, name: string): string {
+    const idx = src.indexOf(`export async function ${name}`);
+    assert.ok(idx >= 0, `${name} missing`);
+    const next = src.indexOf("export async function", idx + "export async function ".length);
+    return src.slice(idx, next > 0 ? next : undefined);
+  }
+
+  for (const name of ["annotateFrameCmd", "highlightRegionCmd", "highlightFrameRangeCmd"] as const) {
+    it(`${name} rejects another tenant's projectId with NOT_FOUND`, () => {
+      const body = fnBody(read("visual-tools.ts"), name);
+      const ownIdx = body.search(/ownProject\(ctx,/);
+      const insertIdx = body.indexOf("insertVisualAnnotation");
+      assert.ok(insertIdx > 0, `${name} must persist via insertVisualAnnotation`);
+      assert.ok(
+        ownIdx >= 0 && ownIdx < insertIdx,
+        `${name} must call ownProject(ctx, projectId) before insert. A foreign projectId ` +
+          "is otherwise a legal write; list filtered by userId hides the leak on read but " +
+          "the row still lands in the victim project. ownProject throws NOT_FOUND.",
+      );
+      assert.match(
+        body,
+        /ownProject\(ctx,\s*(str\(args\.projectId\)|projectId)\)/,
+        `${name} must own the caller-supplied projectId, not skip when it is present`,
+      );
+      assert.match(
+        body,
+        /projectId:\s*project\.id/,
+        `${name} must store the owned project.id, not the raw args.projectId`,
+      );
+    });
+  }
+
+  it("dispatchVisualTool cannot skip assertToolAllowed", () => {
+    const exec = read("execute.ts");
+    const executeStart = exec.indexOf("export async function executeTool");
+    const dispatchDef = exec.indexOf("async function dispatch(");
+    assert.ok(executeStart >= 0 && dispatchDef > executeStart);
+    const executeTool = exec.slice(executeStart, dispatchDef);
+    const allowed = executeTool.indexOf("assertToolAllowed(ctx.scopes, tool)");
+    const dispatchCall = executeTool.indexOf("await dispatch(ctx, tool, args)");
+    assert.ok(allowed >= 0, "executeTool must assertToolAllowed");
+    assert.ok(dispatchCall > allowed, "dispatch() — including visual tools — runs after assertToolAllowed");
+    assert.doesNotMatch(
+      executeTool,
+      /dispatchVisualTool/,
+      "executeTool must not call dispatchVisualTool directly; that would be a second entry that skips the scope check",
+    );
+    const dispatchFn = exec.slice(dispatchDef);
+    const visual = dispatchFn.indexOf("dispatchVisualTool");
+    assert.ok(visual > 0, "visual tools still route through dispatch()");
+    assert.ok(
+      dispatchFn.indexOf("MCP_CONTEXT_TOOLS") < visual || dispatchFn.indexOf("VISUAL_TOOLS") < visual,
+      "dispatchVisualTool stays inside dispatch, which executeTool only calls after assertToolAllowed",
+    );
+  });
+});
+
 describe("timeline binding", () => {
   const api = fs.readFileSync(
     path.join(process.cwd(), "src", "lib", "framelab", "api.ts"),

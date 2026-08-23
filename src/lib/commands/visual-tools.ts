@@ -51,6 +51,7 @@ export async function getVisualContextCmd(ctx: CommandContext, args: Record<stri
 }
 
 export async function annotateFrameCmd(ctx: CommandContext, args: Record<string, unknown>) {
+  const project = await ownProject(ctx, str(args.projectId));
   const frame = num(args.frameNumber, num(args.frame));
   const type = str(args.type, "LABEL").toUpperCase();
   const coords = Array.isArray(args.coordinates)
@@ -71,13 +72,14 @@ export async function annotateFrameCmd(ctx: CommandContext, args: Record<string,
   await repo.insertVisualAnnotation({
     ...annotation,
     userId: ctx.userId,
-    projectId: typeof args.projectId === "string" ? args.projectId : null,
+    projectId: project.id,
     sessionId: typeof args.sessionId === "string" ? args.sessionId : null,
   });
   return { annotation };
 }
 
 export async function highlightRegionCmd(ctx: CommandContext, args: Record<string, unknown>) {
+  const project = await ownProject(ctx, str(args.projectId));
   const frame = num(args.frameNumber, num(args.frame));
   const box = {
     x: num(args.x, 0.3),
@@ -93,13 +95,14 @@ export async function highlightRegionCmd(ctx: CommandContext, args: Record<strin
   await repo.insertVisualAnnotation({
     ...annotation,
     userId: ctx.userId,
-    projectId: typeof args.projectId === "string" ? args.projectId : null,
+    projectId: project.id,
     sessionId: typeof args.sessionId === "string" ? args.sessionId : null,
   });
   return { annotation };
 }
 
 export async function highlightFrameRangeCmd(ctx: CommandContext, args: Record<string, unknown>) {
+  const project = await ownProject(ctx, str(args.projectId));
   const start = num(args.startFrame, num(args.start));
   const end = num(args.endFrame, num(args.end, start));
   const annotation = rangeAnnotation(nid("ann"), start, end, str(args.label, `F${start}–F${end}`), {
@@ -110,7 +113,7 @@ export async function highlightFrameRangeCmd(ctx: CommandContext, args: Record<s
   await repo.insertVisualAnnotation({
     ...annotation,
     userId: ctx.userId,
-    projectId: typeof args.projectId === "string" ? args.projectId : null,
+    projectId: project.id,
     sessionId: typeof args.sessionId === "string" ? args.sessionId : null,
   });
   return { annotation, range: [start, end] };
