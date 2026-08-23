@@ -153,19 +153,19 @@ describe("visual annotation writes", () => {
   for (const name of ["annotateFrameCmd", "highlightRegionCmd", "highlightFrameRangeCmd"] as const) {
     it(`${name} rejects another tenant's projectId with NOT_FOUND`, () => {
       const body = fnBody(read("visual-tools.ts"), name);
-      const ownIdx = body.search(/ownProject\(ctx,/);
+      const helper = read("visual-tools.ts");
+      assert.match(
+        helper,
+        /async function ownAnnotationProject/,
+        "writes must resolve projectId from sessionId/timelineId before ownProject",
+      );
+      assert.match(helper, /getWorkspaceSession\(ctx\.userId,\s*sessionId\)/);
+      const ownIdx = body.search(/ownAnnotationProject\(ctx,\s*args\)|ownProject\(ctx,/);
       const insertIdx = body.indexOf("insertVisualAnnotation");
       assert.ok(insertIdx > 0, `${name} must persist via insertVisualAnnotation`);
       assert.ok(
         ownIdx >= 0 && ownIdx < insertIdx,
-        `${name} must call ownProject(ctx, projectId) before insert. A foreign projectId ` +
-          "is otherwise a legal write; list filtered by userId hides the leak on read but " +
-          "the row still lands in the victim project. ownProject throws NOT_FOUND.",
-      );
-      assert.match(
-        body,
-        /ownProject\(ctx,\s*(str\(args\.projectId\)|projectId)\)/,
-        `${name} must own the caller-supplied projectId, not skip when it is present`,
+        `${name} must own the project before insert`,
       );
       assert.match(
         body,

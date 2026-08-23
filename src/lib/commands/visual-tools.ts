@@ -20,6 +20,28 @@ async function ownTimeline(ctx: CommandContext, timelineId: string) {
   return t;
 }
 
+/**
+ * Visual writes used to take an optional projectId. After ownProject was added
+ * on the empty string, every MCP/REST/conversation path 404'd. Resolve in
+ * order: projectId → sessionId → timelineId; refuse only when none are present.
+ */
+async function ownAnnotationProject(ctx: CommandContext, args: Record<string, unknown>) {
+  const projectId = str(args.projectId);
+  if (projectId) return ownProject(ctx, projectId);
+  const sessionId = str(args.sessionId) || str(args.session_id);
+  if (sessionId) {
+    const session = await repo.getWorkspaceSession(ctx.userId, sessionId);
+    if (!session) fail("FRAME_NOT_FOUND", "Workspace session not found", 404);
+    return ownProject(ctx, session.project_id);
+  }
+  const timelineId = str(args.timelineId);
+  if (timelineId) {
+    const t = await ownTimeline(ctx, timelineId);
+    return ownProject(ctx, t.project_id);
+  }
+  fail("VALIDATION_ERROR", "projectId, sessionId, or timelineId required");
+}
+
 function num(v: unknown, fallback = 0): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
@@ -51,7 +73,7 @@ export async function getVisualContextCmd(ctx: CommandContext, args: Record<stri
 }
 
 export async function annotateFrameCmd(ctx: CommandContext, args: Record<string, unknown>) {
-  const project = await ownProject(ctx, str(args.projectId));
+  const project = await ownAnnotationProject(ctx, args);
   const frame = num(args.frameNumber, num(args.frame));
   const type = str(args.type, "LABEL").toUpperCase();
   const coords = Array.isArray(args.coordinates)
@@ -79,7 +101,7 @@ export async function annotateFrameCmd(ctx: CommandContext, args: Record<string,
 }
 
 export async function highlightRegionCmd(ctx: CommandContext, args: Record<string, unknown>) {
-  const project = await ownProject(ctx, str(args.projectId));
+  const project = await ownAnnotationProject(ctx, args);
   const frame = num(args.frameNumber, num(args.frame));
   const box = {
     x: num(args.x, 0.3),
@@ -102,7 +124,7 @@ export async function highlightRegionCmd(ctx: CommandContext, args: Record<strin
 }
 
 export async function highlightFrameRangeCmd(ctx: CommandContext, args: Record<string, unknown>) {
-  const project = await ownProject(ctx, str(args.projectId));
+  const project = await ownAnnotationProject(ctx, args);
   const start = num(args.startFrame, num(args.start));
   const end = num(args.endFrame, num(args.end, start));
   const annotation = rangeAnnotation(nid("ann"), start, end, str(args.label, `F${start}–F${end}`), {

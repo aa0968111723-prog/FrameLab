@@ -272,13 +272,22 @@ export function mapRestPath(
     return { tool: "get_visual_context", args: { timelineId: query.timelineId, frameNumber: Number(query.frameNumber ?? 0) } };
   }
   if (parts[0] === "visual" && parts[1] === "annotate" && m === "POST") {
-    return { tool: "annotate_frame", args: {} };
+    return {
+      tool: "annotate_frame",
+      args: { projectId: query.projectId, sessionId: query.sessionId, timelineId: query.timelineId },
+    };
   }
   if (parts[0] === "visual" && parts[1] === "region" && m === "POST") {
-    return { tool: "highlight_region", args: {} };
+    return {
+      tool: "highlight_region",
+      args: { projectId: query.projectId, sessionId: query.sessionId, timelineId: query.timelineId },
+    };
   }
   if (parts[0] === "visual" && parts[1] === "range" && m === "POST") {
-    return { tool: "highlight_frame_range", args: {} };
+    return {
+      tool: "highlight_frame_range",
+      args: { projectId: query.projectId, sessionId: query.sessionId, timelineId: query.timelineId },
+    };
   }
   if (parts[0] === "visual" && parts[1] === "motion-path" && m === "GET") {
     return { tool: "get_motion_path", args: { projectId: query.projectId, name: query.name } };
