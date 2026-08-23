@@ -445,6 +445,7 @@ export async function readSessionContextResource(ctx: CommandContext, sessionId:
 export async function readConversationResource(ctx: CommandContext, conversationId: string) {
   const conv = await repo.getConversation(ctx.userId, conversationId);
   if (!conv) fail("FRAME_NOT_FOUND", "Conversation not found", 404);
+  await ownProject(ctx, conv.project_id);
   const messages = await repo.listMessages(conversationId);
   return {
     id: conv.id,

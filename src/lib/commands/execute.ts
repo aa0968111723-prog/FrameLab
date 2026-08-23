@@ -38,6 +38,7 @@ import {
   isHighRisk,
   parseScopes,
   requireConfirmedEdit,
+  scopedProjectIds,
   TOOL_SCOPES,
   type Scope,
 } from "@/lib/domain/permissions";
@@ -91,6 +92,18 @@ function num(v: unknown, fallback = 0): number {
 
 // ownProject / ownTimeline now live in ./ownership.ts so every command module
 // shares one gate — see that file for why the pair must not be re-inlined.
+
+async function ownJob(ctx: CommandContext, jobId: string) {
+  const job = await repo.getJob(ctx.userId, jobId);
+  if (!job) fail("FRAME_NOT_FOUND", "Job not found", 404);
+  if (job.project_id) {
+    await ownProject(ctx, job.project_id);
+  } else if (ctx.projectScope && ctx.projectScope !== "all") {
+    // Jobs without a project cannot be named inside a scoped token.
+    fail("PERMISSION_DENIED", "MCP token is not allowed to access this job", 403);
+  }
+  return job;
+}
 
 async function loadOwnedFrame(ctx: CommandContext, args: Record<string, unknown>) {
   if (typeof args.frameId === "string" && args.frameId) {
@@ -182,6 +195,7 @@ export async function executeTool(
   } catch (err) {
     status = "error";
     if (err instanceof FrameLabError) {
+      status = err.code === "PERMISSION_DENIED" ? "denied" : "error";
       error = err.message;
       return { ok: false, code: err.code, error: err.message };
     }
@@ -213,8 +227,15 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     return dispatchVisualTool(ctx, tool as (typeof VISUAL_TOOLS)[number], args);
   }
   switch (tool) {
-    case "list_projects":
-      return repo.listProjects(ctx.userId);
+    case "list_projects": {
+      const all = await repo.listProjects(ctx.userId);
+      const allowed = scopedProjectIds(ctx.projectScope);
+      return allowed ? all.filter((p) => allowed.includes(p.id)) : all;
+    }
+    case "get_conversation": {
+      const { readConversationResource } = await import("./context-tools");
+      return readConversationResource(ctx, str(args.conversationId));
+    }
     case "get_project": {
       const p = await ownProject(ctx, str(args.projectId));
       const timelines = await repo.listTimelines(p.id);
@@ -288,9 +309,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       return rows.filter((r) => r.severity === "warning" || r.severity === "error" || r.severity === "critical");
     }
     case "get_job": {
-      const job = await repo.getJob(ctx.userId, str(args.jobId));
-      if (!job) fail("FRAME_NOT_FOUND", "Job not found", 404);
-      return job;
+      return ownJob(ctx, str(args.jobId));
     }
     case "list_jobs":
       return repo.listJobs(ctx.userId, typeof args.projectId === "string" ? args.projectId : undefined);
@@ -478,8 +497,15 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
       return undoFrame(ctx, args);
     case "redo":
       return redoFrame(ctx, args);
-    case "list_audit_logs":
-      return repo.listAudit(ctx.userId, num(args.limit, 30));
+    case "list_audit_logs": {
+      const rows = await repo.listAudit(ctx.userId, num(args.limit, 30));
+      const allowed = scopedProjectIds(ctx.projectScope);
+      if (!allowed) return rows;
+      return rows.filter((r) => {
+        const pid = (r as { project_id?: string | null }).project_id;
+        return !pid || allowed.includes(pid);
+      });
+    }
     case "create_sample_project":
       return createSampleProject(ctx, typeof args.name === "string" ? args.name : undefined);
     case "ingest_frames":
@@ -521,8 +547,7 @@ async function dispatch(ctx: CommandContext, tool: string, args: Record<string, 
     case "render_frame_range":
       return renderPreview(ctx, args);
     case "cancel_job": {
-      const job = await repo.getJob(ctx.userId, str(args.jobId));
-      if (!job) fail("FRAME_NOT_FOUND", "Job not found", 404);
+      const job = await ownJob(ctx, str(args.jobId));
       await repo.updateJob(job.id, { state: "cancelled", error_code: "JOB_CANCELLED" });
       return { id: job.id, state: "cancelled" };
     }

@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import { executeTool, type CommandContext } from "@/lib/commands/execute";
-import { getDeviceInfo, listModels } from "@/lib/ai/registry";
 import { parseScopes } from "@/lib/domain/permissions";
 import * as repo from "@/lib/framelab/repo";
 import { MCP_PROMPTS, MCP_RESOURCE_TEMPLATES, MCP_RESOURCES, MCP_TOOLS, promptText } from "./catalog.ts";
@@ -101,6 +100,7 @@ async function dispatch(
 ): Promise<unknown> {
   switch (method) {
     case "initialize":
+      // Protocol handshake. No tenant data, no tool — cannot go through executeTool.
       return {
         protocolVersion: "2024-11-05",
         serverInfo: { name: "FrameLab", version: "0.4.0" },
@@ -113,8 +113,10 @@ async function dispatch(
     case "notifications/initialized":
       return {};
     case "ping":
+      // Transport keepalive. No tenant data.
       return {};
     case "tools/list":
+      // Catalog only; authorization is per tools/call via executeTool.
       return { tools: MCP_TOOLS };
     case "tools/call": {
       const name = String(params.name ?? "");
@@ -131,12 +133,14 @@ async function dispatch(
       };
     }
     case "resources/list":
+      // URI templates are public; each resources/read still goes through executeTool.
       return { resources: MCP_RESOURCES, resourceTemplates: MCP_RESOURCE_TEMPLATES };
     case "resources/read":
       return readResource(ctx, String(params.uri ?? ""));
     case "prompts/list":
       return { prompts: MCP_PROMPTS };
     case "prompts/get": {
+      // Prompt text is static; no tenant data.
       const name = String(params.name ?? "");
       const args = (params.arguments as Record<string, string>) ?? {};
       return {
@@ -160,10 +164,12 @@ async function readResource(ctx: CommandContext, uri: string) {
     return textResource(uri, data);
   }
   if (uri === "framelab://models") {
-    return textResource(uri, { models: listModels() });
+    // Model inventory is not tenant data, but still runs through executeTool so
+    // READ scope + audit apply.
+    return textResource(uri, await executeTool(ctx, "get_model_status", {}));
   }
   if (uri === "framelab://system/status") {
-    return textResource(uri, { devices: getDeviceInfo(), models: listModels() });
+    return textResource(uri, await executeTool(ctx, "get_model_status", {}));
   }
   const project = /^framelab:\/\/projects\/([^/]+)$/.exec(uri);
   if (project) {
@@ -225,8 +231,7 @@ async function readResource(ctx: CommandContext, uri: string) {
   }
   const conversation = /^framelab:\/\/conversations\/([^/]+)$/.exec(uri);
   if (conversation) {
-    const { readConversationResource } = await import("@/lib/commands/context-tools");
-    return textResource(uri, await readConversationResource(ctx, conversation[1]));
+    return textResource(uri, await executeTool(ctx, "get_conversation", { conversationId: conversation[1] }));
   }
   const pair = /^framelab:\/\/keyframe-pairs\/([^/]+)$/.exec(uri);
   if (pair) {

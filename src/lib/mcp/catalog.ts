@@ -111,6 +111,7 @@ export const MCP_TOOLS = [
   tool("get_graph", "Frame Graph edges for a project", { projectId: str, edgeType: str }, ["projectId"]),
   tool("get_frame_analysis", "Last stored analysis for a frame — does not re-run models", { frameId: str }, ["frameId"]),
   tool("get_frame_neighbors", "Neighbor window around a frame — metadata and asset refs only, never 4K pixels", { frameId: str, frame_id: str, sessionId: str, session_id: str, before: num, after: num }),
+  tool("get_conversation", "Read a conversation and its messages. Enforces project_scope.", { conversationId: str }, ["conversationId"]),
   tool("get_current_context", "Serialized FrameLab workspace context for a session (session-isolated)", { sessionId: str, session_id: str }),
   tool("get_current_frame", "Current frame metadata for a workspace session (no 4K pixels)", { sessionId: str, session_id: str }),
   tool("get_selected_frames", "Selected frame numbers for a workspace session", { sessionId: str, session_id: str }),

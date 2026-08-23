@@ -1,4 +1,7 @@
 /** Which database backend is active. */
+import { mkdirSync, readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+
 export type DbSource = "neon" | "pglite";
 
 // An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
@@ -15,6 +18,20 @@ const databaseUrl =
  * included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
  */
 export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
+
+/**
+ * On-disk PGLite directory. Default `./data/pglite` (under FRAMELAB_DATA_DIR
+ * when set). Override with PGLITE_DATA_DIR. Created automatically.
+ */
+export function pgliteDataDir(): string {
+  const override =
+    typeof process !== "undefined" ? process.env.PGLITE_DATA_DIR?.trim() : undefined;
+  if (override) return path.resolve(override);
+  const root =
+    (typeof process !== "undefined" && process.env.FRAMELAB_DATA_DIR?.trim()) ||
+    path.join(process.cwd(), "data");
+  return path.join(root, "pglite");
+}
 
 /**
  * Minimal shared SQL surface, satisfied by both Neon and PGLite. Both the
@@ -67,6 +84,28 @@ const identity = (v: string) => v;
 
 type Run = <T>(text: string, params: unknown[]) => Promise<T[]>;
 
+/** Load `migrations/*.sql`. Vite inlines via import.meta.glob; Node/tsx reads the directory. */
+function loadMigrationSql(): Record<string, string> {
+  try {
+    const bundled = import.meta.glob("/migrations/*.sql", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+    if (bundled && Object.keys(bundled).length > 0) return bundled;
+  } catch {
+    // glob is not a function outside Vite
+  }
+  const dir = path.join(process.cwd(), "migrations");
+  const out: Record<string, string> = {};
+  for (const name of readdirSync(dir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort()) {
+    out[`/migrations/${name}`] = readFileSync(path.join(dir, name), "utf8");
+  }
+  return out;
+}
+
 /** Wrap a query runner in the tagged-template + `.query()` `Sql` surface. */
 function toSql(run: Run): Sql {
   const sql = (async <T = Record<string, unknown>>(
@@ -105,11 +144,14 @@ function createNeonSql(): Promise<Sql> {
 
 async function createPgliteSql(): Promise<Sql> {
   // Embedded Postgres, imported on demand so it never loads on the Neon path.
-  // One in-memory instance per process, shared across HMR module instances, so
-  // data survives source edits (it resets on dev-server restart).
+  // One on-disk instance per process, shared across HMR module instances.
+  // Files live under data/pglite so projects survive a dev-server restart.
   globalRef.__pgliteInstance__ ??= (async () => {
     const { PGlite } = await import("@electric-sql/pglite");
+    const dataDir = pgliteDataDir();
+    mkdirSync(dataDir, { recursive: true });
     const pg = new PGlite({
+      dataDir,
       parsers: {
         [OID_INT8]: Number,
         [OID_DATE]: identity,
@@ -133,19 +175,15 @@ async function createPgliteSql(): Promise<Sql> {
   // reload after adding a migration file applies it live — with passes
   // serialized on a global chain so concurrent callers never double-apply.
   const migrate = async (): Promise<void> => {
-    const migrations = import.meta.glob("/migrations/*.sql", {
-      query: "?raw",
-      import: "default",
-      eager: true,
-    }) as Record<string, string>;
+    const migrations = loadMigrationSql();
     const doneRows = await pg.query<{ name: string }>(
       "select name from _migrations",
     );
     const done = new Set(doneRows.rows.map((r) => r.name));
-    for (const [path, text] of Object.entries(migrations).sort(([a], [b]) =>
+    for (const [migPath, text] of Object.entries(migrations).sort(([a], [b]) =>
       a.localeCompare(b),
     )) {
-      const name = path.split("/").pop() as string;
+      const name = migPath.split("/").pop() as string;
       if (done.has(name)) continue;
       // Apply + record atomically (parity with scripts/migrate.mjs) so a failed
       // statement can't leave a file half-applied but untracked.
@@ -212,8 +250,9 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
 /**
  * Finish DB bootstrap before the server handles traffic.
  *
- * - **PGLite** (preview / no `DATABASE_URL`): open the in-memory DB and apply
- *   `migrations/*.sql`. Idempotent — concurrent callers share one promise.
+ * - **PGLite** (preview / no `DATABASE_URL`): open the on-disk DB at
+ *   `data/pglite` and apply `migrations/*.sql`. Idempotent — concurrent callers
+ *   share one promise.
  * - **Neon**: no-op (pool is created lazily on first query).
  *
  * Vite `configureServer` awaits this at dev startup; production imports of this

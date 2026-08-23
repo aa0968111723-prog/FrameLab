@@ -159,6 +159,7 @@ export const TOOL_SCOPES: Record<string, Scope> = {
   focus_problem: "READ",
   compare_frames_visual: "ANALYZE",
   list_visual_annotations: "READ",
+  get_conversation: "READ",
 };
 
 export function parseScopes(raw: string | string[]): Scope[] {
@@ -224,11 +225,8 @@ export function requireConfirmedEdit(tool: string, args: Record<string, unknown>
 
 export function assertProjectScope(projectScope: string | undefined, projectId: string): void {
   if (!projectScope || projectScope === "all") return;
-  const allowed = projectScope
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!allowed.includes(projectId)) {
+  const allowed = scopedProjectIds(projectScope);
+  if (!allowed || !allowed.includes(projectId)) {
     throw new FrameLabError(
       "PERMISSION_DENIED",
       "MCP token is not allowed to access this project",
@@ -236,4 +234,13 @@ export function assertProjectScope(projectScope: string | undefined, projectId: 
       { projectId, projectScope },
     );
   }
+}
+
+/** `null` means the token may touch every project the user owns. */
+export function scopedProjectIds(projectScope?: string): string[] | null {
+  if (!projectScope || projectScope === "all") return null;
+  return projectScope
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
