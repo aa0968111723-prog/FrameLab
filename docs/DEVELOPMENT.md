@@ -9,7 +9,7 @@ npm run typecheck
 npm run build
 ```
 
-Postgres: set `DATABASE_URL` for Neon. Unset → PGLite (preview). Do not create a `.env` in the sandbox.
+Postgres: set `DATABASE_URL` for Neon. Unset → PGLite on disk at `data/pglite` (auto-created). Do not create a `.env` in the sandbox.
 
 Auth is real (Google / X via the Grok broker). Per-user rows filter on `user_id`.
 

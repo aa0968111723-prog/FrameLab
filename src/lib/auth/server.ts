@@ -14,12 +14,14 @@
  * Tri-mode:
  *   - Deployed: the deployer injects a per-app `GROK_AUTH_*` + `BETTER_AUTH_URL`
  *     + `DATABASE_URL`, so real federated auth is persisted in Postgres.
- *   - Sandbox live preview: no injection -> falls back to the shared **preview
- *     client** (`./preview`) and derives the preview's `https://*.grok-sandbox.com`
- *     origin from the request, so real sign-in works (no demo users). Sessions
- *     and identities persist in the embedded PGLite DB (same DB as app data);
- *     the process restart wipes both. Live-preview iframe clients use a bearer
- *     token (partitioned cookies) — see `client.ts`.
+ * Sandbox live preview: no injection -> falls back to the shared **preview
+ * client** (`./preview`) and derives the preview's `https://*.grok-sandbox.com`
+ * origin from the request, so real sign-in works (no demo users). Sessions
+ * and identities persist in the embedded PGLite DB on disk (`data/pglite`,
+ * same DB as app data). The preview signing secret still rotates on process
+ * restart, so login cookies do not survive a restart even though project
+ * rows do. Live-preview iframe clients use a bearer token (partitioned
+ * cookies) — see `client.ts`.
  *   - Explicitly off (`VITE_AUTH_ENABLED=false`): no providers; per-user server
  *     functions fall back to a dev user (see `verify.server.ts`).
  *
@@ -49,10 +51,11 @@ import {
 void ensureDbReady();
 
 /**
- * Preview secret must outlive module reloads: PGLite (and its session rows) is
- * stored on `globalThis`, so an HMR re-eval of this file must NOT mint a new
- * signing secret or every existing session becomes invalid mid-dev. Process
- * restart clears both the secret and PGLite together.
+ * Preview secret must outlive module reloads: PGLite is stored on
+ * `globalThis`, so an HMR re-eval of this file must NOT mint a new signing
+ * secret or every existing session becomes invalid mid-dev. Process restart
+ * still mints a new secret (login cookies die); project rows in `data/pglite`
+ * survive.
  */
 const globalAuthRef = globalThis as typeof globalThis & {
   __grokAuthPreviewSecret__?: string;

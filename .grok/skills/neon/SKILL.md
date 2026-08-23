@@ -112,9 +112,7 @@ shapes: `bigint`/`count(*)` → `number`, `date` → `'YYYY-MM-DD'` string,
 
 - **`bigint` past 2^53 loses precision** as a number — cast `::text` if you
   ever need huge integers (row counts are fine).
-- **Preview DB is in-memory**: wiped on dev-server restart, single-connection
-  (no lock contention or concurrent-write conflicts), and loads **no
-  extensions** — do not `create extension`; stick to core Postgres.
+- **Preview DB is on disk** (`data/pglite`, created automatically): projects survive a dev-server restart. Delete the folder to wipe. Single-connection (no lock contention or concurrent-write conflicts), and loads **no extensions** — do not `create extension`; stick to core Postgres.
 - **Neon's pooled endpoint keeps no session state** — don't rely on `SET`,
   `LISTEN/NOTIFY`, or session advisory locks.
 - **Keep `user_id` columns `text`** — preview uses `'dev-user'`, production uses

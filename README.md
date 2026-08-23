@@ -44,6 +44,16 @@ npm run typecheck
 npm run build
 ```
 
+## Data
+
+Without `DATABASE_URL`, FrameLab uses **PGLite on disk** at [`data/pglite`](data/pglite) (created automatically). Uploaded frames and renders live under `data/projects/`. Both are gitignored.
+
+- Override the PGLite folder with `PGLITE_DATA_DIR`.
+- Override the whole data root with `FRAMELAB_DATA_DIR` (default `./data`).
+- Set `DATABASE_URL` to use Neon instead; then PGLite is not opened.
+
+Dev-server restart keeps projects, frames, revisions, and sessions in `data/pglite`. Delete that folder to start empty.
+
 ## CPU mode
 
 Pixel metrics, RIFE inbetweens, neighborhood repair, timeline, onion skin, revisions, MCP, FFmpeg extract, and Grok vision (API) run without a GPU. linear-blend is 快速預覽 only.
