@@ -56,6 +56,23 @@ export function histogram16(frame: RgbaFrame): {
   return { r, g, b };
 }
 
+/** Single-frame LEVEL_1 metrics. Real numbers from the pixels; never undefined luma. */
+export function level1PixelMetrics(frame: RgbaFrame): {
+  luma: number;
+  histogram: ReturnType<typeof histogram16>;
+  width: number;
+  height: number;
+  provider: "pixel-metrics";
+} {
+  return {
+    luma: meanLuma(frame),
+    histogram: histogram16(frame),
+    width: frame.width,
+    height: frame.height,
+    provider: "pixel-metrics",
+  };
+}
+
 export function histogramDistance(
   a: ReturnType<typeof histogram16>,
   b: ReturnType<typeof histogram16>,

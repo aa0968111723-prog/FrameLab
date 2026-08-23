@@ -29,6 +29,7 @@ import {
 import {
   histogram16,
   histogramDistance,
+  level1PixelMetrics,
   meanAbsDiff,
   motionField,
   type RegionBox,
@@ -688,12 +689,8 @@ async function analyzeFrame(ctx: CommandContext, args: Record<string, unknown>) 
   if (cached) return { ...cached, cacheHit: true };
   const rgba = decodeJpegBase64(frame.image_data);
   const level1 = {
-    luma: rgba.data.length ? undefined : 0,
-    mae_self: 0,
-    width: rgba.width,
-    height: rgba.height,
+    ...level1PixelMetrics(rgba),
     content_hash: frame.content_hash,
-    provider: "pixel-metrics",
   };
   let vlm = null as unknown;
   if (args.vlm === true) {
