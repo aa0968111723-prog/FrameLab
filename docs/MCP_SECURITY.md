@@ -6,6 +6,6 @@
 - Disabled tokens (`enabled = false`) cannot authenticate.
 - Audit: `mcp_audit_logs` records tool, caller, args (binaries redacted), status, duration, error.
 - High-risk tools always create a `revisions` row with before/after snapshots (image included for replace/repair/delete).
-- Rate limit: 120 MCP tool calls / minute / client (`RATE_LIMITED`).
+- Rate limit: 120 MCP tool calls / minute / client (`RATE_LIMITED` → HTTP 429). Enforced in `executeTool` after the scope check. In-memory per process; expired buckets are swept so the map cannot grow without bound.
 - File uploads: type via extension allow-list; names sanitized; FFmpeg invoked with `spawn` argv only — never a shell, never interpolated user strings in filters.
 - MCP tokens cannot see another user's projects (`user_id` + `project_scope`).

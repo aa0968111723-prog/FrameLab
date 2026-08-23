@@ -44,6 +44,7 @@ import {
 import { generateBouncingBall } from "@/lib/domain/sample-ball";
 import { canonicalTrackStatus } from "@/lib/domain/track-continuity";
 import { FRAME_TYPES, isFrameType, type FrameType } from "@/lib/domain/types";
+import { checkRateLimit } from "@/lib/domain/rate-limit";
 import * as repo from "@/lib/framelab/repo";
 import { ownCharacter, ownObject, ownProject, ownTimeline } from "./ownership.ts";
 import { startJob, withJob } from "@/lib/jobs/queue";
@@ -168,6 +169,7 @@ export async function executeTool(
   let revisionId: string | null = null;
   try {
     assertToolAllowed(ctx.scopes, tool);
+    checkRateLimit(ctx.clientId ? `mcp:${ctx.clientId}` : `user:${ctx.userId}`);
     if (isHighRisk(tool) && (tool === "execute_repair_plan" || tool === "restore_revision" || tool === "generate_inbetweens" || tool === "regenerate_inbetween_range" || tool === "accept_generated_frames")) {
       // confirmed is checked in the specific branches so other high-risk tools stay as-is
     }

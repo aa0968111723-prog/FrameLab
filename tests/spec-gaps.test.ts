@@ -143,10 +143,16 @@ describe("permissions and catalog", () => {
 });
 
 describe("rate limit", () => {
-  it("trips after the cap", () => {
+  it("trips after the cap with RATE_LIMITED, not PERMISSION_DENIED", () => {
     resetRateLimitForTests();
     for (let i = 0; i < 5; i += 1) checkRateLimit("t", 5);
-    assert.throws(() => checkRateLimit("t", 5), FrameLabError);
+    assert.throws(
+      () => checkRateLimit("t", 5),
+      (err: unknown) =>
+        err instanceof FrameLabError &&
+        err.code === "RATE_LIMITED" &&
+        err.status === 429,
+    );
   });
 });
 
