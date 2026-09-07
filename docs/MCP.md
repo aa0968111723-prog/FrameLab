@@ -2,7 +2,9 @@
 
 Endpoint: `POST /api/mcp`  
 Auth: `Authorization: Bearer fl_…` (issued in the studio, hashed at rest)  
-Protocol: JSON-RPC 2.0 (`initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, `prompts/get`)
+Protocol: JSON-RPC 2.0 Streamable HTTP (`2025-06-18`, also `2025-03-26`) — `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, `prompts/get`. Notifications without `id` return `202`.
+
+Hermes Console auto-registers this endpoint from `FRAMELAB_MCP_URL` / `FRAMELAB_MCP_TOKEN`. Tools appear as `mcp.framelab.<name>` and as workspace `framelab_*`. `tools/call` returns flattened `structuredContent` (e.g. `{ ok, projects }`, not `{ ok, data }`). See [HERMES.md](./HERMES.md).
 
 MCP never talks to the React tree. It never imports SAM/RIFE/Wan. It calls `executeTool`.
 
